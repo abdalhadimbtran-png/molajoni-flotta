@@ -67,6 +67,11 @@ function Login({ onOk, conVeicolo }: { onOk: (t: string) => void; conVeicolo: bo
     finally { setInvio(false); }
   }
   return (
+    <>
+    <div className="tec-hero">
+      <span className="kicker">{t('App tecnici')}</span>
+      <div className="tec-hero-t">{t('La tua giornata e il tuo veicolo, in un QR.')}</div>
+    </div>
     <form className="tec-card form" onSubmit={invia}>
       <h1 className="tec-h1">{t('Accedi')}</h1>
       <p className="sub">{conVeicolo ? t("Accedi una volta: poi il QR del veicolo ti porta direttamente all'operazione.") : t('Codice e PIN te li dà il responsabile flotta.')}</p>
@@ -80,6 +85,8 @@ function Login({ onOk, conVeicolo }: { onOk: (t: string) => void; conVeicolo: bo
         <Link className="big-btn light" to="/t/scansiona"><IcoQr /><span>{t('Scansiona il QR del veicolo')}<span className="sub">{t('Dopo la scansione inserisci codice e PIN')}</span></span></Link>
       </>}
     </form>
+    <p className="tec-foot">Molajoni Antincendi · {t('Problemi di accesso? Chiama il responsabile flotta.')}</p>
+    </>
   );
 }
 
@@ -460,8 +467,9 @@ function Documenti({ token, qr }: { token: string; qr: string }) {
   async function apri(id: number) {
     setErr(null);
     const w = window.open('', '_blank');
+    if (w) w.opener = null;
     try {
-      const r = await fetch(`${URL_FUNZIONI}/documento`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, id }) });
+      const r = await fetch(`${URL_FUNZIONI}/documento`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, id, qr }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.errore);
       if (w) w.location.href = j.url; else window.location.href = j.url;

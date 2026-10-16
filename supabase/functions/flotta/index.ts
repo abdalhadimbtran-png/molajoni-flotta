@@ -55,10 +55,18 @@ function testo(tipo: string, d: any, lingua: string): { title: string; body: str
   return { title: ar ? "مواعيد الأسطول" : "Scadenze flotta", body: ar ? `${d.superate} منتهية، ${d.in_scadenza} قريبة` : `${d.superate} superate, ${d.in_scadenza} in scadenza` };
 }
 
+function uguali(a: string, b: string) {
+  const x = new TextEncoder().encode(a), y = new TextEncoder().encode(b);
+  let d = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) d |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return d === 0;
+}
+
 async function push(req: Request) {
   const c = await config();
-  if (req.headers.get("x-flotta-secret") !== c.push_secret) return json({ errore: "non autorizzato" }, 401);
+  if (!uguali(req.headers.get("x-flotta-secret") ?? "", c.push_secret)) return json({ errore: "non autorizzato" }, 401);
   const { id } = await req.json();
+  if (!Number.isInteger(id)) return json({ errore: "Richiesta non valida" }, 400);
   const { data: n, error } = await db.from("notifiche").select("*").eq("id", id).single();
   if (error || !n) return json({ errore: "notifica non trovata" }, 404);
   let q = db.from("push_iscrizioni").select("*");
@@ -87,25 +95,33 @@ async function foto(req: Request) {
   if (!(file instanceof File)) return json({ errore: "File mancante" }, 400);
   if (file.size > 8 * 1024 * 1024) return json({ errore: "Foto troppo grande" }, 400);
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return json({ errore: "Formato non supportato" }, 400);
+  if (!Number.isInteger(segn) || segn <= 0) return json({ errore: "Richiesta non valida" }, 400);
+  const testa = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const jpg = testa[0] === 0xff && testa[1] === 0xd8 && testa[2] === 0xff;
+  const png = testa[0] === 0x89 && testa[1] === 0x50 && testa[2] === 0x4e && testa[3] === 0x47;
+  const webp = String.fromCharCode(...testa.slice(0, 4)) === "RIFF" && String.fromCharCode(...testa.slice(8, 12)) === "WEBP";
+  if (!(jpg || png || webp)) return json({ errore: "Formato non supportato" }, 400);
   const { data: ok, error } = await db.rpc("tecnico_puo_caricare_foto", { p_token: token, p_segnalazione: segn });
-  if (error) return json({ errore: error.message }, 401);
+  if (error) return json({ errore: error.message.includes("SESSIONE_NON_VALIDA") ? "SESSIONE_NON_VALIDA" : "Non autorizzato" }, 401);
   if (!ok) return json({ errore: "Non puoi aggiungere altre foto a questa segnalazione." }, 403);
-  const est = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const est = png ? "png" : webp ? "webp" : "jpg";
+  const tipo = png ? "image/png" : webp ? "image/webp" : "image/jpeg";
   const path = `segnalazioni/${segn}/${crypto.randomUUID()}.${est}`;
-  const up = await db.storage.from("foto").upload(path, file, { contentType: file.type, upsert: false });
-  if (up.error) return json({ errore: up.error.message }, 500);
+  const up = await db.storage.from("foto").upload(path, file, { contentType: tipo, upsert: false });
+  if (up.error) return json({ errore: "Caricamento non riuscito" }, 500);
   const ins = await db.from("segnalazioni_foto").insert({ segnalazione_id: segn, path });
-  if (ins.error) return json({ errore: ins.error.message }, 500);
+  if (ins.error) return json({ errore: "Caricamento non riuscito" }, 500);
   return json({ ok: true });
 }
 
 async function documento(req: Request) {
-  const { token, id } = await req.json();
-  const { data: path, error } = await db.rpc("tecnico_percorso_documento", { p_token: token, p_id: id });
-  if (error) return json({ errore: error.message }, 401);
+  const { token, id, qr } = await req.json();
+  if (typeof token !== "string" || typeof qr !== "string" || !Number.isInteger(id)) return json({ errore: "Richiesta non valida" }, 400);
+  const { data: path, error } = await db.rpc("tecnico_percorso_documento", { p_token: token, p_id: id, p_qr: qr });
+  if (error) return json({ errore: error.message.includes("SESSIONE_NON_VALIDA") ? "SESSIONE_NON_VALIDA" : "Documento non disponibile" }, 401);
   if (!path) return json({ errore: "Documento non trovato" }, 404);
   const s = await db.storage.from("documenti").createSignedUrl(path, 300);
-  if (s.error) return json({ errore: s.error.message }, 500);
+  if (s.error) return json({ errore: "Documento non disponibile" }, 500);
   return json({ url: s.data.signedUrl });
 }
 
@@ -119,6 +135,7 @@ Deno.serve(async (req) => {
     if (p.endsWith("/documento")) return await documento(req);
     return json({ errore: "percorso sconosciuto" }, 404);
   } catch (e) {
-    return json({ errore: String((e as Error).message ?? e) }, 500);
+    console.error(e);
+    return json({ errore: "Errore del server" }, 500);
   }
 });

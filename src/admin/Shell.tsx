@@ -51,14 +51,16 @@ export default function Shell() {
   return (
     <>
       <header className="app-top no-print">
-        <div className="app-top-in">
-          <Logo />
-          <span className="prodotto">{t('Gestione flotta')}</span>
-          <span className="who">{sessione?.user.email}</span>
-          <InstallaApp variante="admin" />
-          <Campanella />
-          <SceltaLingua />
-          <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
+        <div className="app-bar">
+          <div className="app-top-in">
+            <Logo chiaro />
+            <span className="prodotto">{t('Gestione flotta')}</span>
+            <span className="who">{sessione?.user.email}</span>
+            <InstallaApp variante="admin" />
+            <Campanella />
+            <SceltaLingua chiaro />
+            <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
+          </div>
         </div>
         <nav className="tabs">
           {TABS.map(([to, l]) => <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'active' : '')}>{t(l)}</NavLink>)}

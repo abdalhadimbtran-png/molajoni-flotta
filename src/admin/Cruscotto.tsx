@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { supabase, rpc } from '../lib/supabase';
-import { CATEGORIE, GRAVITA, STATI_VEICOLO, fmtData, fmtKm, fmtOra, giorniA, prossimoLavorativo } from '../lib/format';
+import { CATEGORIE, GRAVITA, STATI_VEICOLO, fmtData, fmtGiorno, fmtKm, fmtOra, giorniA, prossimoLavorativo } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { SEL_TECNICI, SEL_VEICOLI, type Piano, type Segnalazione, type Tecnico, type Veicolo } from '../lib/tipi';
 import { Caricamento, Errore, Pill, useLoad , Targa } from '../ui';
@@ -59,13 +59,26 @@ export default function Cruscotto() {
 
   return (
     <>
+      <div className="page-hero">
+        <div>
+          <span className="kicker">{fmtGiorno(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }), locale)}</span>
+          <h1>{t('Situazione flotta')}</h1>
+          <p className="sub">{t('{v} veicoli attivi · {n} tecnici', { v: veicoli.length, n: tecnici.length })}</p>
+        </div>
+        <Link to="/piano" className={`piano-chip ${piano.confermato_il ? 'ok' : bloccati ? 'ko' : 'warn'}`}>
+          <span className="dot" />
+          <span><b>{t('Piano di {d}', { d: fmtData(giorno) })}</b>
+            <span className="sub">{piano.confermato_il ? t('Confermato e inviato') : bloccati ? t('{n} tecnici bloccati: da sistemare', { n: bloccati }) : t('Da confermare')}</span></span>
+          <span className="freccia" aria-hidden="true">→</span>
+        </Link>
+      </div>
       <div className="kpis">
-        <div className="kpi ok"><div className="num">{conta('disponibile')}</div><div className="lbl">{t('Veicoli disponibili')}</div></div>
-        <div className="kpi info"><div className="num">{conta('in_uso')}</div><div className="lbl">{t('In uso ai tecnici')}</div></div>
-        <div className="kpi ko"><div className="num">{conta('fermo') + conta('non_utilizzabile')}</div><div className="lbl">{t('Fermi o non utilizzabili')}</div></div>
-        <div className="kpi ko"><div className="num">{scadute}</div><div className="lbl">{t('Scadenze superate')}</div></div>
-        <div className="kpi warn"><div className="num">{inScad}</div><div className="lbl">{t('Scadenze entro 30 gg / 1.500 km')}</div></div>
-        <div className="kpi"><div className="num">{bloccati}</div><div className="lbl">{t('Tecnici bloccati nel piano di {d}', { d: fmtData(giorno) })}</div></div>
+        <Link to="/flotta" className="kpi ok"><div className="lbl">{t('Veicoli disponibili')}</div><div className="num">{conta('disponibile')}</div></Link>
+        <Link to="/flotta" className="kpi info"><div className="lbl">{t('In uso ai tecnici')}</div><div className="num">{conta('in_uso')}</div></Link>
+        <Link to="/segnalazioni" className="kpi ko"><div className="lbl">{t('Fermi o non utilizzabili')}</div><div className="num">{conta('fermo') + conta('non_utilizzabile')}</div></Link>
+        <Link to="/flotta" className="kpi ko"><div className="lbl">{t('Scadenze superate')}</div><div className="num">{scadute}</div></Link>
+        <Link to="/flotta" className="kpi warn"><div className="lbl">{t('Scadenze entro 30 gg / 1.500 km')}</div><div className="num">{inScad}</div></Link>
+        <Link to="/piano" className={`kpi ${bloccati ? 'ko' : 'ok'}`}><div className="lbl">{t('Tecnici bloccati nel piano di {d}', { d: fmtData(giorno) })}</div><div className="num">{bloccati}</div></Link>
       </div>
 
       <div className="two-col">

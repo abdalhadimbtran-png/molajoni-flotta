@@ -18,7 +18,8 @@ export default function Cruscotto() {
       rpc<Piano>('piano_giorno', { p_data: giorno }),
     ]);
     for (const r of [v, tc, s]) if (r.error) throw r.error;
-    return { veicoli: v.data as unknown as Veicolo[], tecnici: tc.data as Tecnico[], segn: s.data as Segnalazione[], piano: p };
+    const mu = await supabase.from('multe').select('id,scadenza_comunicazione,stato,veicoli(targa)').in('stato', ['da_identificare', 'da_comunicare']);
+    return { veicoli: v.data as unknown as Veicolo[], tecnici: tc.data as Tecnico[], segn: s.data as Segnalazione[], piano: p, multe: (mu.data ?? []) as unknown as { id: number; scadenza_comunicazione: string | null; stato: string; veicoli: { targa: string } | null }[] };
   }, [giorno]);
 
   if (errore) return <Errore testo={errore} onRetry={reload} />;
@@ -46,6 +47,12 @@ export default function Cruscotto() {
       const passaggio = m.l === 'warn' && (m.m.startsWith('Ha in carico') || m.m.startsWith('Oggi è in carico'));
       if (daPiano || passaggio) exc.push({ s: m.l as 'ko' | 'warn', t: `${r.nome}: ${tm(m.m)}`, d: t('Piano di {d}', { d: fmtData(giorno) }), to: '/piano' });
     });
+  });
+  data.multe.forEach(m => {
+    const g = giorniA(m.scadenza_comunicazione);
+    const s: 'ko' | 'warn' = g != null && g <= 15 ? 'ko' : 'warn';
+    exc.push({ s, t: `${m.veicoli?.targa ?? ''} · ${m.stato === 'da_identificare' ? t('Multa: conducente da identificare') : t('Multa: conducente da comunicare')}`,
+      d: m.scadenza_comunicazione ? (g! < 0 ? t('Termine scaduto il {d}', { d: fmtData(m.scadenza_comunicazione) }) : t('Entro il {d} ({n} giorni)', { d: fmtData(m.scadenza_comunicazione), n: g! })) : t('Senza decurtazione punti'), to: '/multe' });
   });
   exc.sort((a, b) => (a.s === b.s ? 0 : a.s === 'ko' ? -1 : 1));
   const conta = (s: string) => veicoli.filter(v => v.stato === s).length;

@@ -15,7 +15,10 @@ export default function Piano() {
       supabase.from('v_veicoli').select(SEL_VEICOLI).eq('dismesso', false).order('targa'),
     ]);
     if (v.error) throw v.error;
-    return { piano: p, veicoli: v.data as unknown as Veicolo[] };
+    const n = await supabase.from('notifiche').select('tecnico_id,letta_il,creato_il').eq('tipo', 'piano').eq('dati->>data', giorno).order('creato_il', { ascending: false });
+    const lette: Record<number, { letta_il: string | null; creato_il: string }> = {};
+    (n.data ?? []).forEach(x => { if (x.tecnico_id && !lette[x.tecnico_id]) lette[x.tecnico_id] = x; });
+    return { piano: p, veicoli: v.data as unknown as Veicolo[], lette };
   }, [giorno]);
 
   async function azione(f: () => Promise<void>) {
@@ -87,7 +90,10 @@ export default function Piano() {
                   })}
                 </select>
               </td>
-              <td><Msgs items={r.messaggi} /></td>
+              <td><Msgs items={r.messaggi} />
+                {data.lette[r.tecnico_id] && <div className="sub" style={{ marginTop: 6 }}>{data.lette[r.tecnico_id].letta_il
+                  ? <span className="msg ok">{t('Piano visto dal tecnico alle {d}', { d: fmtOra(data.lette[r.tecnico_id].letta_il, locale) })}</span>
+                  : <span className="msg warn">{t('Notifica inviata, non ancora vista')}</span>}</div>}</td>
             </tr>
           ))}</tbody>
         </table></div>

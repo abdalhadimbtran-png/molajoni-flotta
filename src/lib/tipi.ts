@@ -6,7 +6,7 @@ export interface Veicolo {
   scad_assicurazione: string | null; scad_revisione: string | null; scad_bollo: string | null;
   tecnico_in_carico: number | null; in_carico_dal: string | null; in_carico_nome: string | null;
   in_officina: boolean; dismesso: boolean; qr_token: string; note: string | null;
-  controlli: Messaggio[]; stato: string;
+  controlli: Messaggio[]; stato: string; km_giorno: number | null; tagliando_previsto: string | null;
 }
 
 export interface Tecnico {
@@ -18,7 +18,7 @@ export interface Tecnico {
 export interface Segnalazione {
   id: number; veicolo_id: number; tecnico_id: number | null; categoria: string; gravita: string; descrizione: string;
   stato: string; nota_chiusura: string | null; chiusa_il: string | null; creato_il: string;
-  veicoli?: { targa: string } | null; tecnici?: { nome: string; cognome: string } | null;
+  veicoli?: { targa: string } | null; tecnici?: { nome: string; cognome: string } | null; foto?: string[];
 }
 
 export interface Intervento { id: number; ora: string | null; luogo: string; attivita: string; note: string | null }
@@ -30,5 +30,5 @@ export interface RigaPiano {
 }
 export interface Piano { data: string; confermato_il: string | null; righe: RigaPiano[] }
 
-export const SEL_VEICOLI = 'id,targa,marca_modello,tipo,proprieta,km_attuali,km_prossimo_tagliando,scad_assicurazione,scad_revisione,scad_bollo,tecnico_in_carico,in_carico_dal,in_carico_nome,in_officina,dismesso,qr_token,note,controlli,stato';
+export const SEL_VEICOLI = 'id,targa,marca_modello,tipo,proprieta,km_attuali,km_prossimo_tagliando,scad_assicurazione,scad_revisione,scad_bollo,tecnico_in_carico,in_carico_dal,in_carico_nome,in_officina,dismesso,qr_token,note,controlli,stato,km_giorno,tagliando_previsto';
 export const SEL_TECNICI = 'id,codice,nome,cognome,ruolo,telefono,patente_categoria,patente_scadenza,attivo,ha_pin,tentativi_falliti,bloccato_fino';

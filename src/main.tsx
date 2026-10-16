@@ -13,6 +13,9 @@ import StampaQr from './admin/StampaQr';
 import Tecnici from './admin/Tecnici';
 import Segnalazioni from './admin/Segnalazioni';
 import Registro from './admin/Registro';
+import Multe from './admin/Multe';
+import Carburante from './admin/Carburante';
+import Report from './admin/Report';
 import Tecnico from './tecnico/Tecnico';
 
 function App() {
@@ -33,6 +36,9 @@ function App() {
           <Route path="/tecnici" element={<Tecnici />} />
           <Route path="/segnalazioni" element={<Segnalazioni />} />
           <Route path="/registro" element={<Registro />} />
+          <Route path="/multe" element={<Multe />} />
+          <Route path="/carburante" element={<Carburante />} />
+          <Route path="/report" element={<Report />} />
         </Route>
         <Route path="*" element={<Navigate to="/cruscotto" replace />} />
       </Routes>

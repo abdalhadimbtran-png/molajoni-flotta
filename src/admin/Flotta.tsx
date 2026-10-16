@@ -6,6 +6,7 @@ import { STATI_VEICOLO, fmtData, fmtKm, giorniA, normTarga } from '../lib/format
 import { useT } from '../lib/i18n';
 import { SEL_TECNICI, SEL_VEICOLI, type Tecnico, type Veicolo } from '../lib/tipi';
 import { Banner, Caricamento, Errore, Modal, Pill, Targa, toast, useLoad } from '../ui';
+import DettaglioVeicolo from './DettaglioVeicolo';
 
 export const urlQr = (token: string) => `${window.location.origin}/t/v/${token}`;
 
@@ -23,6 +24,7 @@ export default function Flotta() {
   const [modifica, setModifica] = useState<Veicolo | 'nuovo' | null>(null);
   const [qr, setQr] = useState<Veicolo | null>(null);
   const [mov, setMov] = useState<Veicolo | null>(null);
+  const [det, setDet] = useState<Veicolo | null>(null);
   const { data, errore, reload } = useLoad(async () => {
     const [v, tc] = await Promise.all([
       supabase.from('v_veicoli').select(SEL_VEICOLI).order('targa'),
@@ -56,11 +58,12 @@ export default function Flotta() {
               <td><Scad d={v.scad_assicurazione} bloccante /></td>
               <td><Scad d={v.scad_revisione} bloccante /></td>
               <td>{v.scad_bollo ? <Scad d={v.scad_bollo} bloccante={false} /> : <Pill s="na">—</Pill>}</td>
-              <td>{manc == null ? <Pill s="na">{t('Non impostato')}</Pill> : <Pill s={manc <= 1500 ? 'warn' : 'ok'}>{manc < 0 ? t('Superato di {n} km', { n: fmtKm(-manc) }) : t('Tra {n} km', { n: fmtKm(manc) })}</Pill>}</td>
+              <td>{manc == null ? <Pill s="na">{t('Non impostato')}</Pill> : <Pill s={manc <= 1500 ? 'warn' : 'ok'}>{manc < 0 ? t('Superato di {n} km', { n: fmtKm(-manc) }) : t('Tra {n} km', { n: fmtKm(manc) })}</Pill>}{v.tagliando_previsto && manc != null && manc > 0 && <div className="sub" style={{ marginTop: 3 }}>{t('previsto ~{d}', { d: fmtData(v.tagliando_previsto) })}</div>}</td>
               <td className="wrap-cell">{v.controlli.filter(c => c.l === 'ko').map((c, i) => <div key={i} className="msg ko">{tm(c.m)}</div>)}</td>
               <td className="nowrap actions">
                 <button className="btn-ghost btn-sm" onClick={() => setModifica(v)}>{t('Modifica')}</button>
                 <button className="btn-ghost btn-sm" onClick={() => setMov(v)}>{t('Movimento')}</button>
+                <button className="btn-ghost btn-sm" onClick={() => setDet(v)}>{t('Dotazioni e documenti')}</button>
                 <button className="btn-ghost btn-sm" onClick={() => setQr(v)}>QR</button>
               </td>
             </tr>
@@ -70,6 +73,7 @@ export default function Flotta() {
       <p className="hint">{t('Assicurazione o revisione scadute, veicolo in officina o segnalazione "veicolo fermo" rendono il mezzo non assegnabile. I km e il veicolo in carico cambiano solo con i movimenti, così il registro resta completo.')}</p>
 
       {modifica && <FormVeicolo v={modifica === 'nuovo' ? null : modifica} onClose={() => setModifica(null)} onSalvato={() => { setModifica(null); reload(); }} />}
+      {det && <DettaglioVeicolo v={det} onClose={() => { setDet(null); reload(); }} />}
       {qr && <ModaleQr v={qr} onClose={() => setQr(null)} onRigenerato={() => { setQr(null); reload(); }} />}
       {mov && <ModaleMovimento v={mov} tecnici={data.tecnici} onClose={() => setMov(null)} onSalvato={() => { setMov(null); reload(); }} />}
     </>

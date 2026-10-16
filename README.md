@@ -34,9 +34,20 @@ npm run dev
 
 Le migrazioni sono in `supabase/migrations/` (applicate al progetto `dhqvyxitcrbqwozgcgno`, regione eu-central-1).
 
-## Non ancora incluso (versione 1)
+## Versione 2 (16/10/2026)
 
-- Foto nelle segnalazioni.
+- **Multe**: registro con ricerca automatica del conducente dal registro movimenti e conto alla rovescia dei 60 giorni (decurtazione punti).
+- **Previsione tagliando** dai km medi giornalieri degli ultimi 90 giorni.
+- **Notifiche**: in app e push (PWA). Il tecnico riceve il piano quando viene confermato e conferma "Ho visto"; il responsabile vede chi l'ha letto. Il responsabile riceve veicoli fermi/incidenti e il riepilogo scadenze del lunedì (pg_cron).
+- **Foto** nelle segnalazioni (compresse sul telefono, bucket privato `foto`).
+- **Documenti** del veicolo (bucket privato `documenti`), consultabili dal tecnico con link temporaneo.
+- **Dotazioni di bordo** con scadenze (es. estintore di bordo) nei controlli del veicolo.
+- **Carburante**: import CSV della carta carburante con mappatura colonne e anti-duplicati.
+- **Report mensile** per veicolo con esportazione CSV.
+- Funzione server `supabase/functions/flotta` (push, foto, documenti). Chiavi in `config_privata` (non esposta).
+
+## Non ancora incluso
+
 - Interventi e assenze importati da gestionale/HR (oggi inseriti a mano).
 - Festività italiane nel calcolo del "prossimo giorno lavorativo" (oggi esclude solo sabato e domenica).
-- Notifiche automatiche delle scadenze (email/messaggi).
+- Notifiche via email (oggi: in app e push).

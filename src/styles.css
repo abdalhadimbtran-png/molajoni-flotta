@@ -270,3 +270,21 @@ tr.row-ok td:first-child { box-shadow:inset 4px 0 0 var(--ok-line); }
 .tile.full { grid-column:1 / -1; flex-direction:row; min-height:92px; }
 .oppure { display:flex; align-items:center; gap:12px; color:var(--ink-3); font-size:13px; }
 .oppure::before, .oppure::after { content:""; flex:1; height:1px; background:var(--line); }
+
+.tec-h2 { font-family:var(--f-head); font-size:21px; font-weight:600; }
+.tec-h2::first-letter { text-transform:uppercase; }
+.tec-card.notifica { border:2px solid var(--brand); }
+.foto-btn { cursor:pointer; }
+
+.thumbs { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.thumbs img { width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--line); display:block; }
+.bell-wrap { position:relative; }
+.bell { position:relative; width:38px; height:38px; border-radius:50%; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.bell svg { width:20px; height:20px; }
+.bell-n { position:absolute; top:-4px; inset-inline-end:-4px; min-width:18px; height:18px; border-radius:9px; background:var(--brand); color:#FFFFFF; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 5px; }
+.bell-panel { position:absolute; top:46px; inset-inline-end:0; width:min(380px, calc(100vw - 32px)); max-height:70vh; overflow-y:auto; background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.18); z-index:15; }
+.bell-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+.bell-item { display:flex; flex-direction:column; gap:3px; width:100%; text-align:start; background:none; border:none; border-bottom:1px solid var(--line); padding:12px 14px; cursor:pointer; color:var(--ink); font:inherit; }
+.bell-item.nuova { background:var(--brand-soft); }
+.bell-item:hover { background:var(--surface-2); }
+@media print { .report-title { font-size:20px; } .kpis { grid-template-columns:repeat(5,1fr); } }

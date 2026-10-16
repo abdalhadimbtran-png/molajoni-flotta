@@ -65,3 +65,15 @@ export const livelloDi = (msgs: Messaggio[]): Livello =>
 
 /** Normalizza la targa come la vuole il database. */
 export const normTarga = (t: string) => t.toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+
+export const TIPI_DOC: Record<string, string> = {
+  libretto: 'Carta di circolazione', assicurazione: 'Certificato assicurativo', carta_verde: 'Carta verde', cid: 'Modulo CID (constatazione amichevole)', altro: 'Altro',
+};
+export const TIPI_DOTAZIONE: Record<string, string> = {
+  estintore: 'Estintore di bordo', kit_primo_soccorso: 'Kit primo soccorso', triangolo: 'Triangolo', giubbotto: 'Giubbotto alta visibilità', cassetta_attrezzi: 'Cassetta attrezzi', altro: 'Altro',
+};
+export const STATI_MULTA: Record<string, [Livello, string]> = {
+  da_identificare: ['ko', 'Conducente da identificare'], da_comunicare: ['warn', 'Da comunicare'], comunicata: ['info', 'Comunicata'],
+  pagata: ['ok', 'Pagata'], contestata: ['na', 'Contestata'], chiusa: ['na', 'Chiusa'],
+};
+export const fmtEuro = (n: number | null | undefined) => (n == null ? '—' : Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }));

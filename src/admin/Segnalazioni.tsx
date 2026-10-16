@@ -13,7 +13,16 @@ export default function Segnalazioni() {
     if (!tutte) q = q.neq('stato', 'chiusa');
     const { data, error } = await q;
     if (error) throw error;
-    return data as Segnalazione[];
+    const ids = (data ?? []).map(s => s.id);
+    const foto: Record<number, string[]> = {};
+    if (ids.length) {
+      const f = await supabase.from('segnalazioni_foto').select('segnalazione_id,path').in('segnalazione_id', ids);
+      if (!f.error && f.data.length) {
+        const firm = await supabase.storage.from('foto').createSignedUrls(f.data.map(x => x.path), 3600);
+        f.data.forEach((x, i) => { const u = firm.data?.[i]?.signedUrl; if (u) (foto[x.segnalazione_id] ??= []).push(u); });
+      }
+    }
+    return (data as Segnalazione[]).map(s => ({ ...s, foto: foto[s.id] ?? [] }));
   }, [tutte]);
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data) return <Caricamento />;
@@ -47,6 +56,7 @@ function Riga({ s, onSalvato }: { s: Segnalazione; onSalvato: () => void }) {
       <td className="mono">{fmtOra(s.creato_il, locale)}</td>
       <td><Targa t={s.veicoli?.targa} /></td>
       <td className="wrap-cell"><b style={{ fontWeight: 600 }}>{t(CATEGORIE[s.categoria])}</b><div className="sub">{s.descrizione}</div>
+        {s.foto && s.foto.length > 0 && <div className="thumbs">{s.foto.map((u, i) => <a key={i} href={u} target="_blank" rel="noopener noreferrer"><img src={u} alt={t('Foto {n}', { n: i + 1 })} /></a>)}</div>}
         {s.stato === 'chiusa' && <div className="sub">{t('Chiusa il {d}: {n}', { d: fmtOra(s.chiusa_il, locale), n: s.nota_chiusura ?? '' })}</div>}</td>
       <td>{s.tecnici ? `${s.tecnici.nome} ${s.tecnici.cognome}` : '—'}</td>
       <td><Pill s={g}>{t(gl)}</Pill></td>

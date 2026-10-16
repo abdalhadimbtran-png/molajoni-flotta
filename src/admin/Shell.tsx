@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { SceltaLingua, useT } from '../lib/i18n';
 import { Caricamento, Logo } from '../ui';
+import Campanella from './Campanella';
 
 type Stato = 'caricamento' | 'anonimo' | 'non_abilitato' | 'ok';
 
@@ -29,7 +30,8 @@ export function useSessione() {
 
 const TABS: [string, string][] = [
   ['/cruscotto', 'Cruscotto'], ['/piano', 'Pianificazione'], ['/flotta', 'Flotta'],
-  ['/tecnici', 'Tecnici'], ['/segnalazioni', 'Segnalazioni'], ['/registro', 'Registro movimenti'],
+  ['/tecnici', 'Tecnici'], ['/segnalazioni', 'Segnalazioni'], ['/multe', 'Multe'], ['/carburante', 'Carburante'],
+  ['/report', 'Report'], ['/registro', 'Registro movimenti'],
 ];
 
 export default function Shell() {
@@ -52,6 +54,7 @@ export default function Shell() {
           <Logo />
           <span className="prodotto">{t('Gestione flotta')}</span>
           <span className="who">{sessione?.user.email}</span>
+          <Campanella />
           <SceltaLingua />
           <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
         </div>

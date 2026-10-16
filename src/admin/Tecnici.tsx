@@ -59,6 +59,7 @@ export default function Tecnici() {
                 <button className="btn-ghost btn-sm" onClick={() => setModifica(x)}>{t('Modifica')}</button>
                 <button className="btn-ghost btn-sm" onClick={() => setPin(x)}>{x.ha_pin ? t('Nuovo PIN') : t('Imposta PIN')}</button>
                 {bloccato && <button className="btn-ghost btn-sm" onClick={() => sblocca(x)}>{t('Sblocca')}</button>}
+                {g != null && g <= 30 && <Link className="btn-ghost btn-sm" to={`/avvisi?t=${x.id}&modello=patente&d=${fmtData(x.patente_scadenza)}`}>⚠️ {t('Avvisa')}</Link>}
               </td>
             </tr>
           );

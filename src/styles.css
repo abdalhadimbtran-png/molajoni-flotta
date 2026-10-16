@@ -304,3 +304,29 @@ tr.row-ok td:first-child { box-shadow:inset 4px 0 0 var(--ok-line); }
 .vol-foot { text-align:center; font-size:13px; color:#555555; margin:0; }
 @media (max-width:640px) { .vol-col { grid-template-columns:1fr; } .volantino { padding:18px; } }
 @media print { .volantino { border:none; padding:0; max-width:none; } }
+
+.tec-card.avviso.urgente { background:var(--brand); border-color:var(--brand); color:#FFFFFF; }
+.tec-card.avviso.urgente .lbl-sm, .tec-card.avviso.urgente .sub { color:rgba(255,255,255,.85); }
+.tec-card.avviso.urgente .btn.brand { background:#FFFFFF; color:var(--brand); border-color:#FFFFFF; }
+.tec-card.avviso.urgente .big-btn.light { background:rgba(255,255,255,.15); color:#FFFFFF; border-color:rgba(255,255,255,.5); }
+.tec-card.avviso.urgente .link-mappa { color:#FFFFFF; }
+.avviso-apri { background:#FFFFFF !important; color:var(--brand) !important; border-color:#FFFFFF !important; }
+.tec-card.avviso.importante { border:2px solid var(--warn-line); background:var(--warn-bg); color:var(--warn); }
+.tec-card.avviso.info { border:2px solid var(--info-line); }
+.avviso-righe { display:flex; flex-direction:column; gap:10px; }
+.avviso-righe > div { display:flex; flex-direction:column; gap:4px; }
+.avviso-righe b { font-size:18px; }
+.avviso-testo { font-size:17px; line-height:1.5; margin:0; white-space:pre-wrap; }
+.link-mappa { font-size:15px; font-weight:600; }
+.tec-card.notifica.cambio { border-color:var(--warn-line); }
+@media (prefers-reduced-motion: no-preference) {
+  .tec-card.avviso.urgente { animation:pulsa 1.6s ease-in-out 3; }
+  @keyframes pulsa { 50% { box-shadow:0 0 0 8px rgba(227,6,19,.25); } }
+}
+
+.scelte-tec, .scelte-liv { display:flex; gap:8px; flex-wrap:wrap; }
+.scelte-tec button, .scelte-liv button { padding:8px 14px; border-radius:999px; border:1.5px solid var(--line-strong); background:var(--surface); color:var(--ink); font:inherit; font-size:14px; font-weight:500; cursor:pointer; }
+.scelte-tec button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.scelte-liv button.urgente.on { background:var(--brand); border-color:var(--brand); color:#FFFFFF; }
+.scelte-liv button.importante.on { background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn); }
+.scelte-liv button.info.on { background:var(--info-bg); border-color:var(--info-line); color:var(--info); }

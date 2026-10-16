@@ -102,9 +102,9 @@ function Home({ token, onScaduta }: { token: string; onScaduta: () => void }) {
   const daAprire = mio ? null : oggi?.veicolo;
   return (
     <>
+      <Notifiche token={token} />
       <h1 className="tec-h1">{t('Ciao {n}', { n: h.nome.split(' ')[0] })}</h1>
       {h.avvisi.map((a, i) => <div key={i} className={`ph-msg ${a.l}`}>{tm(a.m)}</div>)}
-      <Notifiche token={token} />
       <InstallaApp />
       <AttivaNotifiche token={token} />
 
@@ -370,24 +370,60 @@ function FormSegnalazione({ token, qr, iniziale, onFatto, onScaduta, onAnnulla }
 
 /* ---------- Notifiche nell'app ---------- */
 interface Notifica { id: number; tipo: string; dati: Record<string, unknown>; creato_il: string; letta: boolean }
+interface DatiPiano { data: string; veicolo?: { targa: string; modello: string } | null; veicolo_prima?: { targa: string } | null; interventi?: { ora: string | null; luogo: string; attivita: string }[]; aggiornato?: boolean; annullato?: boolean }
+interface DatiAvviso { livello: 'urgente' | 'importante' | 'info'; titolo: string; testo?: string; ora?: string; luogo?: string; contatto?: string; telefono?: string; targa?: string; da?: string }
 function Notifiche({ token }: { token: string }) {
   const { t, locale } = useT();
   const [l, setL] = useState<Notifica[]>([]);
+  const [aperta, setAperta] = useState<number | null>(null);
   const carica = useCallback(() => { rpc<Notifica[]>('tecnico_notifiche', { p_token: token }).then(setL).catch(() => {}); }, [token]);
-  useEffect(() => { carica(); const k = window.setInterval(carica, 60000); return () => window.clearInterval(k); }, [carica]);
-  const nonLette = l.filter(n => !n.letta).slice(0, 3);
+  useEffect(() => { carica(); const k = window.setInterval(carica, 45000); return () => window.clearInterval(k); }, [carica]);
+  const nonLette = l.filter(n => !n.letta).slice(0, 6);
   if (!nonLette.length) return null;
-  async function letta(id: number) { try { await rpc('tecnico_notifica_letta', { p_token: token, p_id: id }); } catch { /* riprova al prossimo caricamento */ } carica(); }
+  async function letta(id: number) { try { await rpc('tecnico_notifica_letta', { p_token: token, p_id: id }); } catch { /* riprova al prossimo caricamento */ } setAperta(null); carica(); }
   return <>{nonLette.map(n => {
-    const d = n.dati as { data?: string; veicolo?: { targa: string; modello: string } | null; interventi?: { ora: string | null; luogo: string; attivita: string }[]; targa?: string; nota?: string };
+    if (n.tipo === 'avviso') {
+      const d = n.dati as unknown as DatiAvviso;
+      const ap = aperta === n.id || d.livello !== 'urgente';
+      return (
+        <section key={n.id} className={`tec-card avviso ${d.livello}`}>
+          <div className="lbl-sm">{d.livello === 'urgente' ? `🔴 ${t('URGENTE')}` : d.livello === 'importante' ? `⚠️ ${t('Importante')}` : `ℹ️ ${t('Avviso')}`} · {fmtOra(n.creato_il, locale)}{d.da ? ` · ${d.da}` : ''}</div>
+          <div className="tec-h2">{d.titolo}</div>
+          {!ap ? <button className="btn big avviso-apri" onClick={() => setAperta(n.id)}>{t('Apri e leggi')}</button> : <>
+            {(d.ora || d.luogo) && <div className="avviso-righe">
+              {d.ora && <div><span className="lbl-sm">{t('Quando')}</span><b>{d.ora}</b></div>}
+              {d.luogo && <div><span className="lbl-sm">{t('Dove')}</span><b>{d.luogo}</b>
+                <a className="link-mappa" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.luogo)}`} target="_blank" rel="noopener noreferrer">📍 {t('Apri mappa')}</a></div>}
+            </div>}
+            {d.testo && <p className="avviso-testo">{d.testo}</p>}
+            {(d.contatto || d.telefono) && <div className="avviso-righe"><div><span className="lbl-sm">{t('Contatto')}</span><b>{d.contatto}</b>
+              {d.telefono && <a className="big-btn light" href={`tel:${d.telefono.replace(/\s/g, '')}`}>📞 <span dir="ltr">{d.telefono}</span></a>}</div></div>}
+            {d.targa && <div className="row-flex"><span>{t('Veicolo:')}</span><Targa t={d.targa} /></div>}
+            <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ricevuto')}</button>
+          </>}
+        </section>
+      );
+    }
+    if (n.tipo === 'piano') {
+      const d = n.dati as unknown as DatiPiano;
+      return (
+        <section key={n.id} className={`tec-card notifica ${d.aggiornato || d.annullato ? 'cambio' : ''}`}>
+          <div className="lbl-sm">🔔 {d.annullato ? t('Piano annullato') : d.aggiornato ? t('Piano modificato') : t('Nuovo piano di lavoro')} · {fmtOra(n.creato_il, locale)}</div>
+          <div className="tec-h2">{fmtGiorno(d.data, locale)}</div>
+          {d.annullato ? <p>{t('Non hai più attività o veicolo per questo giorno.')}</p> : <>
+            <div className="row-flex"><span>{t('Veicolo:')}</span>{d.veicolo ? <><Targa t={d.veicolo.targa} big /><span className="sub">{d.veicolo.modello}</span></> : <b>{t('non assegnato')}</b>}</div>
+            {d.veicolo_prima && <div className="ph-msg warn">{t('Prima era {t}: usa il nuovo veicolo.', { t: d.veicolo_prima.targa })}</div>}
+            {(d.interventi ?? []).map((i, k) => <div key={k} className="int"><span className="h">{i.ora ?? '—'}</span><span>{i.luogo}<div className="sub">{i.attivita}</div></span></div>)}
+          </>}
+          <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ho visto')}</button>
+        </section>
+      );
+    }
+    const d = n.dati as { targa?: string; nota?: string };
     return (
       <section key={n.id} className="tec-card notifica">
-        <div className="lbl-sm">🔔 {n.tipo === 'piano' ? t('Nuovo piano di lavoro') : t('Problema risolto')} · {fmtOra(n.creato_il, locale)}</div>
-        {n.tipo === 'piano' ? <>
-          <div className="tec-h2">{fmtGiorno(d.data!, locale)}</div>
-          <div className="row-flex"><span>{t('Veicolo:')}</span>{d.veicolo ? <><Targa t={d.veicolo.targa} big /><span className="sub">{d.veicolo.modello}</span></> : <b>{t('non assegnato')}</b>}</div>
-          {(d.interventi ?? []).map((i, k) => <div key={k} className="int"><span className="h">{i.ora ?? '—'}</span><span>{i.luogo}<div className="sub">{i.attivita}</div></span></div>)}
-        </> : <div className="row-flex"><Targa t={d.targa} /> <span>{d.nota}</span></div>}
+        <div className="lbl-sm">🔔 {t('Problema risolto')} · {fmtOra(n.creato_il, locale)}</div>
+        <div className="row-flex"><Targa t={d.targa} /> <span>{d.nota}</span></div>
         <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ho visto')}</button>
       </section>
     );

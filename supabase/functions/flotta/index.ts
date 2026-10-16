@@ -37,11 +37,17 @@ function testo(tipo: string, d: any, lingua: string): { title: string; body: str
     const v = d.veicolo ? `${ar ? "السيارة" : "Veicolo"} ${d.veicolo.targa}` : (ar ? "بدون سيارة مخصصة" : "Nessun veicolo assegnato");
     const primo = ints[0] ? ` · ${ints[0].ora ?? ""} ${ints[0].luogo} — ${ints[0].attivita}` : "";
     const altri = ints.length > 1 ? (ar ? ` (+${ints.length - 1})` : ` (+${ints.length - 1})`) : "";
-    return { title: ar ? `خطة ${giorno(d.data, true)}` : `Piano di ${giorno(d.data, false)}`, body: v + primo + altri };
+    if (d.annullato) return { title: ar ? `أُلغيت خطتك ليوم ${giorno(d.data, true)}` : `Piano annullato: ${giorno(d.data, false)}`, body: ar ? "لم يعد لديك مهمات أو سيارة لهذا اليوم." : "Non hai più attività o veicolo per questo giorno." };
+    const pre = d.aggiornato ? (ar ? "تم تعديل الخطة · " : "Piano modificato · ") : "";
+    return { title: pre + (ar ? `خطة ${giorno(d.data, true)}` : `Piano di ${giorno(d.data, false)}`), body: v + primo + altri };
   }
   if (tipo === "segnalazione_fermo") {
     const c = CAT[d.categoria]?.[ar ? 1 : 0] ?? d.categoria;
     return { title: (ar ? "سيارة متوقفة: " : "Veicolo fermo: ") + d.targa, body: `${c} · ${d.tecnico ?? ""}: ${d.descrizione ?? ""}` };
+  }
+  if (tipo === "avviso") {
+    const pre = d.livello === "urgente" ? (ar ? "🔴 عاجل: " : "🔴 URGENTE: ") : d.livello === "importante" ? (ar ? "⚠️ مهم: " : "⚠️ Importante: ") : "";
+    return { title: pre + (d.titolo ?? ""), body: [d.ora, d.luogo, d.testo].filter(Boolean).join(" · ") };
   }
   if (tipo === "segnalazione_risolta") {
     return { title: (ar ? "تم حل المشكلة: " : "Problema risolto: ") + d.targa, body: d.nota ?? "" };
@@ -63,7 +69,7 @@ async function push(req: Request) {
     const msg = testo(n.tipo, n.dati, s.lingua);
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        JSON.stringify({ ...msg, url: n.link ?? "/", tag: `${n.tipo}-${n.id}` }), { TTL: 60 * 60 * 24 });
+        JSON.stringify({ ...msg, url: n.link ?? "/", tag: `${n.tipo}-${n.id}`, urgente: n.tipo === "avviso" && n.dati?.livello === "urgente" }), { TTL: 60 * 60 * 24, urgency: n.tipo === "avviso" && n.dati?.livello === "urgente" ? "high" : "normal" });
       inviate++;
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode;

@@ -17,6 +17,7 @@ import Multe from './admin/Multe';
 import Carburante from './admin/Carburante';
 import Report from './admin/Report';
 import Volantino from './admin/Volantino';
+import Avvisi from './admin/Avvisi';
 import Tecnico from './tecnico/Tecnico';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
           <Route path="/carburante" element={<Carburante />} />
           <Route path="/report" element={<Report />} />
           <Route path="/installa-tecnici" element={<Volantino />} />
+          <Route path="/avvisi" element={<Avvisi />} />
         </Route>
         <Route path="*" element={<Navigate to="/cruscotto" replace />} />
       </Routes>

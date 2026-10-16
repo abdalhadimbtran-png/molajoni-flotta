@@ -40,9 +40,9 @@ export default function Piano() {
   });
 
   const conferma = () => azione(async () => {
-    const r = await rpc<{ ok: boolean; bloccati?: string[] }>('conferma_piano', { p_data: giorno });
+    const r = await rpc<{ ok: boolean; bloccati?: string[]; notificati?: number }>('conferma_piano', { p_data: giorno });
     if (!r.ok) throw new Error(t("Il piano non può essere confermato: {n} tecnici hanno un blocco ({l}). Cambia il veicolo, sposta l'intervento o risolvi la scadenza.", { n: r.bloccati!.length, l: r.bloccati!.join(', ') }));
-    toast(t("Piano confermato. I tecnici vedono il veicolo assegnato nell'app."));
+    toast(r.notificati ? t('Piano confermato. Notificati solo i {n} tecnici con modifiche.', { n: r.notificati }) : t('Piano confermato. Nessuna modifica: nessuna nuova notifica.'));
   });
 
   const eliminaIntervento = (id: number) => azione(async () => {

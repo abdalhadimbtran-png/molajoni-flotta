@@ -6,6 +6,7 @@ self.addEventListener('push', e => {
   try { d = e.data ? e.data.json() : {}; } catch { d = { title: 'Molajoni · Flotta', body: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(d.title || 'Molajoni · Flotta', {
     body: d.body || '', icon: '/icon-192.png', badge: '/icon-192.png', tag: d.tag, data: { url: d.url || '/' },
+    requireInteraction: !!d.urgente, vibrate: d.urgente ? [300, 120, 300, 120, 600] : [150],
   }));
 });
 self.addEventListener('notificationclick', e => {

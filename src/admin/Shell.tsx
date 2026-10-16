@@ -30,7 +30,7 @@ export function useSessione() {
 }
 
 const TABS: [string, string][] = [
-  ['/cruscotto', 'Cruscotto'], ['/piano', 'Pianificazione'], ['/flotta', 'Flotta'],
+  ['/cruscotto', 'Cruscotto'], ['/piano', 'Pianificazione'], ['/avvisi', 'Avvisi'], ['/flotta', 'Flotta'],
   ['/tecnici', 'Tecnici'], ['/segnalazioni', 'Segnalazioni'], ['/multe', 'Multe'], ['/carburante', 'Carburante'],
   ['/report', 'Report'], ['/registro', 'Registro movimenti'],
 ];

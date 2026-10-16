@@ -16,6 +16,7 @@ import Registro from './admin/Registro';
 import Multe from './admin/Multe';
 import Carburante from './admin/Carburante';
 import Report from './admin/Report';
+import Volantino from './admin/Volantino';
 import Tecnico from './tecnico/Tecnico';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
           <Route path="/multe" element={<Multe />} />
           <Route path="/carburante" element={<Carburante />} />
           <Route path="/report" element={<Report />} />
+          <Route path="/installa-tecnici" element={<Volantino />} />
         </Route>
         <Route path="*" element={<Navigate to="/cruscotto" replace />} />
       </Routes>

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { SceltaLingua, useT } from '../lib/i18n';
 import { Caricamento, Logo } from '../ui';
 import Campanella from './Campanella';
+import { InstallaApp } from '../Installa';
 
 type Stato = 'caricamento' | 'anonimo' | 'non_abilitato' | 'ok';
 
@@ -54,6 +55,7 @@ export default function Shell() {
           <Logo />
           <span className="prodotto">{t('Gestione flotta')}</span>
           <span className="who">{sessione?.user.email}</span>
+          <InstallaApp variante="admin" />
           <Campanella />
           <SceltaLingua />
           <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>

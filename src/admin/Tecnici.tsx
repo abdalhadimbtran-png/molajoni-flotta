@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase, rpc, testoErrore } from '../lib/supabase';
 import { fmtData, giorniA, oggiISO } from '../lib/format';
 import { useT } from '../lib/i18n';
@@ -39,6 +40,7 @@ export default function Tecnici() {
     <>
       <div className="section-title">{t('Tecnici e conducenti')} <span className="meta">{lista.length}</span><span className="spacer" />
         <label className="sub chk"><input type="checkbox" checked={mostraInattivi} onChange={e => setMostraInattivi(e.target.checked)} /> {t('Mostra non attivi')}</label>
+        <Link className="btn-ghost btn-sm" to="/installa-tecnici">📱 {t('Istruzioni app per i tecnici')}</Link>
         <button className="btn btn-sm" onClick={() => setModifica('nuovo')}>{t('Nuovo tecnico')}</button></div>
       <div className="table-wrap"><table>
         <thead><tr><th>{t('Tecnico')}</th><th>{t('Codice app')}</th><th>{t('Ruolo')}</th><th>{t('Patente')}</th><th>{t('Accesso app')}</th><th></th></tr></thead>

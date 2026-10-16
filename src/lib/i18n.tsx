@@ -224,6 +224,15 @@ const AR: Record<string, string> = {
   "Comunicata": "تم الإبلاغ",
   "Pagata": "مدفوعة",
   "Contestata": "معترض عليها",
+  "Installa l'app": "ثبّت التطبيق",
+  "Installa l'app sul telefono": "ثبّت التطبيق على هاتفك",
+  "Un'icona sulla schermata Home, si apre come un'app e riceve le notifiche.": "أيقونة على الشاشة الرئيسية، تفتح كتطبيق وتستقبل الإشعارات.",
+  "Apri questa pagina con Safari.": "افتح هذه الصفحة بـ Safari.",
+  "Tocca il pulsante Condividi": "اضغط زر المشاركة",
+  "Scegli \"Aggiungi alla schermata Home\" e poi \"Aggiungi\".": "اختر \"إضافة إلى الشاشة الرئيسية\" ثم \"إضافة\".",
+  "Apri l'app dalla nuova icona.": "افتح التطبيق من الأيقونة الجديدة.",
+  "Istruzioni app per i tecnici": "تعليمات التطبيق للفنيين",
+  "Stampalo e consegnalo con codice e PIN, oppure invia il link su WhatsApp:": "اطبعه وسلّمه مع الرمز وPIN، أو أرسل الرابط على واتساب:",
   'Questo QR non è di un veicolo Molajoni.': 'هذا الرمز ليس لسيارة من Molajoni.', 'Indietro': 'رجوع',
 };
 

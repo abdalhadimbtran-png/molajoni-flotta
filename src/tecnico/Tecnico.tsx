@@ -5,6 +5,7 @@ import { rpc, testoErrore } from '../lib/supabase';
 import { CARBURANTE, CATEGORIE, GRAVITA, STATI_SEGN, TIPI_DOC, fmtGiorno, fmtKm, fmtOra, lblCarb, type Messaggio } from '../lib/format';
 import { SceltaLingua, useT } from '../lib/i18n';
 import { Logo, Pill, Targa } from '../ui';
+import { InstallaApp } from '../Installa';
 import { URL_FUNZIONI, attivaPush, comprimiFoto, registraSW, statoPush, type StatoPush } from '../lib/push';
 
 const CHIAVE = 'molajoni_flotta_token';
@@ -73,6 +74,7 @@ function Login({ onOk, conVeicolo }: { onOk: (t: string) => void; conVeicolo: bo
       <div className="field"><label htmlFor="pin">{t('PIN')}</label><input id="pin" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} required value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} className="pin-input" /></div>
       {err && <div className="ph-msg ko">{err}</div>}
       <button className="btn brand big" disabled={invio}>{invio ? t('Accesso…') : t('Accedi')}</button>
+      <InstallaApp />
       {!conVeicolo && <>
         <div className="oppure"><span>{t('oppure')}</span></div>
         <Link className="big-btn light" to="/t/scansiona"><IcoQr /><span>{t('Scansiona il QR del veicolo')}<span className="sub">{t('Dopo la scansione inserisci codice e PIN')}</span></span></Link>
@@ -103,6 +105,7 @@ function Home({ token, onScaduta }: { token: string; onScaduta: () => void }) {
       <h1 className="tec-h1">{t('Ciao {n}', { n: h.nome.split(' ')[0] })}</h1>
       {h.avvisi.map((a, i) => <div key={i} className={`ph-msg ${a.l}`}>{tm(a.m)}</div>)}
       <Notifiche token={token} />
+      <InstallaApp />
       <AttivaNotifiche token={token} />
 
       {mio && (

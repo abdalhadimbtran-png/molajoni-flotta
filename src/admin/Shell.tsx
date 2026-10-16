@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { Caricamento } from '../ui';
+import { SceltaLingua, useT } from '../lib/i18n';
+import { Caricamento, Logo } from '../ui';
 
 type Stato = 'caricamento' | 'anonimo' | 'non_abilitato' | 'ok';
 
@@ -33,28 +34,32 @@ const TABS: [string, string][] = [
 
 export default function Shell() {
   const { sessione, stato } = useSessione();
+  const { t } = useT();
   const loc = useLocation();
   if (stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
   if (stato === 'anonimo') return <Navigate to="/accesso" replace state={{ da: loc.pathname }} />;
   if (stato === 'non_abilitato') return (
     <div className="wrap narrow">
-      <h1>Account non abilitato</h1>
-      <p className="subtitle">L'account {sessione?.user.email} esiste ma non è ancora abilitato come responsabile flotta. Chiedi all'amministratore di abilitarlo.</p>
-      <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>Esci</button>
+      <h1>{t('Account non abilitato')}</h1>
+      <p className="subtitle">{t("L'account {email} esiste ma non è ancora abilitato come responsabile flotta. Chiedi all'amministratore di abilitarlo.", { email: sessione?.user.email ?? '' })}</p>
+      <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
     </div>
   );
   return (
-    <div className="wrap">
-      <header className="top">
-        <h1>Gestione flotta</h1>
-        <span className="tag">molajoni</span>
-        <span className="who">{sessione?.user.email}</span>
-        <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>Esci</button>
+    <>
+      <header className="app-top no-print">
+        <div className="app-top-in">
+          <Logo />
+          <span className="prodotto">{t('Gestione flotta')}</span>
+          <span className="who">{sessione?.user.email}</span>
+          <SceltaLingua />
+          <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
+        </div>
+        <nav className="tabs">
+          {TABS.map(([to, l]) => <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'active' : '')}>{t(l)}</NavLink>)}
+        </nav>
       </header>
-      <nav className="tabs no-print">
-        {TABS.map(([to, l]) => <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'active' : '')}>{l}</NavLink>)}
-      </nav>
-      <Outlet />
-    </div>
+      <div className="wrap"><Outlet /></div>
+    </>
   );
 }

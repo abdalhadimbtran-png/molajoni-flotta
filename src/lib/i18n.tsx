@@ -1,0 +1,208 @@
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
+/**
+ * Lingua scelta a mano dall'utente (italiano di default, arabo opzionale).
+ * Chiave = testo italiano: se manca la traduzione si mostra l'italiano.
+ * Nessuna traduzione automatica: le frasi arabe sono scritte qui.
+ */
+export type Lingua = 'it' | 'ar';
+type Vars = Record<string, string | number>;
+
+const AR: Record<string, string> = {
+  // generale
+  'Gestione flotta': 'إدارة الأسطول', 'Esci': 'خروج', 'Caricamento…': 'جارٍ التحميل…', 'Riprova': 'إعادة المحاولة', 'Chiudi': 'إغلاق',
+  'Salva': 'حفظ', 'Annulla': 'إلغاء', 'Modifica': 'تعديل', 'Elimina': 'حذف', 'Apri': 'فتح', 'Seleziona': 'اختر', 'Conferma': 'تأكيد',
+  'In sede': 'في المقر', 'Responsabile': 'المسؤول', 'Note': 'ملاحظات', 'Fatto': 'تم',
+  'Permesso negato per questa operazione.': 'لا تملك صلاحية لهذه العملية.',
+  'Connessione non disponibile. Controlla la rete e riprova.': 'لا يوجد اتصال. تحقق من الشبكة وأعد المحاولة.',
+  'Errore sconosciuto': 'خطأ غير معروف',
+  // navigazione
+  'Cruscotto': 'لوحة القيادة', 'Pianificazione': 'التخطيط', 'Flotta': 'الأسطول', 'Tecnici': 'الفنيون', 'Segnalazioni': 'البلاغات', 'Registro movimenti': 'سجل الحركات',
+  // accesso
+  'Accesso riservato al responsabile flotta. I tecnici usano il QR sul veicolo.': 'الدخول مخصص لمسؤول الأسطول. الفنيون يستخدمون رمز QR على السيارة.',
+  'Email aziendale': 'البريد الإلكتروني', 'Password': 'كلمة المرور', 'Accedi': 'دخول', 'Crea account': 'إنشاء حساب',
+  "Primo accesso: crea l'account": 'أول دخول: أنشئ الحساب', 'Ho già un account: accedi': 'لدي حساب: دخول',
+  'Sei un tecnico? Vai alla tua giornata': 'هل أنت فني؟ اذهب إلى يومك',
+  'Email o password non corretti.': 'البريد أو كلمة المرور غير صحيحة.', "Conferma prima l'email dal link che hai ricevuto.": 'أكّد البريد أولاً من الرابط الذي وصلك.',
+  'La password deve avere almeno 10 caratteri.': 'يجب أن تتكون كلمة المرور من 10 أحرف على الأقل.',
+  "Account creato. Se richiesto, conferma l'email dal link ricevuto. Poi l'account va abilitato come responsabile flotta prima di poter accedere ai dati.": 'تم إنشاء الحساب. أكّد البريد إن طُلب منك، ثم يجب تفعيل الحساب كمسؤول أسطول قبل الوصول إلى البيانات.',
+  'Account non abilitato': 'الحساب غير مفعّل',
+  "L'account {email} esiste ma non è ancora abilitato come responsabile flotta. Chiedi all'amministratore di abilitarlo.": 'الحساب {email} موجود لكنه غير مفعّل كمسؤول أسطول بعد. اطلب من المدير تفعيله.',
+  // cruscotto
+  'Veicoli disponibili': 'سيارات متاحة', 'In uso ai tecnici': 'مع الفنيين', 'Fermi o non utilizzabili': 'متوقفة أو غير صالحة',
+  'Scadenze superate': 'مواعيد منتهية', 'Scadenze entro 30 gg / 1.500 km': 'مواعيد خلال 30 يومًا / 1.500 كم',
+  'Tecnici bloccati nel piano di {d}': 'فنيون ممنوعون في خطة {d}', 'Da gestire': 'يجب معالجته', '{n} voci, prima le bloccanti': '{n} بند، المانعة أولاً',
+  'Nessuna eccezione aperta.': 'لا توجد مشاكل مفتوحة.', 'Dove sono i veicoli adesso': 'أين السيارات الآن', 'Veicolo': 'السيارة', 'Dove / con chi': 'المكان / مع من', 'Km': 'كم',
+  'Nessun veicolo registrato.': 'لا توجد سيارات مسجلة.', 'Aggiungi il primo': 'أضف أول سيارة', 'Segnalazioni aperte': 'البلاغات المفتوحة', 'Problema': 'المشكلة', 'Gravità': 'الخطورة',
+  'Nessuna segnalazione aperta': 'لا توجد بلاغات مفتوحة', 'Piano di {d}': 'خطة {d}', 'Non può guidare': 'لا يمكنه القيادة', 'Richiedere il rinnovo': 'اطلب التجديد',
+  "Non può usare l'app QR": 'لا يمكنه استخدام تطبيق QR', '{n}: patente scaduta il {d}': '{n}: الرخصة منتهية بتاريخ {d}', '{n}: patente in scadenza il {d}': '{n}: الرخصة تنتهي بتاريخ {d}', '{n}: PIN non impostato': '{n}: لم يُحدَّد رمز PIN',
+  // piano
+  'Giorno': 'اليوم', '{n} bloccati': '{n} ممنوعون', '{n} con avvisi': '{n} مع تنبيهات', '{n} idonei': '{n} جاهزون', 'Proponi assegnazioni': 'اقترح التوزيع', 'Conferma piano': 'ثبّت الخطة',
+  'Piano confermato il {d}. Ogni modifica a interventi, veicoli o assenze di questo giorno annulla la conferma.': 'تم تثبيت الخطة في {d}. أي تعديل على مهمات أو سيارات أو غيابات هذا اليوم يلغي التثبيت.',
+  'Nessun tecnico attivo. Aggiungi i tecnici dalla pagina Tecnici.': 'لا يوجد فنيون نشطون. أضفهم من صفحة الفنيين.',
+  'Tecnico': 'الفني', 'Interventi': 'المهمات', 'Controlli': 'الفحوصات', '— nessun veicolo —': '— بدون سيارة —', 'Veicolo per {n}': 'سيارة {n}',
+  'Elimina intervento': 'حذف المهمة', '+ Aggiungi intervento': '+ إضافة مهمة', 'Ora': 'الساعة', 'Cliente / luogo': 'العميل / المكان', 'Attività': 'النشاط',
+  '{n} assegnazioni proposte.': 'تم اقتراح {n} توزيع.', 'Nessuna modifica necessaria.': 'لا حاجة لأي تعديل.', 'Nessun veicolo idoneo libero per: {n}.': 'لا توجد سيارة صالحة متاحة لـ: {n}.',
+  "Il piano non può essere confermato: {n} tecnici hanno un blocco ({l}). Cambia il veicolo, sposta l'intervento o risolvi la scadenza.": 'لا يمكن تثبيت الخطة: {n} فنيين لديهم مانع ({l}). غيّر السيارة أو انقل المهمة أو عالج الموعد.',
+  "Piano confermato. I tecnici vedono il veicolo assegnato nell'app.": 'تم تثبيت الخطة. يرى الفنيون السيارة المخصصة لهم في التطبيق.',
+  '"Proponi assegnazioni" riempie solo le righe senza veicolo o con veicolo non utilizzabile, scegliendo tra i veicoli liberi e idonei. Non tocca le assegnazioni già valide. Il piano si conferma solo se nessun tecnico con interventi ha un blocco.': '"اقترح التوزيع" يملأ فقط الصفوف بدون سيارة أو بسيارة غير صالحة، من السيارات المتاحة والصالحة، ولا يغيّر التوزيعات الصحيحة. لا تُثبَّت الخطة إلا إذا لم يكن لدى أي فني عنده مهمات مانع.',
+  // flotta
+  'Veicoli': 'السيارات', '{n} mezzi · avviso a 30 giorni o 1.500 km': '{n} مركبة · تنبيه قبل 30 يومًا أو 1.500 كم', 'Mostra dismessi': 'إظهار المستبعدة',
+  'Stampa etichette QR': 'طباعة ملصقات QR', 'Nuovo veicolo': 'سيارة جديدة', 'Stato': 'الحالة', 'Assicurazione': 'التأمين', 'Revisione': 'الفحص الدوري', 'Bollo': 'الضريبة', 'Tagliando': 'الصيانة الدورية', 'Avvisi': 'تنبيهات',
+  'Movimento': 'حركة', 'Non registrata': 'غير مسجلة', 'Scaduta': 'منتهية', 'Scaduto': 'منتهية', 'Valida': 'سارية', 'Tra {n} gg': 'بعد {n} يوم', 'Non impostato': 'غير محدد',
+  'Superato di {n} km': 'تجاوز بـ {n} كم', 'Tra {n} km': 'بعد {n} كم', 'Nessun veicolo. Usa "Nuovo veicolo" per iniziare il censimento.': 'لا توجد سيارات. استخدم "سيارة جديدة" لبدء الجرد.',
+  'Assicurazione o revisione scadute, veicolo in officina o segnalazione "veicolo fermo" rendono il mezzo non assegnabile. I km e il veicolo in carico cambiano solo con i movimenti, così il registro resta completo.': 'انتهاء التأمين أو الفحص، أو وجود السيارة في الورشة، أو بلاغ "سيارة متوقفة" يمنع تخصيصها. الكيلومترات وحيازة السيارة لا تتغير إلا بالحركات، فيبقى السجل كاملاً.',
+  'Modifica {t}': 'تعديل {t}', 'Targa': 'رقم اللوحة', 'Marca e modello': 'الماركة والموديل', 'Tipo': 'النوع', 'Proprietà': 'الملكية', 'Di proprietà': 'ملك الشركة', 'Noleggio lungo termine': 'إيجار طويل الأمد', 'Leasing': 'تأجير تمويلي',
+  'Km attuali (dal cruscotto)': 'الكيلومترات الحالية (من العداد)', 'Km prossimo tagliando': 'كيلومترات الصيانة القادمة', 'Scadenza assicurazione': 'انتهاء التأمين', 'Scadenza revisione': 'انتهاء الفحص الدوري', 'Scadenza bollo': 'انتهاء الضريبة',
+  'In officina (non assegnabile)': 'في الورشة (غير قابلة للتخصيص)', 'Dismesso (non più in flotta, lo storico resta)': 'مستبعدة (خارج الأسطول، ويبقى السجل)',
+  'Per correggere i km usa "Movimento → Rettifica", così la correzione resta nel registro.': 'لتصحيح الكيلومترات استخدم "حركة ← تصحيح"، فيبقى التصحيح في السجل.',
+  'Veicolo aggiornato': 'تم تحديث السيارة', 'Veicolo aggiunto': 'تمت إضافة السيارة', 'QR {t}': 'رمز QR {t}', 'QR del veicolo {t}': 'رمز QR للسيارة {t}',
+  "Applica l'etichetta sul cruscotto o sul montante della portiera. Il tecnico la scansiona con la fotocamera del telefono.": 'ألصق الملصق على لوحة القيادة أو على عمود الباب. يمسحه الفني بكاميرا الهاتف.',
+  'Stampa etichetta': 'طباعة الملصق', 'Rigenera QR': 'إنشاء رمز جديد', 'La vecchia etichetta smetterà di funzionare.': 'الملصق القديم سيتوقف عن العمل.',
+  "Nuovo QR creato: stampa e sostituisci l'etichetta.": 'تم إنشاء رمز جديد: اطبع الملصق واستبدله.', 'Movimento {t}': 'حركة {t}', 'Ultima lettura': 'آخر قراءة', 'in carico a {n}': 'مع {n}', 'in sede': 'في المقر',
+  'Operazione': 'العملية', 'Presa in carico per un tecnico': 'استلام لفني', 'Riconsegna in sede': 'إرجاع إلى المقر', 'Rettifica km (correzione)': 'تصحيح الكيلومترات',
+  'Km sul cruscotto': 'الكيلومترات على العداد', 'Motivo della rettifica (obbligatorio)': 'سبب التصحيح (إلزامي)', 'Registra': 'تسجيل', 'Movimento registrato': 'تم تسجيل الحركة',
+  '← Flotta': '→ الأسطول', 'Stampa': 'طباعة', '{n} etichette · formato consigliato: carta adesiva A4, stampa al 100%': '{n} ملصق · يُنصح بورق لاصق A4 وطباعة بحجم 100%',
+  // tecnici
+  'Tecnici e conducenti': 'الفنيون والسائقون', 'Mostra non attivi': 'إظهار غير النشطين', 'Nuovo tecnico': 'فني جديد', 'Codice app': 'رمز التطبيق', 'Ruolo': 'الوظيفة', 'Patente': 'الرخصة', 'Accesso app': 'دخول التطبيق',
+  'non attivo': 'غير نشط', 'Scadenza non registrata': 'تاريخ الانتهاء غير مسجل', 'Bloccato': 'محظور', 'PIN attivo': 'PIN مفعّل', 'PIN da impostare': 'يجب تحديد PIN', 'Nuovo PIN': 'PIN جديد', 'Imposta PIN': 'تحديد PIN', 'Sblocca': 'رفع الحظر',
+  'Nessun tecnico. Usa "Nuovo tecnico".': 'لا يوجد فنيون. استخدم "فني جديد".', 'Accesso sbloccato': 'تم رفع الحظر',
+  'Assenze in corso e future': 'الغيابات الحالية والقادمة', 'i tecnici assenti non ricevono veicoli nel piano': 'الفنيون الغائبون لا تُخصص لهم سيارات في الخطة',
+  'Dal': 'من', 'Al': 'إلى', 'Motivo': 'السبب', 'Nessuna assenza registrata': 'لا توجد غيابات مسجلة', 'Aggiungi assenza': 'إضافة غياب', 'Assenza registrata': 'تم تسجيل الغياب',
+  'Le assenze qui sono temporanee: in seguito arriveranno dal sistema HR, così non si inseriscono due volte.': 'الغيابات هنا مؤقتة: لاحقًا ستأتي من نظام الموارد البشرية حتى لا تُدخل مرتين.',
+  'La data "al" non può essere prima della data "dal".': 'لا يمكن أن يكون تاريخ "إلى" قبل تاريخ "من".',
+  'Ferie': 'إجازة سنوية', 'Permesso': 'إذن', 'Assenza': 'غياب', 'Formazione': 'تدريب', 'Altro': 'أخرى',
+  'Modifica {n}': 'تعديل {n}', 'Nome': 'الاسم', 'Cognome': 'اسم العائلة', "Codice per l'app": 'رمز الدخول للتطبيق', 'Telefono': 'الهاتف', 'Categoria patente': 'فئة الرخصة', 'Scadenza patente': 'انتهاء الرخصة', 'Attivo': 'نشط',
+  "Il codice è quello che il tecnico digita nell'app insieme al PIN. Registra solo i dati necessari alla gestione dei veicoli.": 'الرمز هو ما يكتبه الفني في التطبيق مع PIN. سجّل فقط البيانات اللازمة لإدارة السيارات.',
+  'Tecnico aggiornato': 'تم تحديث الفني', 'Tecnico aggiunto: ora imposta il PIN': 'تمت إضافة الفني: حدّد الآن رمز PIN', 'PIN per {n}': 'رمز PIN لـ {n}', 'PIN di 6 cifre': 'PIN من 6 أرقام',
+  'Impostando un nuovo PIN il tecnico viene disconnesso da tutti i telefoni.': 'عند تحديد PIN جديد يُسجَّل خروج الفني من كل الهواتف.', 'Salva PIN': 'حفظ PIN', 'Genera un altro': 'توليد رمز آخر',
+  'PIN salvato. Comunicalo al tecnico di persona: codice {c}, PIN {p}. Dopo la chiusura non sarà più visibile.': 'تم حفظ PIN. سلّمه للفني شخصيًا: الرمز {c}، PIN {p}. لن يظهر مرة أخرى بعد الإغلاق.',
+  // segnalazioni
+  'Segnalazioni dai tecnici': 'بلاغات الفنيين', '{n} non chiuse': '{n} غير مغلقة', 'Mostra anche le chiuse': 'إظهار المغلقة أيضًا', 'Data': 'التاريخ', 'Segnalata da': 'المُبلِّغ',
+  'Nessuna segnalazione': 'لا توجد بلاغات', 'Chiusa il {d}: {n}': 'أُغلق في {d}: {n}', 'Nota di chiusura': 'ملاحظة الإغلاق', 'Cosa è stato fatto': 'ماذا تم', 'Chiudi…': 'إغلاق…',
+  'Segnalazione chiusa': 'تم إغلاق البلاغ', 'Stato aggiornato': 'تم تحديث الحالة',
+  'Una segnalazione "veicolo fermo" blocca il mezzo finché non viene chiusa. La chiusura richiede una nota (es. riparato in officina, fattura n.) e resta nello storico.': 'بلاغ "سيارة متوقفة" يمنع استخدامها حتى يُغلق. الإغلاق يتطلب ملاحظة (مثل: أُصلحت في الورشة، رقم الفاتورة) ويبقى في السجل.',
+  // registro
+  'non modificabile: ogni correzione è una nuova riga': 'غير قابل للتعديل: كل تصحيح سطر جديد', 'Tutti i veicoli': 'كل السيارات', 'Filtra per veicolo': 'تصفية حسب السيارة', 'Data e ora': 'التاريخ والوقت', 'Δ km': 'Δ كم', 'Carburante': 'الوقود',
+  'registrato dal responsabile': 'سجّله المسؤول', 'Dichiarati danni': 'تم الإبلاغ عن أضرار', 'Nessun movimento': 'لا توجد حركات',
+  'Il registro indica chi aveva quale veicolo in ogni momento: serve per le multe (comunicazione del conducente), per i danni e per i chilometri per tecnico. Mostra gli ultimi 500 movimenti.': 'السجل يبيّن من كان معه أي سيارة في كل لحظة: للمخالفات (تحديد السائق)، والأضرار، والكيلومترات لكل فني. يعرض آخر 500 حركة.',
+  // etichette categoria / stato
+  'Guasto meccanico': 'عطل ميكانيكي', 'Spia accesa': 'ضوء تحذير', 'Pneumatici': 'الإطارات', 'Danno carrozzeria': 'ضرر في الهيكل', 'Incidente': 'حادث', 'Dotazioni di bordo': 'تجهيزات السيارة', 'Pulizia': 'النظافة',
+  'Utilizzabile': 'صالحة', 'Da verificare': 'تحتاج فحص', 'Veicolo fermo': 'سيارة متوقفة', 'Aperta': 'مفتوح', 'In lavorazione': 'قيد المعالجة', 'Chiusa': 'مغلق',
+  'Disponibile': 'متاحة', 'In uso': 'قيد الاستخدام', 'Fermo': 'متوقفة', 'Non utilizzabile': 'غير صالحة', 'Dismesso': 'مستبعدة',
+  'Presa in carico': 'استلام', 'Riconsegna': 'إرجاع', 'Lettura km': 'قراءة كيلومترات', 'Rettifica': 'تصحيح', 'Riserva': 'احتياطي', 'Pieno': 'ممتلئ',
+  // app tecnico
+  'Molajoni · Flotta': 'Molajoni · الأسطول', 'Accesso…': 'جارٍ الدخول…', 'Codice': 'الرمز', 'PIN': 'PIN',
+  "Accedi una volta: poi il QR del veicolo ti porta direttamente all'operazione.": 'سجّل الدخول مرة واحدة: بعدها رمز QR للسيارة يأخذك مباشرة إلى العملية.',
+  'Codice e PIN te li dà il responsabile flotta.': 'الرمز وPIN يعطيك إياهما مسؤول الأسطول.', 'Accesso non riuscito.': 'تعذّر الدخول.',
+  'Ciao {n}': 'مرحبًا {n}', 'Veicolo in carico': 'السيارة التي معك', 'Nessuno.': 'لا شيء.', 'dal {d}': 'منذ {d}',
+  'Scansiona il QR del veicolo': 'امسح رمز QR للسيارة', 'Scegli il veicolo dall\'elenco': 'اختر السيارة من القائمة', 'Il QR non si legge? Scegli il veicolo': 'الرمز لا يُقرأ؟ اختر السيارة',
+  'piano non ancora confermato': 'الخطة غير مثبتة بعد', 'Veicolo:': 'السيارة:', 'non assegnato': 'غير مخصصة', 'Nessun intervento pianificato': 'لا توجد مهمات مخططة', 'Le tue segnalazioni': 'بلاغاتك',
+  'Apri il veicolo': 'افتح السيارة', 'Oggi': 'اليوم', 'Prossimo giorno lavorativo': 'يوم العمل التالي',
+  'In carico a te': 'معك', 'In carico a {n}': 'مع {n}', 'Ultimi km registrati: {n}': 'آخر كيلومترات مسجلة: {n}', 'Nuova operazione': 'عملية جديدة', 'La mia giornata': 'يومي',
+  'Prendo il veicolo': 'أستلم السيارة', 'Riconsegno': 'أرجع السيارة', 'Aggiorno i km': 'أحدّث الكيلومترات', 'Segnala un problema': 'أبلّغ عن مشكلة',
+  'Risulta in carico a {n}. Prendendolo registri il passaggio a te.': 'السيارة مسجلة مع {n}. باستلامها يُسجَّل انتقالها إليك.', 'Almeno {n}': 'على الأقل {n}',
+  'Nessun danno nuovo visibile': 'لا يوجد ضرر جديد ظاهر', 'Note (facoltative)': 'ملاحظات (اختيارية)', 'Es. parcheggiato in sede, chiavi in ufficio': 'مثال: مركونة في المقر، المفاتيح في المكتب',
+  'Confermo i km': 'أؤكد الكيلومترات', 'Conferma presa in carico': 'تأكيد الاستلام', 'Conferma riconsegna': 'تأكيد الإرجاع', 'Salva km': 'حفظ الكيلومترات',
+  'Tipo di problema': 'نوع المشكلة', 'Il veicolo si può usare?': 'هل يمكن استخدام السيارة؟', 'Sì, posso continuare': 'نعم، أستطيع المتابعة', 'Sì, ma va controllato presto': 'نعم، لكن يجب فحصها قريبًا', 'No, veicolo fermo': 'لا، السيارة متوقفة',
+  'Descrizione': 'الوصف', 'Cosa è successo, dove, quando': 'ماذا حدث، أين، متى',
+  'Il veicolo verrà bloccato subito e non sarà assegnato finché il responsabile non chiude la segnalazione.': 'سيتم إيقاف السيارة فورًا ولن تُخصص حتى يغلق المسؤول البلاغ.',
+  'Invia segnalazione': 'إرسال البلاغ', 'Elenco veicoli': 'قائمة السيارات', 'Usa il QR quando puoi: conferma che sei davanti al veicolo giusto.': 'استخدم رمز QR متى استطعت: يؤكد أنك أمام السيارة الصحيحة.',
+  'tuo': 'معك', 'Inquadra il QR sul veicolo': 'وجّه الكاميرا نحو رمز QR على السيارة', 'Fotocamera non disponibile. Usa la fotocamera del telefono o scegli il veicolo dall\'elenco.': 'الكاميرا غير متاحة. استخدم كاميرا الهاتف أو اختر السيارة من القائمة.',
+  'Il tuo veicolo di oggi': 'سيارتك اليوم', 'Luci': 'الأضواء', 'Carrozzeria': 'الهيكل', 'Estintore di bordo': 'طفاية السيارة', 'Controllo veloce': 'فحص سريع', 'OK': 'سليم',
+  'Tocca OK o Problema per ogni voce del controllo.': 'اضغط "سليم" أو "مشكلة" لكل بند في الفحص.', 'Hai indicato un problema nel controllo: completa la segnalazione.': 'أشرت إلى مشكلة في الفحص: أكمل البلاغ.',
+  'Scegli il tipo di problema.': 'اختر نوع المشكلة.',
+  'Questo QR non è di un veicolo Molajoni.': 'هذا الرمز ليس لسيارة من Molajoni.', 'Indietro': 'رجوع',
+};
+
+/** Traduzione dei messaggi generati dal database (regole, errori). */
+const REGOLE: [RegExp, (m: RegExpMatchArray, tm: (s: string) => string) => string][] = [
+  [/^Veicolo dismesso$/, () => 'السيارة مستبعدة'],
+  [/^In officina$/, () => 'في الورشة'],
+  [/^Fermo per segnalazione aperta$/, () => 'متوقفة بسبب بلاغ مفتوح'],
+  [/^Scadenza (assicurazione|revisione|patente) non registrata$/, m => `تاريخ انتهاء ${({ assicurazione: 'التأمين', revisione: 'الفحص الدوري', patente: 'الرخصة' } as Record<string, string>)[m[1]]} غير مسجل`],
+  [/^Assicurazione scaduta il (.+)$/, m => `التأمين منتهٍ بتاريخ ${m[1]}`],
+  [/^Assicurazione in scadenza il (.+)$/, m => `التأمين ينتهي بتاريخ ${m[1]}`],
+  [/^Revisione scaduta il (.+)$/, m => `الفحص الدوري منتهٍ بتاريخ ${m[1]}`],
+  [/^Revisione in scadenza il (.+)$/, m => `الفحص الدوري ينتهي بتاريخ ${m[1]}`],
+  [/^Bollo scaduto il (.+)$/, m => `الضريبة منتهية بتاريخ ${m[1]}`],
+  [/^Bollo in scadenza il (.+)$/, m => `الضريبة تنتهي بتاريخ ${m[1]}`],
+  [/^Tagliando superato di (.+) km$/, m => `تجاوزت موعد الصيانة بـ ${m[1]} كم`],
+  [/^Tagliando tra (.+) km$/, m => `الصيانة بعد ${m[1]} كم`],
+  [/^(\d+) segnalazion[ei] da verificare$/, m => `${m[1]} بلاغ يحتاج فحص`],
+  [/^Tecnico non attivo$/, () => 'الفني غير نشط'],
+  [/^Assente: (.+)$/, (m, tm) => `غائب: ${tm(m[1])}`],
+  [/^Patente scaduta il (.+): non può guidare$/, m => `الرخصة منتهية بتاريخ ${m[1]}: لا يمكنه القيادة`],
+  [/^Patente in scadenza il (.+)$/, m => `الرخصة تنتهي بتاريخ ${m[1]}`],
+  [/^Nessun veicolo assegnato$/, () => 'لا توجد سيارة مخصصة'],
+  [/^Nessun intervento pianificato$/, () => 'لا توجد مهمات مخططة'],
+  [/^Idoneo$/, () => 'جاهز'],
+  [/^Ha in carico (.+): recuperare il veicolo$/, m => `السيارة ${m[1]} معه: يجب استرجاعها`],
+  [/^Veicolo condiviso con (.+) \(stesso primo intervento\)$/, m => `سيارة مشتركة مع ${m[1]} (نفس أول مهمة)`],
+  [/^Veicolo già assegnato a (.+) con altro intervento$/, m => `السيارة مخصصة مسبقًا لـ ${m[1]} لمهمة أخرى`],
+  [/^Oggi è in carico a (.+?)( \(assente\))?: organizzare il passaggio$/, m => `اليوم مع ${m[1]}${m[2] ? ' (غائب)' : ''}: رتّب التسليم`],
+  [/^Codice o PIN non validi\.$/, () => 'الرمز أو PIN غير صحيح.'],
+  [/^Troppi tentativi errati\. Riprova dopo le (.+) o chiedi al responsabile flotta\.$/, m => `محاولات خاطئة كثيرة. حاول بعد الساعة ${m[1]} أو اسأل مسؤول الأسطول.`],
+  [/^I km non possono essere inferiori all'ultima lettura \((.+) km\)\. Ricontrolla il cruscotto\.$/, m => `لا يمكن أن تكون الكيلومترات أقل من آخر قراءة (${m[1]} كم). تحقق من العداد.`],
+  [/^Sono (.+) km in più dall'ultima lettura \((.+)\)\. Se è corretto, conferma\.$/, m => `هذه ${m[1]} كم زيادة عن آخر قراءة (${m[2]}). إذا كان صحيحًا، أكّد.`],
+  [/^Veicolo non utilizzabile: (.+)\. Contatta il responsabile flotta\.$/, (m, tm) => `السيارة غير صالحة: ${m[1].split('; ').map(tm).join('؛ ')}. تواصل مع مسؤول الأسطول.`],
+  [/^Non puoi prendere un veicolo: (.+)\. Contatta il responsabile flotta\.$/, (m, tm) => `لا يمكنك استلام سيارة: ${m[1].split('; ').map(tm).join('؛ ')}. تواصل مع مسؤول الأسطول.`],
+  [/^Il veicolo risulta già in carico a te\.$/, () => 'السيارة مسجلة معك أصلاً.'],
+  [/^Hai già in carico (.+)\. Riconsegnalo prima di prendere un altro veicolo\.$/, m => `معك السيارة ${m[1]}. أرجعها قبل استلام سيارة أخرى.`],
+  [/^Il veicolo risulta già in sede\.$/, () => 'السيارة موجودة في المقر أصلاً.'],
+  [/^Il veicolo risulta in carico a (.+), non a te\.$/, m => `السيارة مسجلة مع ${m[1]}، وليست معك.`],
+  [/^Puoi aggiornare i km solo di un veicolo in carico a te\.$/, () => 'يمكنك تحديث كيلومترات السيارة التي معك فقط.'],
+  [/^Presa in carico registrata: (.+), (.+) km\.( Hai indicato danni: invia ora una segnalazione\.)?$/, m => `تم تسجيل الاستلام: ${m[1]}، ${m[2]} كم.${m[3] ? ' أشرت إلى أضرار: أرسل بلاغًا الآن.' : ''}`],
+  [/^Riconsegna registrata: (.+), (.+) km\. Grazie\.$/, m => `تم تسجيل الإرجاع: ${m[1]}، ${m[2]} كم. شكرًا.`],
+  [/^Km aggiornati: (.+)\.$/, m => `تم تحديث الكيلومترات: ${m[1]}.`],
+  [/^Segnalazione inviata\. (.+) è fermo: non verrà assegnato finché il responsabile flotta non chiude la segnalazione\.$/, m => `تم إرسال البلاغ. السيارة ${m[1]} متوقفة ولن تُخصص حتى يغلق مسؤول الأسطول البلاغ.`],
+  [/^Segnalazione inviata al responsabile flotta\.$/, () => 'تم إرسال البلاغ إلى مسؤول الأسطول.'],
+  [/^Codice QR non riconosciuto\..*$/, () => 'رمز QR غير معروف. أبلغ مسؤول الأسطول.'],
+  [/^Descrivi il problema in poche parole\.$/, () => 'صف المشكلة بكلمات قليلة.'],
+  [/^Il PIN deve avere 6 cifre$/, () => 'يجب أن يتكون PIN من 6 أرقام'],
+  [/^La rettifica richiede una nota con il motivo$/, () => 'التصحيح يحتاج ملاحظة بالسبب'],
+  [/^I km non possono essere inferiori all'ultima lettura \((.+) km\)\. Usa una rettifica con motivo\.$/, m => `لا يمكن أن تكون الكيلومترات أقل من آخر قراءة (${m[1]} كم). استخدم التصحيح مع ذكر السبب.`],
+  [/^Esiste già un veicolo con questa targa\.$/, () => 'توجد سيارة بنفس رقم اللوحة.'],
+  [/^Esiste già un tecnico con questo codice\.$/, () => 'يوجد فني بنفس الرمز.'],
+];
+
+interface Ctx { lingua: Lingua; setLingua: (l: Lingua) => void }
+const LinguaCtx = createContext<Ctx>({ lingua: 'it', setLingua: () => {} });
+const CHIAVE = 'molajoni_flotta_lingua';
+
+export function LinguaProvider({ children }: { children: ReactNode }) {
+  const [lingua, set] = useState<Lingua>(() => { try { return localStorage.getItem(CHIAVE) === 'ar' ? 'ar' : 'it'; } catch { return 'it'; } });
+  useEffect(() => {
+    document.documentElement.lang = lingua;
+    document.documentElement.dir = lingua === 'ar' ? 'rtl' : 'ltr';
+  }, [lingua]);
+  const setLingua = useCallback((l: Lingua) => { set(l); try { localStorage.setItem(CHIAVE, l); } catch { /* nulla */ } }, []);
+  return <LinguaCtx.Provider value={{ lingua, setLingua }}>{children}</LinguaCtx.Provider>;
+}
+
+const riempi = (s: string, v?: Vars) => (v ? s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? '')) : s);
+
+export function useT() {
+  const { lingua, setLingua } = useContext(LinguaCtx);
+  return useMemo(() => {
+    const t = (s: string, v?: Vars) => riempi(lingua === 'ar' ? AR[s] ?? s : s, v);
+    const tm = (s: string): string => {
+      if (lingua !== 'ar' || !s) return s;
+      if (AR[s]) return AR[s];
+      for (const [re, f] of REGOLE) { const m = s.match(re); if (m) return f(m, tm); }
+      return s;
+    };
+    const locale = lingua === 'ar' ? 'ar-u-nu-latn' : 'it-IT';
+    return { t, tm, lingua, setLingua, locale };
+  }, [lingua, setLingua]);
+}
+
+export function SceltaLingua({ chiaro = false }: { chiaro?: boolean }) {
+  const { lingua, setLingua } = useT();
+  return (
+    <div className={`lang ${chiaro ? 'lang-chiaro' : ''}`} role="group" aria-label="Lingua / اللغة">
+      <button className={lingua === 'it' ? 'on' : ''} onClick={() => setLingua('it')} aria-pressed={lingua === 'it'}>IT</button>
+      <button className={lingua === 'ar' ? 'on' : ''} onClick={() => setLingua('ar')} aria-pressed={lingua === 'ar'} lang="ar">عربي</button>
+    </div>
+  );
+}

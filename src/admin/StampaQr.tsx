@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { supabase } from '../lib/supabase';
-import { Caricamento, Errore, useLoad } from '../ui';
+import { useT } from '../lib/i18n';
+import { Caricamento, Errore, Targa, useLoad } from '../ui';
 import { urlQr } from './Flotta';
 
 interface V { id: number; targa: string; marca_modello: string; qr_token: string }
 
+/** Le etichette restano in italiano e arabo insieme: vanno sui veicoli e le leggono tutti. */
 export default function StampaQr() {
+  const { t } = useT();
   const [sp] = useSearchParams();
   const solo = sp.get('v');
   const { data, errore } = useLoad(async () => {
@@ -27,20 +30,20 @@ export default function StampaQr() {
   if (!data) return <Caricamento />;
   return (
     <>
-      <div className="row-flex no-print" style={{ marginBottom: 16 }}>
-        <Link className="btn-ghost btn-sm" to="/flotta">← Flotta</Link>
-        <button className="btn btn-sm" onClick={() => window.print()}>Stampa</button>
-        <span className="sub">{data.length} etichette · formato consigliato: carta adesiva A4, stampa al 100%</span>
+      <div className="row-flex no-print" style={{ marginBottom: 18 }}>
+        <Link className="btn-ghost btn-sm" to="/flotta">{t('← Flotta')}</Link>
+        <button className="btn btn-sm" onClick={() => window.print()}>{t('Stampa')}</button>
+        <span className="sub">{t('{n} etichette · formato consigliato: carta adesiva A4, stampa al 100%', { n: data.length })}</span>
       </div>
       <div className="labels">
         {data.map(v => (
           <div key={v.id} className="label">
-            {img[v.id] && <img src={img[v.id]} alt="" />}
-            <div className="label-txt">
-              <div className="label-brand">MOLAJONI · FLOTTA</div>
-              <div className="label-targa">{v.targa}</div>
+            {img[v.id] && <img className="qr" src={img[v.id]} alt="" />}
+            <div>
+              <img className="label-logo" src="/logo-molajoni.png" alt="Molajoni Antincendi" />
+              <div><Targa t={v.targa} /></div>
               <div className="label-mm">{v.marca_modello}</div>
-              <div className="label-istr">Scansiona per: presa in carico, riconsegna, km, segnalare un problema</div>
+              <div className="label-istr">Scansiona: prendi, riconsegna, km, problemi<br /><span lang="ar" dir="rtl">امسح الرمز: استلام، إرجاع، كيلومترات، مشاكل</span></div>
             </div>
           </div>
         ))}

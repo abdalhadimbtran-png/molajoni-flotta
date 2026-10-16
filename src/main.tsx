@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './styles.css';
 import { configurato } from './lib/supabase';
+import { LinguaProvider } from './lib/i18n';
 import Shell from './admin/Shell';
 import Accesso from './admin/Accesso';
 import Cruscotto from './admin/Cruscotto';
@@ -21,6 +22,8 @@ function App() {
       <Routes>
         <Route path="/t" element={<Tecnico />} />
         <Route path="/t/v/:qr" element={<Tecnico />} />
+        <Route path="/t/scansiona" element={<Tecnico />} />
+        <Route path="/t/elenco" element={<Tecnico />} />
         <Route path="/accesso" element={<Accesso />} />
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />
@@ -37,4 +40,4 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><LinguaProvider><App /></LinguaProvider></React.StrictMode>);

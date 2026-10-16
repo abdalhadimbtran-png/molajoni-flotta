@@ -1,16 +1,19 @@
 import { ReactNode, useCallback, useEffect, useState } from 'react';
 import type { Livello, Messaggio } from './lib/format';
 import { testoErrore } from './lib/supabase';
+import { useT } from './lib/i18n';
 
 export const Pill = ({ s, children }: { s: Livello; children: ReactNode }) => <span className={`pill ${s}`}>{children}</span>;
 
-export const Msgs = ({ items }: { items: Messaggio[] }) => (
-  <div className="msgs">{items.map((x, i) => <div key={i} className={`msg ${x.l}`}>{x.m}</div>)}</div>
-);
+export function Msgs({ items }: { items: Messaggio[] }) {
+  const { tm } = useT();
+  return <div className="msgs">{items.map((x, i) => <div key={i} className={`msg ${x.l}`}>{tm(x.m)}</div>)}</div>;
+}
 
 export const Banner = ({ s, children }: { s: 'ok' | 'ko' | 'warn'; children: ReactNode }) => <div className={`banner ${s}`}>{children}</div>;
 
 export function Modal({ titolo, onClose, children }: { titolo: string; onClose: () => void; children: ReactNode }) {
+  const { t } = useT();
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', k);
@@ -19,7 +22,7 @@ export function Modal({ titolo, onClose, children }: { titolo: string; onClose: 
   return (
     <div className="modal" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card" role="dialog" aria-modal="true" aria-label={titolo}>
-        <div className="modal-head"><h2>{titolo}</h2><button className="btn-ghost btn-sm" onClick={onClose}>Chiudi</button></div>
+        <div className="modal-head"><h2>{titolo}</h2><button className="btn-ghost btn-sm" onClick={onClose}>{t('Chiudi')}</button></div>
         {children}
       </div>
     </div>
@@ -52,7 +55,15 @@ export function toast(msg: string) {
   toastTimer = window.setTimeout(() => { if (el) el.hidden = true; }, 3500);
 }
 
-export const Caricamento = () => <p className="sub" style={{ padding: '24px 0' }}>Caricamento…</p>;
-export const Errore = ({ testo, onRetry }: { testo: string; onRetry?: () => void }) => (
-  <Banner s="ko">{testo} {onRetry && <button className="btn-ghost btn-sm" onClick={onRetry}>Riprova</button>}</Banner>
-);
+export function Caricamento() { const { t } = useT(); return <p className="sub" style={{ padding: '24px 0' }}>{t('Caricamento…')}</p>; }
+export function Errore({ testo, onRetry }: { testo: string; onRetry?: () => void }) {
+  const { t, tm } = useT();
+  return <Banner s="ko">{tm(testo)} {onRetry && <button className="btn-ghost btn-sm" onClick={onRetry}>{t('Riprova')}</button>}</Banner>;
+}
+
+export const Targa = ({ t, big = false }: { t: string | null | undefined; big?: boolean }) =>
+  t ? <span className={`targa${big ? ' big' : ''}`}><span>{t}</span></span> : null;
+
+export const Logo = ({ chiaro = false }: { chiaro?: boolean }) => chiaro
+  ? <img className="logo" src="/logo-molajoni-bianco.png" alt="Molajoni Antincendi" />
+  : <><img className="logo logo-light" src="/logo-molajoni.png" alt="Molajoni Antincendi" /><img className="logo logo-dark" src="/logo-molajoni-bianco.png" alt="Molajoni Antincendi" /></>;

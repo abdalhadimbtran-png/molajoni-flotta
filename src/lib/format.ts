@@ -9,14 +9,14 @@ export function fmtData(d: string | null | undefined): string {
   return `${g}/${m}/${y}`;
 }
 
-export function fmtOra(ts: string | null | undefined): string {
+export function fmtOra(ts: string | null | undefined, locale = 'it-IT'): string {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
+  return new Date(ts).toLocaleString(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
 }
 
-export function fmtGiorno(d: string): string {
+export function fmtGiorno(d: string, locale = 'it-IT'): string {
   const [y, m, g] = d.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, g, 12)).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return new Date(Date.UTC(y, m - 1, g, 12)).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 /** Data di oggi a Roma in formato YYYY-MM-DD. */

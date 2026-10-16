@@ -112,6 +112,7 @@ const AR: Record<string, string> = {
   'Il tuo veicolo di oggi': 'سيارتك اليوم', 'Luci': 'الأضواء', 'Carrozzeria': 'الهيكل', 'Estintore di bordo': 'طفاية السيارة', 'Controllo veloce': 'فحص سريع', 'OK': 'سليم',
   'Tocca OK o Problema per ogni voce del controllo.': 'اضغط "سليم" أو "مشكلة" لكل بند في الفحص.', 'Hai indicato un problema nel controllo: completa la segnalazione.': 'أشرت إلى مشكلة في الفحص: أكمل البلاغ.',
   'Scegli il tipo di problema.': 'اختر نوع المشكلة.',
+  'oppure': 'أو', 'Dopo la scansione inserisci codice e PIN': 'بعد المسح أدخل الرمز وPIN', 'Scansiona un altro veicolo': 'امسح سيارة أخرى', 'Ultimi km registrati': 'آخر كيلومترات مسجلة',
   'Questo QR non è di un veicolo Molajoni.': 'هذا الرمز ليس لسيارة من Molajoni.', 'Indietro': 'رجوع',
 };
 

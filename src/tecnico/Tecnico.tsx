@@ -38,7 +38,8 @@ export default function Tecnico() {
         </div>
       </div>
       <main className="tec-main">
-        {!token ? <Login onOk={x => { scriviToken(x); setToken(x); }} conVeicolo={!!qr} />
+        {pagina === 'scan' && !token ? <Scanner />
+          : !token ? <Login onOk={x => { scriviToken(x); setToken(x); }} conVeicolo={!!qr} />
           : pagina === 'veicolo' ? <Veicolo token={token} qr={qr!} onScaduta={esci} />
           : pagina === 'scan' ? <Scanner />
           : pagina === 'elenco' ? <Elenco token={token} onScaduta={esci} />
@@ -68,6 +69,10 @@ function Login({ onOk, conVeicolo }: { onOk: (t: string) => void; conVeicolo: bo
       <div className="field"><label htmlFor="pin">{t('PIN')}</label><input id="pin" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} required value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} className="pin-input" /></div>
       {err && <div className="ph-msg ko">{err}</div>}
       <button className="btn brand big" disabled={invio}>{invio ? t('Accesso…') : t('Accedi')}</button>
+      {!conVeicolo && <>
+        <div className="oppure"><span>{t('oppure')}</span></div>
+        <Link className="big-btn light" to="/t/scansiona"><IcoQr /><span>{t('Scansiona il QR del veicolo')}<span className="sub">{t('Dopo la scansione inserisci codice e PIN')}</span></span></Link>
+      </>}
     </form>
   );
 }
@@ -230,7 +235,7 @@ function Veicolo({ token, qr, onScaduta }: { token: string; qr: string; onScadut
         <span className="m">{v.modello}</span>
         <div className="row-flex">
           {!v.utilizzabile ? <Pill s="ko">{t('Non utilizzabile')}</Pill> : v.in_carico_a_me ? <Pill s="info">{t('In carico a te')}</Pill> : v.in_carico_a ? <Pill s="na">{t('In carico a {n}', { n: v.in_carico_a })}</Pill> : <Pill s="ok">{t('In sede')}</Pill>}
-          <span className="mono sub">{t('Ultimi km registrati: {n}', { n: fmtKm(v.km) })}</span>
+          <span className="sub">{t('Ultimi km registrati')}: <span className="mono">{fmtKm(v.km)}</span></span>
         </div>
         {v.controlli.filter(c => c.l === 'ko').map((c, i) => <div key={i} className="msg ko">{tm(c.m)}</div>)}
       </div>
@@ -239,11 +244,12 @@ function Veicolo({ token, qr, onScaduta }: { token: string; qr: string; onScadut
 
       {!az && <>
         <div className="tiles">
-          {!v.in_carico_a_me && <button className="tile go" onClick={() => { setEsito(null); setAz('presa'); }}><IcoPrendo />{t('Prendo il veicolo')}</button>}
+          {!v.in_carico_a_me && <button className="tile go full" onClick={() => { setEsito(null); setAz('presa'); }}><IcoPrendo />{t('Prendo il veicolo')}</button>}
           {v.in_carico_a_me && <button className="tile back" onClick={() => { setEsito(null); setAz('riconsegna'); }}><IcoRiconsegno />{t('Riconsegno')}</button>}
           {v.in_carico_a_me && <button className="tile km" onClick={() => { setEsito(null); setAz('lettura_km'); }}><IcoKm />{t('Aggiorno i km')}</button>}
           <button className="tile alert" onClick={() => { setEsito(null); setDescrizioneIniziale(''); setAz('segnala'); }}><IcoAllarme />{t('Segnala un problema')}</button>
         </div>
+        <Link className="big-btn light" to="/t/scansiona"><IcoQr /><span>{t('Scansiona un altro veicolo')}</span></Link>
         <Link className="back-link" to="/t">{t('La mia giornata')}</Link>
       </>}
       {az && az !== 'segnala' && <FormMovimento key={az} token={token} qr={qr} tipo={az} kmUltimi={v.km} passaggio={!v.in_carico_a_me ? v.in_carico_a : null} onFatto={fatto} onScaduta={onScaduta} onAnnulla={() => setAz(null)} />}

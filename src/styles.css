@@ -266,3 +266,7 @@ tr.row-ok td:first-child { box-shadow:inset 4px 0 0 var(--ok-line); }
 .scanner .mirino { position:absolute; inset:18%; border:3px solid #FFFFFF; border-radius:18px; box-shadow:0 0 0 999px rgba(0,0,0,.35); }
 .btn.big { width:100%; padding:16px; font-size:17px; border-radius:12px; }
 .back-link { background:none; border:none; padding:6px 0; color:var(--ink-2); font:inherit; font-size:15px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; align-self:flex-start; }
+
+.tile.full { grid-column:1 / -1; flex-direction:row; min-height:92px; }
+.oppure { display:flex; align-items:center; gap:12px; color:var(--ink-3); font-size:13px; }
+.oppure::before, .oppure::after { content:""; flex:1; height:1px; background:var(--line); }

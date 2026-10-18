@@ -2,6 +2,7 @@
    Grafite e porcellana come un quadro tecnico; rosso Molajoni solo per azioni e allarmi;
    Archivo largo per i titoli (cartellonistica), IBM Plex Sans per il testo (documentazione tecnica). */
 :root {
+  /* tema chiaro sempre, anche se il telefono è in modalità scura */
   --bg:#EEF0F2; --surface:#FFFFFF; --surface-2:#F5F6F8; --line:#DDE1E6; --line-strong:#C3C9D1;
   --ink:#1B222B; --ink-2:#4E5866; --ink-3:#7D8693;
   --graphite:#1B222B; --graphite-2:#252E39; --graphite-line:#333D4A; --graphite-ink:#C9D0D9;
@@ -19,22 +20,6 @@
   --f-ar:"IBM Plex Sans Arabic", "Noto Sans Arabic", Tahoma, sans-serif;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:#0E1217; --surface:#161B22; --surface-2:#1C222B; --line:#262D36; --line-strong:#38414D;
-    --ink:#E8ECF0; --ink-2:#AEB7C2; --ink-3:#7C8794;
-    --graphite:#0A0E13; --graphite-2:#141A21; --graphite-line:#222A34; --graphite-ink:#AEB7C2;
-    --brand:#FF2D3A; --brand-ink:#FF7A82; --brand-soft:#3A1418;
-    --primary:#E8ECF0; --on-primary:#10151B;
-    --ok-bg:#12291B; --ok:#93D6A8; --ok-line:#2E6A43;
-    --warn-bg:#31240C; --warn:#F1C677; --warn-line:#7A5714;
-    --ko-bg:#391317; --ko:#FFB2B6; --ko-line:#8C2028;
-    --na-bg:#1F252E; --na:#C3CAD3; --na-line:#3E4753;
-    --info-bg:#14243A; --info:#B4CDEF; --info-line:#2F5687;
-    --overlay:rgba(0,0,0,.65); --shadow:none;
-    color-scheme: dark;
-  }
-}
 * { box-sizing:border-box; }
 html, body { margin:0; }
 body { background:var(--bg); color:var(--ink); font-family:var(--f-sans); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; }
@@ -51,7 +36,6 @@ img { max-width:100%; }
 .app-top-in { max-width:1240px; margin:0 auto; padding-block:14px; padding-left:max(20px, env(safe-area-inset-left,0px)); padding-right:max(20px, env(safe-area-inset-right,0px)); display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
 .logo { height:30px; width:auto; display:block; }
 .logo-dark { display:none; }
-@media (prefers-color-scheme: dark) { .logo-light { display:none; } .logo-dark { display:block; } }
 .prodotto { font-family:var(--f-head); font-weight:600; font-size:15px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-2); padding-inline-start:18px; border-inline-start:1px solid var(--line-strong); }
 .who { margin-inline-start:auto; font-size:13px; color:var(--ink-3); }
 nav.tabs { max-width:1240px; margin:0 auto; display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; padding-left:max(12px, env(safe-area-inset-left,0px)); padding-right:max(12px, env(safe-area-inset-right,0px)); }
@@ -560,8 +544,6 @@ input:focus, select:focus, textarea:focus { border-color:var(--ink-2); box-shado
 .lang-chiaro { border-color:var(--graphite-line); }
 .grafico, .mini-stat, .livelli div, .piano-chip { box-shadow:none; }
 .segmented button.on { background:var(--graphite); color:#FFFFFF; }
-@media (prefers-color-scheme: dark) { .btn:hover { background:#FFFFFF; border-color:#FFFFFF; } .segmented button.on { background:var(--ink); color:var(--bg); } }
-
 /* Targa: carattere della targa reale, più sobrio */
 .targa { font-family:var(--f-mono); font-weight:600; border-color:#2A323C; border-width:1.25px; }
 

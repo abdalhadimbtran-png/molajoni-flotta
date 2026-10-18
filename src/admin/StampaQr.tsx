@@ -43,7 +43,7 @@ export default function StampaQr() {
               <img className="label-logo" src="/logo-molajoni.png" alt="Molajoni Antincendi" />
               <div><Targa t={v.targa} /></div>
               <div className="label-mm">{v.marca_modello}</div>
-              <div className="label-istr">Scansiona: prendi, riconsegna, km, problemi<br /><span lang="ar" dir="rtl">امسح الرمز: استلام، إرجاع، كيلومترات، مشاكل</span></div>
+              <div className="label-istr">Scansiona: prendi, riconsegna, km, problemi</div>
             </div>
           </div>
         ))}

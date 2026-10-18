@@ -244,6 +244,7 @@ const AR: Record<string, string> = {
   "Panoramica": "نظرة عامة",
   "Account": "الحسابات",
   "Sicurezza": "الأمان",
+  "Menu": "القائمة",
   'Molajoni · Flotta': 'Molajoni · الأسطول', 'Accesso…': 'جارٍ الدخول…', 'Codice': 'الرمز', 'PIN': 'PIN',
   "Accedi una volta: poi il QR del veicolo ti porta direttamente all'operazione.": 'سجّل الدخول مرة واحدة: بعدها رمز QR للسيارة يأخذك مباشرة إلى العملية.',
   'Codice e PIN te li dà il responsabile flotta.': 'الرمز وPIN يعطيك إياهما مسؤول الأسطول.', 'Accesso non riuscito.': 'تعذّر الدخول.',

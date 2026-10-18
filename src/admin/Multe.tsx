@@ -103,7 +103,7 @@ function FormMulta({ m, veicoli, tecnici, onClose, onSalvato }: { m: Multa | nul
         <div className="field"><label htmlFor="mu-v">{t('Veicolo')}</label><select id="mu-v" required value={f.veicolo_id} onChange={set('veicolo_id')}>
           <option value="">{t('Seleziona')}</option>{veicoli.map(v => <option key={v.id} value={v.id}>{v.targa}</option>)}</select></div>
         <div className="field"><label htmlFor="mu-d">{t('Data e ora infrazione')}</label><input id="mu-d" type="datetime-local" required value={f.data_ora} onChange={set('data_ora')} /></div>
-        <div className="span2 row-flex"><button type="button" className="btn-ghost" onClick={trova}>🔎 {t('Trova il conducente dal registro')}</button>
+        <div className="span2 row-flex"><button type="button" className="btn-ghost" onClick={trova}>{t('Trova il conducente dal registro')}</button>
           {cond && (cond.tecnico_id
             ? <span className="msg ok">{t('{n} aveva il veicolo (dal {d})', { n: cond.nome ?? '', d: fmtOra(cond.dal) })}</span>
             : <span className="msg warn">{cond.esito === 'in_sede' ? t('Il veicolo risultava in sede: verifica a mano.') : t('Nessun movimento registrato prima di quell\'ora.')}</span>)}</div>

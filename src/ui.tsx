@@ -67,3 +67,13 @@ export const Targa = ({ t, big = false }: { t: string | null | undefined; big?: 
 export const Logo = ({ chiaro = false }: { chiaro?: boolean }) => chiaro
   ? <img className="logo" src="/logo-molajoni-bianco.png" alt="Molajoni Antincendi" />
   : <><img className="logo logo-light" src="/logo-molajoni.png" alt="Molajoni Antincendi" /><img className="logo logo-dark" src="/logo-molajoni-bianco.png" alt="Molajoni Antincendi" /></>;
+
+/** Menu di azioni secondarie per le righe delle tabelle. */
+export function MenuAzioni({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="menu-az" onClick={e => { if ((e.target as HTMLElement).closest('.menu-az-pop button, .menu-az-pop a')) (e.currentTarget as HTMLDetailsElement).open = false; }}>
+      <summary className="btn-ghost btn-sm">{label}</summary>
+      <div className="menu-az-pop">{children}</div>
+    </details>
+  );
+}

@@ -22,6 +22,7 @@ const IcoAllarme = () => <Ico d={<><path d="M12 3 2 20h20L12 3z" /><path d="M12 
 const IcoQr = () => <Ico d={<><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M21 14v7h-4M17 21v-2" /></>} />;
 const IcoFoto = () => <Ico d={<><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>} />;
 const IcoDoc = () => <Ico d={<><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h6" /></>} />;
+const IcoTel = () => <Ico d={<path d="M5 3.5h3.5l2 5-2.5 1.5a11 11 0 0 0 6 6l1.5-2.5 5 2V19a1.5 1.5 0 0 1-1.5 1.5A16.5 16.5 0 0 1 3.5 5 1.5 1.5 0 0 1 5 3.5Z" />} />;
 const IcoLista = () => <Ico d={<><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" /></>} />;
 
 /** Contenitore dell'app tecnico: accesso con codice + PIN, poi le pagine. */
@@ -68,7 +69,6 @@ function Login({ onOk, conVeicolo }: { onOk: (t: string) => void; conVeicolo: bo
   return (
     <>
     <div className="tec-hero">
-      <span className="kicker">{t('App tecnici')}</span>
       <div className="tec-hero-t">{t('La tua giornata e il tuo veicolo, in un QR.')}</div>
     </div>
     <form className="tec-card form" onSubmit={invia}>
@@ -361,7 +361,7 @@ function FormSegnalazione({ token, qr, iniziale, onFatto, onScaduta, onAnnulla }
             <span style={{ flex: 1 }}>{g === 'utilizzabile' ? t('Sì, posso continuare') : g === 'da_verificare' ? t('Sì, ma va controllato presto') : t('No, veicolo fermo')}</span><Pill s={GRAVITA[g][0]}>{t(GRAVITA[g][1])}</Pill></label>))}
       </fieldset>
       <div className="field"><label htmlFor="desc">3 · {t('Descrizione')}</label><textarea id="desc" required minLength={5} value={desc} onChange={e => setDesc(e.target.value)} placeholder={t('Cosa è successo, dove, quando')} />
-        <span className="sub">🎤 {t('Non vuoi scrivere? Premi il microfono sulla tastiera e parla.')}</span></div>
+        <span className="sub">{t('Non vuoi scrivere? Premi il microfono sulla tastiera e parla.')}</span></div>
       <div className="field"><span className="lbl-sm">4 · {t('Foto (facoltative, max 5)')}</span>
         <label className="big-btn light foto-btn"><IcoFoto /><span>{foto.length ? t('{n} foto pronte', { n: foto.length }) : t('Scatta o scegli una foto')}</span>
           <input type="file" accept="image/*" capture="environment" multiple hidden onChange={e => setFoto([...foto, ...Array.from(e.target.files ?? [])].slice(0, 5))} /></label>
@@ -393,17 +393,17 @@ function Notifiche({ token }: { token: string }) {
       const ap = aperta === n.id || d.livello !== 'urgente';
       return (
         <section key={n.id} className={`tec-card avviso ${d.livello}`}>
-          <div className="lbl-sm">{d.livello === 'urgente' ? `🔴 ${t('URGENTE')}` : d.livello === 'importante' ? `⚠️ ${t('Importante')}` : `ℹ️ ${t('Avviso')}`} · {fmtOra(n.creato_il, locale)}{d.da ? ` · ${d.da}` : ''}</div>
+          <div className="lbl-sm">{d.livello === 'urgente' ? t('URGENTE') : d.livello === 'importante' ? t('Importante') : t('Avviso')} · {fmtOra(n.creato_il, locale)}{d.da ? ` · ${d.da}` : ''}</div>
           <div className="tec-h2">{d.titolo}</div>
           {!ap ? <button className="btn big avviso-apri" onClick={() => setAperta(n.id)}>{t('Apri e leggi')}</button> : <>
             {(d.ora || d.luogo) && <div className="avviso-righe">
               {d.ora && <div><span className="lbl-sm">{t('Quando')}</span><b>{d.ora}</b></div>}
               {d.luogo && <div><span className="lbl-sm">{t('Dove')}</span><b>{d.luogo}</b>
-                <a className="link-mappa" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.luogo)}`} target="_blank" rel="noopener noreferrer">📍 {t('Apri mappa')}</a></div>}
+                <a className="link-mappa" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.luogo)}`} target="_blank" rel="noopener noreferrer">{t('Apri mappa')}</a></div>}
             </div>}
             {d.testo && <p className="avviso-testo">{d.testo}</p>}
             {(d.contatto || d.telefono) && <div className="avviso-righe"><div><span className="lbl-sm">{t('Contatto')}</span><b>{d.contatto}</b>
-              {d.telefono && <a className="big-btn light" href={`tel:${d.telefono.replace(/\s/g, '')}`}>📞 <span dir="ltr">{d.telefono}</span></a>}</div></div>}
+              {d.telefono && <a className="big-btn light" href={`tel:${d.telefono.replace(/\s/g, '')}`}><IcoTel /><span dir="ltr">{d.telefono}</span></a>}</div></div>}
             {d.targa && <div className="row-flex"><span>{t('Veicolo:')}</span><Targa t={d.targa} /></div>}
             <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ricevuto')}</button>
           </>}
@@ -414,7 +414,7 @@ function Notifiche({ token }: { token: string }) {
       const d = n.dati as unknown as DatiPiano;
       return (
         <section key={n.id} className={`tec-card notifica ${d.aggiornato || d.annullato ? 'cambio' : ''}`}>
-          <div className="lbl-sm">🔔 {d.annullato ? t('Piano annullato') : d.aggiornato ? t('Piano modificato') : t('Nuovo piano di lavoro')} · {fmtOra(n.creato_il, locale)}</div>
+          <div className="lbl-sm">{d.annullato ? t('Piano annullato') : d.aggiornato ? t('Piano modificato') : t('Nuovo piano di lavoro')} · {fmtOra(n.creato_il, locale)}</div>
           <div className="tec-h2">{fmtGiorno(d.data, locale)}</div>
           {d.annullato ? <p>{t('Non hai più attività o veicolo per questo giorno.')}</p> : <>
             <div className="row-flex"><span>{t('Veicolo:')}</span>{d.veicolo ? <><Targa t={d.veicolo.targa} big /><span className="sub">{d.veicolo.modello}</span></> : <b>{t('non assegnato')}</b>}</div>
@@ -428,7 +428,7 @@ function Notifiche({ token }: { token: string }) {
     const d = n.dati as { targa?: string; nota?: string };
     return (
       <section key={n.id} className="tec-card notifica">
-        <div className="lbl-sm">🔔 {t('Problema risolto')} · {fmtOra(n.creato_il, locale)}</div>
+        <div className="lbl-sm">{t('Problema risolto')} · {fmtOra(n.creato_il, locale)}</div>
         <div className="row-flex"><Targa t={d.targa} /> <span>{d.nota}</span></div>
         <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ho visto')}</button>
       </section>
@@ -447,7 +447,7 @@ function AttivaNotifiche({ token }: { token: string }) {
   }
   return (
     <section className="tec-card">
-      <div className="lbl-sm">🔔 {t('Notifiche sul telefono')}</div>
+      <div className="lbl-sm">{t('Notifiche sul telefono')}</div>
       {s === 'serve_home' ? <p>{t('Su iPhone: premi Condividi e poi "Aggiungi alla schermata Home". Apri l\'app dalla Home e attiva le notifiche.')}</p>
         : s === 'negate' ? <p>{t('Le notifiche sono bloccate. Attivale dalle impostazioni del browser per questo sito.')}</p>
         : <><p>{t('Ricevi un avviso quando il responsabile conferma il tuo veicolo e le tue attività.')}</p>

@@ -61,15 +61,13 @@ export default function Cruscotto() {
     <>
       <div className="page-hero">
         <div>
-          <span className="kicker">{fmtGiorno(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }), locale)}</span>
           <h1>{t('Situazione flotta')}</h1>
-          <p className="sub">{t('{v} veicoli attivi · {n} tecnici', { v: veicoli.length, n: tecnici.length })}</p>
+          <p className="sub data-oggi">{fmtGiorno(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }), locale)}, {t('{v} veicoli attivi e {n} tecnici', { v: veicoli.length, n: tecnici.length })}</p>
         </div>
         <Link to="/piano" className={`piano-chip ${piano.confermato_il ? 'ok' : bloccati ? 'ko' : 'warn'}`}>
           <span className="dot" />
           <span><b>{t('Piano di {d}', { d: fmtData(giorno) })}</b>
             <span className="sub">{piano.confermato_il ? t('Confermato e inviato') : bloccati ? t('{n} tecnici bloccati: da sistemare', { n: bloccati }) : t('Da confermare')}</span></span>
-          <span className="freccia" aria-hidden="true">→</span>
         </Link>
       </div>
       <div className="kpis">

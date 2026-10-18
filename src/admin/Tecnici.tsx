@@ -42,7 +42,7 @@ export default function Tecnici() {
     <>
       <div className="section-title">{t('Tecnici e conducenti')} <span className="meta">{lista.length}</span><span className="spacer" />
         <label className="sub chk"><input type="checkbox" checked={mostraInattivi} onChange={e => setMostraInattivi(e.target.checked)} /> {t('Mostra non attivi')}</label>
-        <Link className="btn-ghost btn-sm" to={`${base}/installa-tecnici`}>📱 {t('Scheda app vuota')}</Link>
+        <Link className="btn-ghost btn-sm" to={`${base}/installa-tecnici`}>{t('Scheda app vuota')}</Link>
         <button className="btn btn-sm" onClick={() => setModifica('nuovo')}>{t('Nuovo tecnico')}</button></div>
       <div className="table-wrap"><table>
         <thead><tr><th>{t('Tecnico')}</th><th>{t('Codice app')}</th><th>{t('Ruolo')}</th><th>{t('Patente')}</th><th>{t('Accesso app')}</th><th></th></tr></thead>
@@ -59,10 +59,10 @@ export default function Tecnici() {
               <td>{bloccato ? <Pill s="ko">{t('Bloccato')}</Pill> : x.ha_pin ? <Pill s="ok">{t('PIN attivo')}</Pill> : <Pill s="warn">{t('PIN da impostare')}</Pill>}</td>
               <td className="nowrap actions">
                 <button className="btn-ghost btn-sm" onClick={() => setModifica(x)}>{t('Modifica')}</button>
-                {x.attivo && <button className="btn btn-sm" onClick={() => setScheda(x)}>📱 {t('Scheda app + PIN')}</button>}
+                {x.attivo && <button className="btn btn-sm" onClick={() => setScheda(x)}>{t('Scheda app + PIN')}</button>}
                 <button className="btn-ghost btn-sm" onClick={() => setPin(x)}>{x.ha_pin ? t('Nuovo PIN') : t('Imposta PIN')}</button>
                 {bloccato && <button className="btn-ghost btn-sm" onClick={() => sblocca(x)}>{t('Sblocca')}</button>}
-                {g != null && g <= 30 && <Link className="btn-ghost btn-sm" to={`/avvisi?t=${x.id}&modello=patente&d=${fmtData(x.patente_scadenza)}`}>⚠️ {t('Avvisa')}</Link>}
+                {g != null && g <= 30 && <Link className="btn-ghost btn-sm" to={`/avvisi?t=${x.id}&modello=patente&d=${fmtData(x.patente_scadenza)}`}>{t('Avvisa')}</Link>}
               </td>
             </tr>
           );

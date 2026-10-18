@@ -65,7 +65,7 @@ export default function Avvisi() {
         <div className="field"><span className="lbl-sm">{t('Tipo')}</span>
           <div className="scelte-liv">{(['urgente', 'importante', 'info'] as const).map(l => (
             <button type="button" key={l} className={`${l} ${f.livello === l ? 'on' : ''}`} onClick={() => setF({ ...f, livello: l })}>
-              {l === 'urgente' ? `🔴 ${t('Urgente')}` : l === 'importante' ? `⚠️ ${t('Importante')}` : `ℹ️ ${t('Informazione')}`}</button>))}</div></div>
+              <span className={`dot-liv ${l}`} />{l === 'urgente' ? t('Urgente') : l === 'importante' ? t('Importante') : t('Informazione')}</button>))}</div></div>
         <div className="form grid2">
           <div className="field span2"><label htmlFor="av-t">{t('Titolo')}</label><input id="av-t" required value={f.titolo} onChange={set('titolo')} placeholder={t('Es. Intervento urgente: allarme IRAI')} /></div>
           <div className="field"><label htmlFor="av-o">{t('Quando')}</label><input id="av-o" value={f.ora} onChange={set('ora')} placeholder={t('Es. Subito / oggi 14:30')} /></div>

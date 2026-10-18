@@ -1,13 +1,16 @@
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { AreaBilingue, SceltaLingua, useT } from '../../lib/i18n';
-import { Caricamento, Logo } from '../../ui';
+import { Caricamento } from '../../ui';
+import { Icona, Layout, type Gruppo } from '../Barra';
 import { useSessione } from '../Shell';
 import { URL_FUNZIONI } from '../../lib/push';
 
-const TABS: [string, string][] = [
-  ['/admin', 'Panoramica'], ['/admin/account', 'Account'], ['/admin/tecnici', 'Tecnici'],
-  ['/admin/sicurezza', 'Sicurezza'], ['/admin/registro', 'Registro movimenti'],
+const GRUPPI: Gruppo[] = [
+  { titolo: 'Amministrazione', voci: [
+    { to: '/admin', label: 'Panoramica', icona: 'panoramica', end: true }, { to: '/admin/account', label: 'Account', icona: 'account' },
+    { to: '/admin/tecnici', label: 'Tecnici', icona: 'tecnici' }, { to: '/admin/sicurezza', label: 'Sicurezza', icona: 'sicurezza' },
+    { to: '/admin/registro', label: 'Registro movimenti', icona: 'registro' }] },
 ];
 
 /** Area dell'amministratore del sistema: unico livello con la scelta italiano/arabo. */
@@ -17,32 +20,20 @@ export default function AreaAdmin() {
   if (stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
   if (stato === 'anonimo') return <Navigate to="/accesso" replace state={{ da: loc.pathname }} />;
   if (!admin) return <Navigate to="/cruscotto" replace />;
-  return (
-    <AreaBilingue>
-      <Testata email={sessione?.user.email ?? ''} />
-      <div className="wrap"><Outlet /></div>
-    </AreaBilingue>
-  );
+  return <AreaBilingue><Contenuto email={sessione?.user.email ?? ''} /></AreaBilingue>;
 }
 
-function Testata({ email }: { email: string }) {
+function Contenuto({ email }: { email: string }) {
   const { t } = useT();
   return (
-    <header className="app-top no-print">
-      <div className="app-bar admin-bar">
-        <div className="app-top-in">
-          <Logo chiaro />
-          <span className="prodotto">{t('Amministrazione')}</span>
-          <span className="who">{email}</span>
-          <NavLink className="btn-ghost btn-sm" to="/cruscotto">{t('Pannello responsabile')}</NavLink>
-          <SceltaLingua chiaro />
-          <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
-        </div>
-      </div>
-      <nav className="tabs">
-        {TABS.map(([to, l]) => <NavLink key={to} to={to} end={to === '/admin'} className={({ isActive }) => (isActive ? 'active' : '')}>{t(l)}</NavLink>)}
-      </nav>
-    </header>
+    <Layout prodotto={t('Amministrazione')} gruppi={GRUPPI}
+      utilita={<SceltaLingua chiaro />}
+      piede={<>
+        <NavLink className="side-voce" to="/cruscotto"><Icona n="ritorno" /><span>{t('Pannello responsabile')}</span></NavLink>
+        <div className="side-utente"><span>{email}</span><button className="side-esci" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button></div>
+      </>}>
+      <Outlet />
+    </Layout>
   );
 }
 

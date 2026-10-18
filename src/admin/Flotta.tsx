@@ -5,7 +5,7 @@ import { supabase, rpc, testoErrore } from '../lib/supabase';
 import { STATI_VEICOLO, fmtData, fmtKm, giorniA, normTarga } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { SEL_TECNICI, SEL_VEICOLI, type Tecnico, type Veicolo } from '../lib/tipi';
-import { Banner, Caricamento, Errore, Modal, Pill, Targa, toast, useLoad } from '../ui';
+import { Banner, Caricamento, Errore, Modal, Pill, Targa, toast, useLoad, MenuAzioni } from '../ui';
 import DettaglioVeicolo from './DettaglioVeicolo';
 
 export const urlQr = (token: string) => `${window.location.origin}/t/v/${token}`;
@@ -62,9 +62,11 @@ export default function Flotta() {
               <td className="wrap-cell">{v.controlli.filter(c => c.l === 'ko').map((c, i) => <div key={i} className="msg ko">{tm(c.m)}</div>)}</td>
               <td className="nowrap actions">
                 <button className="btn-ghost btn-sm" onClick={() => setModifica(v)}>{t('Modifica')}</button>
-                <button className="btn-ghost btn-sm" onClick={() => setMov(v)}>{t('Movimento')}</button>
-                <button className="btn-ghost btn-sm" onClick={() => setDet(v)}>{t('Dotazioni e documenti')}</button>
-                <button className="btn-ghost btn-sm" onClick={() => setQr(v)}>QR</button>
+                <MenuAzioni label={t('Altro')}>
+                  <button onClick={() => setMov(v)}>{t('Registra movimento')}</button>
+                  <button onClick={() => setDet(v)}>{t('Dotazioni e documenti')}</button>
+                  <button onClick={() => setQr(v)}>{t('Codice QR')}</button>
+                </MenuAzioni>
               </td>
             </tr>
           );

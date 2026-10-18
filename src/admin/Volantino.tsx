@@ -61,7 +61,7 @@ Molajoni Antincendi`)}` : '';
           <div className="row-flex wrap-end">
             <div className="field" style={{ flex: 1, minWidth: 240 }}><label htmlFor="v-mail">{t('Email di {n}', { n: `${dati.tecnico.nome} ${dati.tecnico.cognome}` })}</label>
               <input id="v-mail" type="email" dir="ltr" value={email} onChange={e => setEmail(e.target.value)} placeholder="nome@esempio.it" /></div>
-            <a className={`btn ${emailValida ? '' : 'disabled'}`} aria-disabled={!emailValida} href={emailValida ? mailto : undefined}>✉️ {t('Apri email pronta')}</a>
+            <a className={`btn ${emailValida ? '' : 'disabled'}`} aria-disabled={!emailValida} href={emailValida ? mailto : undefined}>{t('Apri email pronta')}</a>
           </div>
           <p className="hint">{t("Si apre il tuo programma di posta con il messaggio già scritto: controlla e premi Invia. Il PIN è visibile solo adesso: se chiudi la pagina, per rivederlo devi generarne uno nuovo.")}</p>
         </div>

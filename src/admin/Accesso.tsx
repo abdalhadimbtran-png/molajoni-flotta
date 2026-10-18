@@ -31,7 +31,6 @@ export default function Accesso() {
       <aside className="accesso-brand">
         <Logo chiaro />
         <div className="accesso-claim">
-          <span className="kicker">{t('Gestione flotta')}</span>
           <h1>{t('Ogni veicolo, ogni tecnico, ogni giorno: sotto controllo.')}</h1>
           <ul>
             <li>{t('Piano giornaliero di veicoli e interventi')}</li>
@@ -51,7 +50,7 @@ export default function Accesso() {
           <button className="btn big" disabled={invio}>{invio ? t('Accesso…') : t('Accedi')}</button>
           <p className="hint">{t("Non hai un account? Chiedilo all'amministratore del sistema.")}</p>
         </form>
-        <a className="accesso-tec" href="/t">{t('Sei un tecnico? Vai alla tua giornata')} <span className="freccia" aria-hidden="true">→</span></a>
+        <a className="accesso-tec" href="/t">{t('Sei un tecnico? Vai alla tua giornata')}</a>
       </main>
     </div>
   );

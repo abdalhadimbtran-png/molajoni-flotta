@@ -3,7 +3,8 @@ import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useT } from '../lib/i18n';
-import { Caricamento, Logo } from '../ui';
+import { Caricamento } from '../ui';
+import { Icona, Layout, type Gruppo } from './Barra';
 import Campanella from './Campanella';
 import { InstallaApp } from '../Installa';
 
@@ -31,10 +32,15 @@ export function useSessione() {
   return { sessione, stato, admin };
 }
 
-const TABS: [string, string][] = [
-  ['/cruscotto', 'Cruscotto'], ['/piano', 'Pianificazione'], ['/avvisi', 'Avvisi'], ['/flotta', 'Flotta'],
-  ['/tecnici', 'Tecnici'], ['/segnalazioni', 'Segnalazioni'], ['/multe', 'Multe'], ['/carburante', 'Carburante'],
-  ['/report', 'Report'], ['/registro', 'Registro movimenti'],
+const GRUPPI: Gruppo[] = [
+  { titolo: 'Operatività', voci: [
+    { to: '/cruscotto', label: 'Cruscotto', icona: 'cruscotto' }, { to: '/piano', label: 'Pianificazione', icona: 'piano' }, { to: '/avvisi', label: 'Avvisi', icona: 'avvisi' }] },
+  { titolo: 'Risorse', voci: [
+    { to: '/flotta', label: 'Flotta', icona: 'flotta' }, { to: '/tecnici', label: 'Tecnici', icona: 'tecnici' }] },
+  { titolo: 'Controllo', voci: [
+    { to: '/segnalazioni', label: 'Segnalazioni', icona: 'segnalazioni' }, { to: '/multe', label: 'Multe', icona: 'multe' }, { to: '/carburante', label: 'Carburante', icona: 'carburante' }] },
+  { titolo: 'Dati', voci: [
+    { to: '/report', label: 'Report', icona: 'report' }, { to: '/registro', label: 'Registro movimenti', icona: 'registro' }] },
 ];
 
 export default function Shell() {
@@ -51,24 +57,13 @@ export default function Shell() {
     </div>
   );
   return (
-    <>
-      <header className="app-top no-print">
-        <div className="app-bar">
-          <div className="app-top-in">
-            <Logo chiaro />
-            <span className="prodotto">{t('Gestione flotta')}</span>
-            <span className="who">{sessione?.user.email}</span>
-            <InstallaApp variante="admin" />
-            <Campanella />
-            {admin && <NavLink className="btn-ghost btn-sm" to="/admin">{t('Amministrazione')}</NavLink>}
-            <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
-          </div>
-        </div>
-        <nav className="tabs">
-          {TABS.map(([to, l]) => <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'active' : '')}>{t(l)}</NavLink>)}
-        </nav>
-      </header>
-      <div className="wrap"><Outlet /></div>
-    </>
+    <Layout prodotto={t('Gestione flotta')} gruppi={GRUPPI}
+      utilita={<><Campanella /><InstallaApp variante="admin" /></>}
+      piede={<>
+        {admin && <NavLink className="side-voce" to="/admin"><Icona n="sicurezza" /><span>{t('Amministrazione')}</span></NavLink>}
+        <div className="side-utente"><span>{sessione?.user.email}</span><button className="side-esci" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button></div>
+      </>}>
+      <Outlet />
+    </Layout>
   );
 }

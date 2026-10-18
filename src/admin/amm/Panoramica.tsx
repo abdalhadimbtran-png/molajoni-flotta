@@ -40,7 +40,7 @@ export default function Panoramica() {
   return (
     <>
       <div className="page-hero">
-        <div><span className="kicker">{t('Amministrazione')}</span><h1>{t('Panoramica del sistema')}</h1>
+        <div><h1>{t('Panoramica del sistema')}</h1>
           <p className="sub">{t('Dal {a} al {b}', { a: new Date(data.da).toLocaleDateString(locale), b: new Date(data.a).toLocaleDateString(locale) })}</p></div>
         <div className="segmented" role="group" aria-label={t('Periodo')}>
           {[3, 6, 12].map(n => <button key={n} className={mesi === n ? 'on' : ''} onClick={() => setMesi(n)}>{t('{n} mesi', { n })}</button>)}

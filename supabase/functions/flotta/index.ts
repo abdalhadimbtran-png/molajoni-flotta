@@ -2,6 +2,7 @@
 // /push      (chiamata dal database) invia la notifica push ai telefoni iscritti
 // /foto      (app tecnico) carica una foto su una segnalazione propria
 // /documento (app tecnico) restituisce un link temporaneo a un documento del veicolo
+// /account   (amministratore) elenco, creazione, password e stato degli account responsabile
 // Le chiavi stanno nella tabella privata config_privata, letta con la chiave di servizio.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
@@ -125,6 +126,63 @@ async function documento(req: Request) {
   return json({ url: s.data.signedUrl });
 }
 
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+async function account(req: Request) {
+  const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const { data: io, error: e1 } = await db.auth.getUser(jwt);
+  if (e1 || !io?.user) return json({ errore: "Sessione non valida: accedi di nuovo." }, 401);
+  const { data: me } = await db.from("responsabili").select("ruolo,attivo").eq("user_id", io.user.id).maybeSingle();
+  if (!me || !me.attivo || me.ruolo !== "admin") return json({ errore: "Accesso riservato all'amministratore" }, 403);
+  const b = await req.json().catch(() => ({}));
+  const traccia = (azione: string, record: string, dopo: unknown) =>
+    db.from("audit_log").insert({ tabella: "account", record_id: record, azione, dopo, utente: io.user.id });
+
+  if (b.azione === "elenco") {
+    const { data: rs, error } = await db.from("responsabili").select("user_id,nome,email,ruolo,attivo,creato_il").order("creato_il");
+    if (error) return json({ errore: "Errore del server" }, 500);
+    const out = [];
+    for (const r of rs ?? []) {
+      const { data: u } = await db.auth.admin.getUserById(r.user_id);
+      out.push({ ...r, email: u?.user?.email ?? r.email, ultimo_accesso: u?.user?.last_sign_in_at ?? null, io: r.user_id === io.user.id });
+    }
+    return json({ account: out });
+  }
+  if (b.azione === "crea") {
+    const email = String(b.email ?? "").trim().toLowerCase(), nome = String(b.nome ?? "").trim(), password = String(b.password ?? "");
+    const ruolo = b.ruolo === "admin" ? "admin" : "responsabile";
+    if (!EMAIL.test(email)) return json({ errore: "Email non valida" }, 400);
+    if (nome.length < 2 || nome.length > 80) return json({ errore: "Scrivi nome e cognome" }, 400);
+    if (password.length < 10 || password.length > 72) return json({ errore: "La password deve avere almeno 10 caratteri." }, 400);
+    const { data: nu, error } = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { nome } });
+    if (error || !nu?.user) return json({ errore: /already|registered|exists/i.test(error?.message ?? "") ? "Esiste già un account con questa email." : "Creazione account non riuscita" }, 400);
+    const ins = await db.from("responsabili").insert({ user_id: nu.user.id, nome, email, ruolo, attivo: true });
+    if (ins.error) { await db.auth.admin.deleteUser(nu.user.id); return json({ errore: "Creazione account non riuscita" }, 500); }
+    await traccia("CREA", nu.user.id, { email, nome, ruolo });
+    return json({ ok: true });
+  }
+  if (b.azione === "password") {
+    const id = String(b.user_id ?? ""), password = String(b.password ?? "");
+    if (password.length < 10 || password.length > 72) return json({ errore: "La password deve avere almeno 10 caratteri." }, 400);
+    const { data: r } = await db.from("responsabili").select("user_id").eq("user_id", id).maybeSingle();
+    if (!r) return json({ errore: "Account non trovato" }, 404);
+    const { error } = await db.auth.admin.updateUserById(id, { password });
+    if (error) return json({ errore: "Cambio password non riuscito" }, 400);
+    await traccia("PASSWORD", id, { cambiata: true });
+    return json({ ok: true });
+  }
+  if (b.azione === "stato") {
+    const id = String(b.user_id ?? ""), attivo = b.attivo === true, ruolo = b.ruolo === "admin" ? "admin" : "responsabile";
+    if (id === io.user.id) return json({ errore: "Non puoi modificare il tuo stesso account" }, 400);
+    const up = await db.from("responsabili").update({ attivo, ruolo }).eq("user_id", id).select("user_id");
+    if (up.error || !up.data?.length) return json({ errore: "Account non trovato" }, 404);
+    // account disattivato: bloccato anche l'accesso
+    await db.auth.admin.updateUserById(id, { ban_duration: attivo ? "none" : "876000h" });
+    await traccia("STATO", id, { attivo, ruolo });
+    return json({ ok: true });
+  }
+  return json({ errore: "Richiesta non valida" }, 400);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ errore: "metodo non ammesso" }, 405);
@@ -133,6 +191,7 @@ Deno.serve(async (req) => {
     if (p.endsWith("/push")) return await push(req);
     if (p.endsWith("/foto")) return await foto(req);
     if (p.endsWith("/documento")) return await documento(req);
+    if (p.endsWith("/account")) return await account(req);
     return json({ errore: "percorso sconosciuto" }, 404);
   } catch (e) {
     console.error(e);

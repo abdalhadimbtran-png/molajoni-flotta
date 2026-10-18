@@ -1,13 +1,13 @@
 import { FormEvent, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase, testoErrore } from '../lib/supabase';
-import { SceltaLingua, useT } from '../lib/i18n';
+import { useT } from '../lib/i18n';
 import { useSessione } from './Shell';
 import { Banner, Logo } from '../ui';
 
 /** Accesso del responsabile flotta. Gli account si creano solo dall'amministratore (nessuna registrazione pubblica). */
 export default function Accesso() {
-  const { stato } = useSessione();
+  const { stato, admin } = useSessione();
   const { t, tm } = useT();
   const loc = useLocation() as { state?: { da?: string } };
   const [email, setEmail] = useState('');
@@ -15,13 +15,13 @@ export default function Accesso() {
   const [msg, setMsg] = useState<{ s: 'ok' | 'ko'; t: string } | null>(null);
   const [invio, setInvio] = useState(false);
 
-  if (stato === 'ok' || stato === 'non_abilitato') return <Navigate to={loc.state?.da ?? '/cruscotto'} replace />;
+  if (stato === 'ok' || stato === 'non_abilitato') return <Navigate to={loc.state?.da ?? (admin ? '/admin' : '/cruscotto')} replace />;
 
   async function invia(e: FormEvent) {
     e.preventDefault(); setMsg(null); setInvio(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (error) throw new Error(error.message.includes('Invalid login') ? 'Email o password non corretti.' : error.message.includes('not confirmed') ? "Conferma prima l'email dal link che hai ricevuto." : 'Accesso non riuscito. Riprova tra poco.');
+      if (error) throw new Error(error.message.includes('Invalid login') ? 'Email o password non corretti.' : error.message.includes('not confirmed') ? "Conferma prima l'email dal link che hai ricevuto." : /banned/i.test(error.message) ? "Account disattivato: contatta l'amministratore." : 'Accesso non riuscito. Riprova tra poco.');
     } catch (err) { setMsg({ s: 'ko', t: testoErrore(err) }); }
     finally { setInvio(false); }
   }
@@ -42,7 +42,6 @@ export default function Accesso() {
         <span className="accesso-foot">Molajoni Antincendi · {t('Uso interno')}</span>
       </aside>
       <main className="accesso-form">
-        <div className="accesso-lang"><SceltaLingua /></div>
         <form className="accesso-box form" onSubmit={invia}>
           <h2>{t('Accedi')}</h2>
           <p className="subtitle">{t('Accesso riservato al responsabile flotta. I tecnici usano il QR sul veicolo.')}</p>

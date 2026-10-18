@@ -10,7 +10,7 @@ export interface Veicolo {
 }
 
 export interface Tecnico {
-  id: number; codice: string; nome: string; cognome: string; ruolo: string | null; telefono: string | null;
+  id: number; codice: string; nome: string; cognome: string; ruolo: string | null; telefono: string | null; email: string | null;
   patente_categoria: string | null; patente_scadenza: string | null; attivo: boolean; ha_pin: boolean;
   tentativi_falliti: number; bloccato_fino: string | null;
 }
@@ -31,4 +31,4 @@ export interface RigaPiano {
 export interface Piano { data: string; confermato_il: string | null; righe: RigaPiano[] }
 
 export const SEL_VEICOLI = 'id,targa,marca_modello,tipo,proprieta,km_attuali,km_prossimo_tagliando,scad_assicurazione,scad_revisione,scad_bollo,tecnico_in_carico,in_carico_dal,in_carico_nome,in_officina,dismesso,qr_token,note,controlli,stato,km_giorno,tagliando_previsto';
-export const SEL_TECNICI = 'id,codice,nome,cognome,ruolo,telefono,patente_categoria,patente_scadenza,attivo,ha_pin,tentativi_falliti,bloccato_fino';
+export const SEL_TECNICI = 'id,codice,nome,cognome,ruolo,telefono,email,patente_categoria,patente_scadenza,attivo,ha_pin,tentativi_falliti,bloccato_fino';

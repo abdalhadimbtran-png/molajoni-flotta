@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import jsQR from 'jsqr';
 import { rpc, testoErrore } from '../lib/supabase';
 import { CARBURANTE, CATEGORIE, GRAVITA, STATI_SEGN, TIPI_DOC, fmtGiorno, fmtKm, fmtOra, lblCarb, type Messaggio } from '../lib/format';
-import { SceltaLingua, useT } from '../lib/i18n';
+import { useT } from '../lib/i18n';
 import { Logo, Pill, Targa } from '../ui';
 import { InstallaApp } from '../Installa';
 import { URL_FUNZIONI, attivaPush, comprimiFoto, registraSW, statoPush, type StatoPush } from '../lib/push';
@@ -38,7 +38,6 @@ export default function Tecnico() {
       <div className="tec-bar">
         <Link to="/t" aria-label={t('La mia giornata')}><Logo chiaro /></Link>
         <div className="row-flex" style={{ gap: 8 }}>
-          <SceltaLingua chiaro />
           {token && <button className="esci" onClick={async () => { try { await rpc('tecnico_logout', { p_token: token }); } catch { /* già scaduta */ } esci(); }}>{t('Esci')}</button>}
         </div>
       </div>

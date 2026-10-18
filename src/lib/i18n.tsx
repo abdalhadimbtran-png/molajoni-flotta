@@ -120,6 +120,130 @@ const AR: Record<string, string> = {
   "Richiesta non valida": "طلب غير صالح",
   "Errore del server": "خطأ في الخادم",
   'Report': 'التقارير',
+  "Accessi dei tecnici": "دخول الفنيين",
+  "Account aggiornato": "تم تحديث الحساب",
+  "Account creato": "تم إنشاء الحساب",
+  "Account creato. Comunica di persona email e password iniziale: {e} · {p}": "تم إنشاء الحساب. أبلغ البريد وكلمة المرور الأولية شخصيًا: {e} · {p}",
+  "Account del pannello": "حسابات لوحة الإدارة",
+  "Account pannello": "حسابات اللوحة",
+  "Aggiungi un altro tecnico…": "أضف فنيًا آخر…",
+  "Amministratore": "مدير النظام",
+  "Amministrazione": "الإدارة العامة",
+  "App con codice e PIN: veicolo, km, segnalazioni.": "تطبيق برمز وPIN: السيارة، الكيلومترات، البلاغات.",
+  "Apri email pronta": "افتح بريدًا جاهزًا",
+  "Attendere…": "انتظر…",
+  "Attivare «Leaked password protection».": "فعّل «Leaked password protection».",
+  "Avvisi letti": "التنبيهات المقروءة",
+  "Cambiare il ruolo di {n}?": "تغيير دور {n}؟",
+  "Carburante al mese (€)": "الوقود شهريًا (€)",
+  "Costo carburante": "تكلفة الوقود",
+  "Dal {a} al {b}": "من {a} إلى {b}",
+  "Dettaglio": "التفاصيل",
+  "Disattiva": "تعطيل",
+  "Disattivare {n}? Non potrà più accedere.": "تعطيل {n}؟ لن يتمكن من الدخول بعد الآن.",
+  "Disattivare «Allow new users to sign up»: gli account si creano solo da qui.": "أوقف «Allow new users to sign up»: الحسابات تُنشأ من هنا فقط.",
+  "Disattivato": "معطّل",
+  "Disconnettere {n} da tutti i telefoni? Dovrà accedere di nuovo con codice e PIN.": "فصل {n} من كل الهواتف؟ سيحتاج للدخول مجددًا بالرمز وPIN.",
+  "Disconnetti": "افصل",
+  "Dispositivi con notifiche": "أجهزة بالإشعارات",
+  "Email": "البريد الإلكتروني",
+  "Email (per inviare la scheda app)": "البريد الإلكتروني (لإرسال ورقة التطبيق)",
+  "Email di {n}": "بريد {n}",
+  "Fermi": "توقفات",
+  "Genera": "توليد",
+  "Genera PIN e apri la scheda": "ولّد PIN وافتح الورقة",
+  "Giorni con movimenti": "أيام فيها حركات",
+  "Gli account non si cancellano: si disattivano, così lo storico resta leggibile. Ogni modifica è registrata.": "الحسابات لا تُحذف بل تُعطّل، ليبقى السجل مقروءًا. كل تعديل مسجّل.",
+  "Il PIN attuale smetterà di funzionare e il tecnico dovrà accedere di nuovo su tutti i telefoni.": "سيتوقف PIN الحالي عن العمل وسيحتاج الفني للدخول مجددًا على كل الهواتف.",
+  "Il sistema crea un PIN nuovo e prepara la scheda con codice e PIN, da stampare o inviare per email.": "النظام ينشئ PIN جديدًا ويجهز الورقة بالرمز وPIN للطباعة أو الإرسال بالبريد.",
+  "Impostare Site URL = https://molajoni-flotta.vercel.app": "اضبط Site URL = https://molajoni-flotta.vercel.app",
+  "Impostazioni consigliate (pannello Supabase › Authentication)": "إعدادات مقترحة (لوحة Supabase › Authentication)",
+  "Invia la scheda per email": "أرسل الورقة بالبريد",
+  "Km dai movimenti registrati con il QR (le rettifiche del responsabile non contano). Tempo di lettura: mediana tra invio e apertura di piani e avvisi.": "الكيلومترات من الحركات المسجلة عبر QR (تصحيحات المسؤول لا تُحتسب). زمن القراءة: الوسيط بين الإرسال وفتح الخطط والتنبيهات.",
+  "Km guidati": "كم مقطوعة",
+  "Km percorsi al mese": "الكيلومترات شهريًا",
+  "L'account {email} non è abilitato come responsabile flotta. Chiedi all'amministratore di abilitarlo.": "الحساب {email} غير مفعّل كمسؤول أسطول. اطلب من مدير النظام تفعيله.",
+  "La password non sarà più visibile dopo la chiusura.": "لن تظهر كلمة المرور بعد الإغلاق.",
+  "Modifiche agli account del pannello": "تعديلات حسابات اللوحة",
+  "Modifiche registrate (30 gg)": "تعديلات مسجلة (30 يومًا)",
+  "Nessun punto di attenzione.": "لا توجد نقاط تحتاج انتباه.",
+  "Nessuna modifica registrata": "لا توجد تعديلات مسجلة",
+  "Nessuna segnalazione nel periodo": "لا توجد بلاغات في الفترة",
+  "No": "لا",
+  "Nome e cognome": "الاسم واللقب",
+  "Notifiche attive": "الإشعارات مفعّلة",
+  "Nuova password": "كلمة مرور جديدة",
+  "Nuova password per {n}": "كلمة مرور جديدة لـ {n}",
+  "Nuovo account": "حساب جديد",
+  "Pannello responsabile": "لوحة المسؤول",
+  "Panoramica del sistema": "نظرة عامة على النظام",
+  "Password (almeno 10 caratteri)": "كلمة المرور (10 أحرف على الأقل)",
+  "Password cambiata": "تم تغيير كلمة المرور",
+  "Password cambiata: {p}": "تم تغيير كلمة المرور: {p}",
+  "Password iniziale": "كلمة المرور الأولية",
+  "Periodo": "الفترة",
+  "Piani confermati": "خطط مؤكدة",
+  "Piano, veicoli, tecnici, segnalazioni, avvisi, multe, carburante.": "الخطة، السيارات، الفنيون، البلاغات، التنبيهات، المخالفات، الوقود.",
+  "Prese veicolo": "استلامات السيارة",
+  "Problemi per tipo": "المشاكل حسب النوع",
+  "Punti di attenzione": "نقاط تحتاج انتباه",
+  "Regolare": "سليم",
+  "Rendi amministratore": "اجعله مدير نظام",
+  "Rendi responsabile": "اجعله مسؤول أسطول",
+  "Responsabile flotta": "مسؤول الأسطول",
+  "Riattiva": "إعادة التفعيل",
+  "Ruolo o stato cambiato": "تغيير الدور أو الحالة",
+  "Salva password": "احفظ كلمة المرور",
+  "Scegli il tecnico…": "اختر الفني…",
+  "Scheda app + PIN": "ورقة التطبيق + PIN",
+  "Scheda app per {n}": "ورقة التطبيق لـ {n}",
+  "Scheda app vuota": "ورقة تطبيق فارغة",
+  "Scheda vuota: per una scheda con codice e PIN usa \"Scheda app + PIN\" accanto al tecnico.": "ورقة فارغة: لورقة فيها الرمز وPIN استخدم «ورقة التطبيق + PIN» بجانب الفني.",
+  "Segnalazioni al mese": "البلاغات شهريًا",
+  "Si apre il tuo programma di posta con il messaggio già scritto: controlla e premi Invia. Il PIN è visibile solo adesso: se chiudi la pagina, per rivederlo devi generarne uno nuovo.": "يفتح برنامج البريد والرسالة جاهزة: راجعها واضغط إرسال. PIN ظاهر الآن فقط: إذا أغلقت الصفحة يجب توليد PIN جديد.",
+  "Sistema": "النظام",
+  "Tecnici attivi": "الفنيون الفعّالون",
+  "Tecnici nel periodo": "الفنيون في الفترة",
+  "Telefoni connessi": "هواتف متصلة",
+  "Tempo di lettura": "زمن القراءة",
+  "Tempo medio di risoluzione": "متوسط زمن الحل",
+  "Togli tutti": "أزل الكل",
+  "Togli {n}": "أزل {n}",
+  "Tutti i tecnici": "كل الفنيين",
+  "Tutto il sistema: account, analisi, sicurezza e pannello responsabile.": "كل النظام: الحسابات، التحليلات، الأمان ولوحة المسؤول.",
+  "Ultimo accesso": "آخر دخول",
+  "Veicoli attivi": "السيارات الفعّالة",
+  "Veicoli nel periodo": "السيارات في الفترة",
+  "amministratori e responsabili flotta": "مدراء النظام ومسؤولو الأسطول",
+  "giorni nel periodo": "أيام في الفترة",
+  "nessun dato carta carburante": "لا توجد بيانات بطاقة الوقود",
+  "tu": "أنت",
+  "un telefono perso? Chiudi le sessioni e genera un PIN nuovo": "هاتف ضائع؟ افصل الجلسات وولّد PIN جديدًا",
+  "{a} di {b}": "{a} من {b}",
+  "{n} gg": "{n} يوم",
+  "{n} h": "{n} س",
+  "{n} mesi": "{n} أشهر",
+  "{n} min": "{n} دقيقة",
+  "{n} risolte": "{n} محلولة",
+  "{n} segnalazioni ({f} fermi)": "{n} بلاغات ({f} توقف)",
+  "{n} sessioni chiuse": "تم إغلاق {n} جلسات",
+  "{n} tecnici bloccati per PIN errati": "{n} فنيين مقفلين بسبب PIN خاطئ",
+  "{n} tecnici senza PIN: non possono usare l'app": "{n} فنيين بلا PIN: لا يستطيعون استخدام التطبيق",
+  "{n}: notifiche non attive sul telefono": "{n}: الإشعارات غير مفعّلة على الهاتف",
+  "{n}: {k} avvisi non letti": "{n}: {k} تنبيهات غير مقروءة",
+  "{v}: fermo {n} volte nel periodo": "{v}: توقفت {n} مرات في الفترة",
+  "{x} €/km": "{x} €/كم",
+  "Accesso riservato all'amministratore": "الدخول مخصص لمدير النظام",
+  "Non puoi modificare il tuo stesso account": "لا يمكنك تعديل حسابك نفسه",
+  "Esiste già un account con questa email.": "يوجد حساب بهذا البريد.",
+  "Email non valida": "بريد غير صالح",
+  "Scrivi nome e cognome": "اكتب الاسم واللقب",
+  "Creazione account non riuscita": "فشل إنشاء الحساب",
+  "Account non trovato": "الحساب غير موجود",
+  "Tecnico non trovato o non attivo": "الفني غير موجود أو غير فعّال",
+  "Panoramica": "نظرة عامة",
+  "Account": "الحسابات",
+  "Sicurezza": "الأمان",
   'Molajoni · Flotta': 'Molajoni · الأسطول', 'Accesso…': 'جارٍ الدخول…', 'Codice': 'الرمز', 'PIN': 'PIN',
   "Accedi una volta: poi il QR del veicolo ti porta direttamente all'operazione.": 'سجّل الدخول مرة واحدة: بعدها رمز QR للسيارة يأخذك مباشرة إلى العملية.',
   'Codice e PIN te li dà il responsabile flotta.': 'الرمز وPIN يعطيك إياهما مسؤول الأسطول.', 'Accesso non riuscito.': 'تعذّر الدخول.',
@@ -354,18 +478,28 @@ const REGOLE: [RegExp, (m: RegExpMatchArray, tm: (s: string) => string) => strin
   [/^Esiste già un tecnico con questo codice\.$/, () => 'يوجد فني بنفس الرمز.'],
 ];
 
-interface Ctx { lingua: Lingua; setLingua: (l: Lingua) => void }
-const LinguaCtx = createContext<Ctx>({ lingua: 'it', setLingua: () => {} });
+interface Ctx { lingua: Lingua; setLingua: (l: Lingua) => void; setBilingue: (b: boolean) => void }
+const LinguaCtx = createContext<Ctx>({ lingua: 'it', setLingua: () => {}, setBilingue: () => {} });
 const CHIAVE = 'molajoni_flotta_lingua';
 
+/** L'arabo è disponibile solo nell'area amministratore (<AreaBilingue>); responsabile e tecnici sempre in italiano. */
 export function LinguaProvider({ children }: { children: ReactNode }) {
-  const [lingua, set] = useState<Lingua>(() => { try { return localStorage.getItem(CHIAVE) === 'ar' ? 'ar' : 'it'; } catch { return 'it'; } });
+  const [scelta, set] = useState<Lingua>(() => { try { return localStorage.getItem(CHIAVE) === 'ar' ? 'ar' : 'it'; } catch { return 'it'; } });
+  const [bilingue, setBilingue] = useState(false);
+  const lingua: Lingua = bilingue ? scelta : 'it';
   useEffect(() => {
     document.documentElement.lang = lingua;
     document.documentElement.dir = lingua === 'ar' ? 'rtl' : 'ltr';
   }, [lingua]);
   const setLingua = useCallback((l: Lingua) => { set(l); try { localStorage.setItem(CHIAVE, l); } catch { /* nulla */ } }, []);
-  return <LinguaCtx.Provider value={{ lingua, setLingua }}>{children}</LinguaCtx.Provider>;
+  return <LinguaCtx.Provider value={{ lingua, setLingua, setBilingue }}>{children}</LinguaCtx.Provider>;
+}
+
+/** Abilita la scelta della lingua per le pagine che contiene (solo area amministratore). */
+export function AreaBilingue({ children }: { children: ReactNode }) {
+  const { setBilingue } = useContext(LinguaCtx);
+  useEffect(() => { setBilingue(true); return () => setBilingue(false); }, [setBilingue]);
+  return <>{children}</>;
 }
 
 const riempi = (s: string, v?: Vars) => (v ? s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? '')) : s);

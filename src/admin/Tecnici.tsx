@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase, rpc, testoErrore } from '../lib/supabase';
 import { fmtData, giorniA, oggiISO } from '../lib/format';
 import { useT } from '../lib/i18n';
@@ -13,6 +13,8 @@ export default function Tecnici() {
   const { t, tm } = useT();
   const [modifica, setModifica] = useState<Tecnico | 'nuovo' | null>(null);
   const [pin, setPin] = useState<Tecnico | null>(null);
+  const [scheda, setScheda] = useState<Tecnico | null>(null);
+  const base = useLocation().pathname.startsWith('/admin') ? '/admin' : '';
   const [mostraInattivi, setMostraInattivi] = useState(false);
   const { data, errore, reload } = useLoad(async () => {
     const [tc, a] = await Promise.all([
@@ -40,7 +42,7 @@ export default function Tecnici() {
     <>
       <div className="section-title">{t('Tecnici e conducenti')} <span className="meta">{lista.length}</span><span className="spacer" />
         <label className="sub chk"><input type="checkbox" checked={mostraInattivi} onChange={e => setMostraInattivi(e.target.checked)} /> {t('Mostra non attivi')}</label>
-        <Link className="btn-ghost btn-sm" to="/installa-tecnici">📱 {t('Istruzioni app per i tecnici')}</Link>
+        <Link className="btn-ghost btn-sm" to={`${base}/installa-tecnici`}>📱 {t('Scheda app vuota')}</Link>
         <button className="btn btn-sm" onClick={() => setModifica('nuovo')}>{t('Nuovo tecnico')}</button></div>
       <div className="table-wrap"><table>
         <thead><tr><th>{t('Tecnico')}</th><th>{t('Codice app')}</th><th>{t('Ruolo')}</th><th>{t('Patente')}</th><th>{t('Accesso app')}</th><th></th></tr></thead>
@@ -49,7 +51,7 @@ export default function Tecnici() {
           const bloccato = x.bloccato_fino && new Date(x.bloccato_fino) > new Date();
           return (
             <tr key={x.id} className={x.attivo ? '' : 'muted'}>
-              <td><div style={{ fontWeight: 600 }}>{x.nome} {x.cognome}</div><div className="sub">{x.telefono ?? ''}{!x.attivo ? ` · ${t('non attivo')}` : ''}</div></td>
+              <td><div style={{ fontWeight: 600 }}>{x.nome} {x.cognome}</div><div className="sub">{[x.telefono, x.email].filter(Boolean).join(' · ')}{!x.attivo ? ` · ${t('non attivo')}` : ''}</div></td>
               <td className="mono">{x.codice}</td>
               <td>{x.ruolo ?? '—'}</td>
               <td>{x.patente_categoria ?? '—'} <div className="scad" style={{ marginTop: 3 }}>{g == null ? <Pill s="warn">{t('Scadenza non registrata')}</Pill>
@@ -57,6 +59,7 @@ export default function Tecnici() {
               <td>{bloccato ? <Pill s="ko">{t('Bloccato')}</Pill> : x.ha_pin ? <Pill s="ok">{t('PIN attivo')}</Pill> : <Pill s="warn">{t('PIN da impostare')}</Pill>}</td>
               <td className="nowrap actions">
                 <button className="btn-ghost btn-sm" onClick={() => setModifica(x)}>{t('Modifica')}</button>
+                {x.attivo && <button className="btn btn-sm" onClick={() => setScheda(x)}>📱 {t('Scheda app + PIN')}</button>}
                 <button className="btn-ghost btn-sm" onClick={() => setPin(x)}>{x.ha_pin ? t('Nuovo PIN') : t('Imposta PIN')}</button>
                 {bloccato && <button className="btn-ghost btn-sm" onClick={() => sblocca(x)}>{t('Sblocca')}</button>}
                 {g != null && g <= 30 && <Link className="btn-ghost btn-sm" to={`/avvisi?t=${x.id}&modello=patente&d=${fmtData(x.patente_scadenza)}`}>⚠️ {t('Avvisa')}</Link>}
@@ -78,6 +81,7 @@ export default function Tecnici() {
       <p className="hint">{t('Le assenze qui sono temporanee: in seguito arriveranno dal sistema HR, così non si inseriscono due volte.')}</p>
 
       {modifica && <FormTecnico x={modifica === 'nuovo' ? null : modifica} onClose={() => setModifica(null)} onSalvato={() => { setModifica(null); reload(); }} />}
+      {scheda && <ModaleScheda x={scheda} base={base} onClose={() => setScheda(null)} />}
       {pin && <ModalePin x={pin} onClose={() => setPin(null)} onSalvato={() => { setPin(null); reload(); }} />}
     </>
   );
@@ -86,7 +90,7 @@ export default function Tecnici() {
 function FormTecnico({ x, onClose, onSalvato }: { x: Tecnico | null; onClose: () => void; onSalvato: () => void }) {
   const { t, tm } = useT();
   const [f, setF] = useState({
-    codice: x?.codice ?? '', nome: x?.nome ?? '', cognome: x?.cognome ?? '', ruolo: x?.ruolo ?? '', telefono: x?.telefono ?? '',
+    codice: x?.codice ?? '', nome: x?.nome ?? '', cognome: x?.cognome ?? '', ruolo: x?.ruolo ?? '', telefono: x?.telefono ?? '', email: x?.email ?? '',
     patente_categoria: x?.patente_categoria ?? 'B', patente_scadenza: x?.patente_scadenza ?? '', attivo: x?.attivo ?? true,
   });
   const [err, setErr] = useState<string | null>(null);
@@ -95,7 +99,7 @@ function FormTecnico({ x, onClose, onSalvato }: { x: Tecnico | null; onClose: ()
   async function salva(e: FormEvent) {
     e.preventDefault(); setErr(null);
     const rec = { codice: f.codice.toUpperCase().replace(/[^A-Z0-9]/g, ''), nome: f.nome.trim(), cognome: f.cognome.trim(), ruolo: f.ruolo.trim() || null,
-      telefono: f.telefono.trim() || null, patente_categoria: f.patente_categoria.trim() || null, patente_scadenza: f.patente_scadenza || null, attivo: f.attivo };
+      telefono: f.telefono.trim() || null, email: f.email.trim().toLowerCase() || null, patente_categoria: f.patente_categoria.trim() || null, patente_scadenza: f.patente_scadenza || null, attivo: f.attivo };
     const { error } = x ? await supabase.from('tecnici').update(rec).eq('id', x.id) : await supabase.from('tecnici').insert(rec);
     if (error) { setErr(tm(testoErrore(error))); return; }
     toast(x ? t('Tecnico aggiornato') : t('Tecnico aggiunto: ora imposta il PIN')); onSalvato();
@@ -108,6 +112,7 @@ function FormTecnico({ x, onClose, onSalvato }: { x: Tecnico | null; onClose: ()
         <div className="field"><label htmlFor="t-cod">{t("Codice per l'app")}</label><input id="t-cod" dir="ltr" required value={f.codice} onChange={set('codice')} placeholder="ROSSIM" /></div>
         <div className="field"><label htmlFor="t-ruolo">{t('Ruolo')}</label><input id="t-ruolo" value={f.ruolo} onChange={set('ruolo')} /></div>
         <div className="field"><label htmlFor="t-tel">{t('Telefono')}</label><input id="t-tel" dir="ltr" value={f.telefono} onChange={set('telefono')} /></div>
+        <div className="field"><label htmlFor="t-mail">{t('Email (per inviare la scheda app)')}</label><input id="t-mail" type="email" dir="ltr" value={f.email} onChange={set('email')} /></div>
         <div className="field"><label htmlFor="t-cat">{t('Categoria patente')}</label><input id="t-cat" value={f.patente_categoria} onChange={set('patente_categoria')} /></div>
         <div className="field"><label htmlFor="t-scad">{t('Scadenza patente')}</label><input id="t-scad" type="date" value={f.patente_scadenza} onChange={set('patente_scadenza')} /></div>
         {x && <label className="chk"><input type="checkbox" checked={f.attivo} onChange={set('attivo')} /> {t('Attivo')}</label>}
@@ -143,6 +148,32 @@ function ModalePin({ x, onClose, onSalvato }: { x: Tecnico; onClose: () => void;
           <Banner s="ok">{t('PIN salvato. Comunicalo al tecnico di persona: codice {c}, PIN {p}. Dopo la chiusura non sarà più visibile.', { c: x.codice, p: pin })}</Banner>
           <button className="btn" onClick={onSalvato}>{t('Fatto')}</button>
         </>}
+      </div>
+    </Modal>
+  );
+}
+
+/** Genera un PIN nuovo (mai salvato in chiaro) e apre la scheda di installazione già compilata. */
+function ModaleScheda({ x, base, onClose }: { x: Tecnico; base: string; onClose: () => void }) {
+  const { t, tm } = useT();
+  const nav = useNavigate();
+  const [err, setErr] = useState<string | null>(null);
+  const [invio, setInvio] = useState(false);
+  async function genera() {
+    setErr(null); setInvio(true);
+    try {
+      const pin = await rpc<string>('genera_pin', { p_tecnico: x.id });
+      nav(`${base}/installa-tecnici`, { state: { tecnico: { nome: x.nome, cognome: x.cognome, codice: x.codice, email: x.email }, pin } });
+    } catch (e) { setErr(tm(testoErrore(e))); setInvio(false); }
+  }
+  return (
+    <Modal titolo={t('Scheda app per {n}', { n: `${x.nome} ${x.cognome}` })} onClose={onClose}>
+      <div className="form">
+        <p>{t('Il sistema crea un PIN nuovo e prepara la scheda con codice e PIN, da stampare o inviare per email.')}</p>
+        {x.ha_pin && <Banner s="warn">{t('Il PIN attuale smetterà di funzionare e il tecnico dovrà accedere di nuovo su tutti i telefoni.')}</Banner>}
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn" onClick={genera} disabled={invio}>{invio ? t('Attendere…') : t('Genera PIN e apri la scheda')}</button>
+          <button className="btn-ghost" onClick={onClose}>{t('Annulla')}</button></div>
       </div>
     </Modal>
   );

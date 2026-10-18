@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { SceltaLingua, useT } from '../lib/i18n';
+import { useT } from '../lib/i18n';
 import { Caricamento, Logo } from '../ui';
 import Campanella from './Campanella';
 import { InstallaApp } from '../Installa';
@@ -12,21 +12,23 @@ type Stato = 'caricamento' | 'anonimo' | 'non_abilitato' | 'ok';
 export function useSessione() {
   const [sessione, setSessione] = useState<Session | null>(null);
   const [stato, setStato] = useState<Stato>('caricamento');
+  const [admin, setAdmin] = useState(false);
   useEffect(() => {
     let attivo = true;
     async function verifica(s: Session | null) {
       if (!attivo) return;
       setSessione(s);
       if (!s) { setStato('anonimo'); return; }
-      const { data, error } = await supabase.rpc('is_responsabile');
+      const [r, a] = await Promise.all([supabase.rpc('is_responsabile'), supabase.rpc('is_admin')]);
       if (!attivo) return;
-      setStato(!error && data === true ? 'ok' : 'non_abilitato');
+      setAdmin(!a.error && a.data === true);
+      setStato(!r.error && r.data === true ? 'ok' : 'non_abilitato');
     }
     supabase.auth.getSession().then(({ data }) => verifica(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { verifica(s); });
     return () => { attivo = false; sub.subscription.unsubscribe(); };
   }, []);
-  return { sessione, stato };
+  return { sessione, stato, admin };
 }
 
 const TABS: [string, string][] = [
@@ -36,7 +38,7 @@ const TABS: [string, string][] = [
 ];
 
 export default function Shell() {
-  const { sessione, stato } = useSessione();
+  const { sessione, stato, admin } = useSessione();
   const { t } = useT();
   const loc = useLocation();
   if (stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
@@ -44,7 +46,7 @@ export default function Shell() {
   if (stato === 'non_abilitato') return (
     <div className="wrap narrow">
       <h1>{t('Account non abilitato')}</h1>
-      <p className="subtitle">{t("L'account {email} esiste ma non è ancora abilitato come responsabile flotta. Chiedi all'amministratore di abilitarlo.", { email: sessione?.user.email ?? '' })}</p>
+      <p className="subtitle">{t("L'account {email} non è abilitato come responsabile flotta. Chiedi all'amministratore di abilitarlo.", { email: sessione?.user.email ?? '' })}</p>
       <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
     </div>
   );
@@ -58,7 +60,7 @@ export default function Shell() {
             <span className="who">{sessione?.user.email}</span>
             <InstallaApp variante="admin" />
             <Campanella />
-            <SceltaLingua chiaro />
+            {admin && <NavLink className="btn-ghost btn-sm" to="/admin">{t('Amministrazione')}</NavLink>}
             <button className="btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button>
           </div>
         </div>

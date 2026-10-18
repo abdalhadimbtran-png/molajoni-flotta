@@ -33,6 +33,10 @@ import Report from './admin/Report';
 import Volantino from './admin/Volantino';
 import Avvisi from './admin/Avvisi';
 import Tecnico from './tecnico/Tecnico';
+import AreaAdmin from './admin/amm/AreaAdmin';
+import Panoramica from './admin/amm/Panoramica';
+import Account from './admin/amm/Account';
+import Sicurezza from './admin/amm/Sicurezza';
 
 function App() {
   if (!configurato) return <div className="wrap"><div className="banner ko">Configurazione mancante: VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.</div></div>;
@@ -44,6 +48,14 @@ function App() {
         <Route path="/t/scansiona" element={<Tecnico />} />
         <Route path="/t/elenco" element={<Tecnico />} />
         <Route path="/accesso" element={<Accesso />} />
+        <Route element={<AreaAdmin />}>
+          <Route path="/admin" element={<Panoramica />} />
+          <Route path="/admin/account" element={<Account />} />
+          <Route path="/admin/tecnici" element={<Tecnici />} />
+          <Route path="/admin/installa-tecnici" element={<Volantino />} />
+          <Route path="/admin/sicurezza" element={<Sicurezza />} />
+          <Route path="/admin/registro" element={<Registro />} />
+        </Route>
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />
           <Route path="/piano" element={<Piano />} />

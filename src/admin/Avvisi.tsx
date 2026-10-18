@@ -51,12 +51,17 @@ export default function Avvisi() {
     <>
       <div className="section-title">{t('Invia un avviso ai tecnici')}</div>
       <form className="panel form" onSubmit={invia}>
-        <div className="field"><span className="lbl-sm">{t('A chi')}</span>
-          <div className="scelte-tec">
-            <button type="button" className={tutti ? 'on' : ''} onClick={() => setSel(tutti ? [] : data.tecnici.map(x => x.id))}>{t('Tutti')}</button>
-            {data.tecnici.map(x => <button type="button" key={x.id} className={sel.includes(x.id) ? 'on' : ''}
-              onClick={() => setSel(sel.includes(x.id) ? sel.filter(y => y !== x.id) : [...sel, x.id])}>{x.nome} {x.cognome}</button>)}
-          </div></div>
+        <div className="field"><label htmlFor="av-chi">{t('A chi')}</label>
+          <div className="row-flex">
+            <select id="av-chi" value="" onChange={e => { const id = Number(e.target.value); if (id && !sel.includes(id)) setSel([...sel, id]); }} style={{ minWidth: 260 }}>
+              <option value="">{sel.length ? t('Aggiungi un altro tecnico…') : t('Scegli il tecnico…')}</option>
+              {data.tecnici.filter(x => !sel.includes(x.id)).map(x => <option key={x.id} value={x.id}>{x.cognome} {x.nome}</option>)}
+            </select>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setSel(tutti ? [] : data.tecnici.map(x => x.id))}>{tutti ? t('Togli tutti') : t('Tutti i tecnici')}</button>
+          </div>
+          {sel.length > 0 && <div className="scelte-tec">{sel.map(id => { const x = data.tecnici.find(y => y.id === id); return x ? (
+            <button type="button" key={id} className="on" onClick={() => setSel(sel.filter(y => y !== id))} aria-label={t('Togli {n}', { n: `${x.nome} ${x.cognome}` })}>{x.nome} {x.cognome} ✕</button>) : null; })}</div>}
+        </div>
         <div className="field"><span className="lbl-sm">{t('Tipo')}</span>
           <div className="scelte-liv">{(['urgente', 'importante', 'info'] as const).map(l => (
             <button type="button" key={l} className={`${l} ${f.livello === l ? 'on' : ''}`} onClick={() => setF({ ...f, livello: l })}>

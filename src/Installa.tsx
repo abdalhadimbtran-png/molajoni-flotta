@@ -33,7 +33,7 @@ export function InstallaApp({ variante = 'tec' }: { variante?: 'tec' | 'admin' }
   );
   return (
     <section className="tec-card installa">
-      <div className="row-flex"><img src="/icon-192.png" alt="" width={44} height={44} style={{ borderRadius: 10 }} />
+      <div className="row-flex"><img src="/icon-tecnico-192.png" alt="" width={44} height={44} style={{ borderRadius: 10 }} />
         <div style={{ flex: 1 }}><b>{t("Installa l'app sul telefono")}</b><div className="sub">{t("Un'icona sulla schermata Home, si apre come un'app e riceve le notifiche.")}</div></div></div>
       <button className="btn brand big" onClick={installa}>⬇ {t("Installa l'app")}</button>
       {guida && <GuidaIOS />}

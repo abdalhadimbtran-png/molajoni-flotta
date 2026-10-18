@@ -41,8 +41,9 @@ export default function Accesso() {
         <span className="accesso-foot">Molajoni Antincendi · {t('Uso interno')}</span>
       </aside>
       <main className="accesso-form">
+        <div className="accesso-logo"><Logo /></div>
         <form className="accesso-box form" onSubmit={invia}>
-          <h2>{t('Accedi')}</h2>
+          <h2>{t('Accedi a Gestione flotta')}</h2>
           <p className="subtitle">{t('Accesso riservato al responsabile flotta. I tecnici usano il QR sul veicolo.')}</p>
           <div className="field"><label htmlFor="email">{t('Email aziendale')}</label><input id="email" type="email" dir="ltr" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} /></div>
           <div className="field"><label htmlFor="pw">{t('Password')}</label><input id="pw" type="password" dir="ltr" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></div>

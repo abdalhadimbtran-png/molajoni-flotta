@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import '@fontsource-variable/archivo/wdth.css';
+import '@fontsource-variable/inter/opsz.css';
 import '@fontsource/ibm-plex-sans/latin-400.css';
 import '@fontsource/ibm-plex-sans/latin-500.css';
 import '@fontsource/ibm-plex-sans/latin-600.css';

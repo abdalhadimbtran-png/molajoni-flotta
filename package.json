@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.1.1",
+    "@fontsource-variable/inter": "^5.1.1",
     "@fontsource/barlow": "^5.1.1",
     "@fontsource/barlow-semi-condensed": "^5.1.1",
     "@fontsource/ibm-plex-sans": "^5.1.1",

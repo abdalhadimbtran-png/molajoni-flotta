@@ -28,27 +28,22 @@ export const Icona = ({ n }: { n: string }) => (
 export interface Voce { to: string; label: string; icona: string; end?: boolean }
 export interface Gruppo { titolo: string; voci: Voce[] }
 
-/** Struttura delle aree di gestione: barra laterale grafite + contenuto. Su telefono la barra diventa un menu. */
-export function Layout({ prodotto, gruppi, utilita, piede, children }: { prodotto: string; gruppi: Gruppo[]; utilita?: ReactNode; piede: ReactNode; children: ReactNode }) {
+/** Struttura delle aree di gestione: barra laterale chiara + barra superiore con utilità e menu utente. */
+export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children }:
+  { prodotto: string; gruppi: Gruppo[]; utilita?: ReactNode; email: string; menuUtente: ReactNode; children: ReactNode }) {
   const { t } = useT();
   const [aperto, setAperto] = useState(false);
   const loc = useLocation();
-  const mobile = useMobile();
   useEffect(() => { setAperto(false); }, [loc.pathname]);
+  const corrente = gruppi.flatMap(g => g.voci).filter(v => v.end ? loc.pathname === v.to : loc.pathname === v.to || loc.pathname.startsWith(v.to + '/')).sort((a, b) => b.to.length - a.to.length)[0];
+  const iniziali = (email.split('@')[0].split(/[._-]/).filter(Boolean).slice(0, 2).map(x => x[0]).join('') || '?').toUpperCase();
   return (
     <div className={`gest ${aperto ? 'menu-aperto' : ''}`}>
-      <header className="gest-top no-print">
-        <button className="gest-menu" onClick={() => setAperto(!aperto)} aria-expanded={aperto} aria-label={t('Menu')}><Icona n={aperto ? 'chiudi' : 'menu'} /></button>
-        <img className="logo" src="/logo-molajoni-bianco.png" alt="Molajoni Antincendi" />
-        <span className="gest-top-sp" />
-        {mobile && utilita}
-      </header>
       <aside className="side no-print">
         <div className="side-brand">
-          <img className="logo" src="/logo-molajoni-bianco.png" alt="Molajoni Antincendi" />
+          <img className="logo" src="/logo-molajoni.png" alt="Molajoni Antincendi" />
           <span className="side-prodotto">{prodotto}</span>
         </div>
-        {!mobile && utilita && <div className="side-util">{utilita}</div>}
         <nav className="side-nav">
           {gruppi.map(g => (
             <div key={g.titolo} className="side-gruppo">
@@ -61,20 +56,25 @@ export function Layout({ prodotto, gruppi, utilita, piede, children }: { prodott
             </div>
           ))}
         </nav>
-        <div className="side-piede">{piede}</div>
       </aside>
       <div className="gest-velo no-print" onClick={() => setAperto(false)} />
-      <main className="gest-main"><div className="wrap">{children}</div></main>
+      <div className="gest-col">
+        <header className="gest-top no-print">
+          <button className="gest-menu" onClick={() => setAperto(!aperto)} aria-expanded={aperto} aria-label={t('Menu')}><Icona n={aperto ? 'chiudi' : 'menu'} /></button>
+          <img className="logo gest-top-logo" src="/logo-molajoni.png" alt="Molajoni Antincendi" />
+          <div className="gest-crumb">{prodotto}{corrente && <><span aria-hidden="true">/</span><b>{t(corrente.label)}</b></>}</div>
+          <span className="gest-top-sp" />
+          {utilita}
+          <details className="utente">
+            <summary aria-label={t('Account')}><span className="avatar">{iniziali}</span></summary>
+            <div className="utente-pop" onClick={e => { if ((e.target as HTMLElement).closest('a,button')) (e.currentTarget.parentElement as HTMLDetailsElement).open = false; }}>
+              <div className="utente-mail">{email}</div>
+              {menuUtente}
+            </div>
+          </details>
+        </header>
+        <main className="gest-main"><div className="wrap">{children}</div></main>
+      </div>
     </div>
   );
-}
-
-const MQ = '(max-width: 900px)';
-function useMobile() {
-  const [m, setM] = useState(() => typeof window !== 'undefined' && window.matchMedia(MQ).matches);
-  useEffect(() => {
-    const q = window.matchMedia(MQ); const f = () => setM(q.matches);
-    q.addEventListener('change', f); return () => q.removeEventListener('change', f);
-  }, []);
-  return m;
 }

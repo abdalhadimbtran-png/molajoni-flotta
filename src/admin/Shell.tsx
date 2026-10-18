@@ -57,11 +57,11 @@ export default function Shell() {
     </div>
   );
   return (
-    <Layout prodotto={t('Gestione flotta')} gruppi={GRUPPI}
-      utilita={<><Campanella /><InstallaApp variante="admin" /></>}
-      piede={<>
-        {admin && <NavLink className="side-voce" to="/admin"><Icona n="sicurezza" /><span>{t('Amministrazione')}</span></NavLink>}
-        <div className="side-utente"><span>{sessione?.user.email}</span><button className="side-esci" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button></div>
+    <Layout prodotto={t('Gestione flotta')} gruppi={admin ? [...GRUPPI, { titolo: 'Sistema', voci: [{ to: '/admin', label: 'Amministrazione', icona: 'sicurezza' }] }] : GRUPPI} email={sessione?.user.email ?? ''}
+      utilita={<><InstallaApp variante="admin" /><Campanella /></>}
+      menuUtente={<>
+        {admin && <NavLink to="/admin"><Icona n="sicurezza" />{t('Amministrazione')}</NavLink>}
+        <button onClick={() => supabase.auth.signOut()}><Icona n="ritorno" />{t('Esci')}</button>
       </>}>
       <Outlet />
     </Layout>

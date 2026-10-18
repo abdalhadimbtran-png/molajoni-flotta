@@ -29,7 +29,7 @@ export default function Accesso() {
   return (
     <div className="accesso">
       <aside className="accesso-brand">
-        <Logo chiaro />
+        <Logo />
         <div className="accesso-claim">
           <h1>{t('Ogni veicolo, ogni tecnico, ogni giorno: sotto controllo.')}</h1>
           <ul>

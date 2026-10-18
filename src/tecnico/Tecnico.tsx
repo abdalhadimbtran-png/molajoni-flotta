@@ -37,7 +37,7 @@ export default function Tecnico() {
   return (
     <div className="tec">
       <div className="tec-bar">
-        <Link to="/t" aria-label={t('La mia giornata')}><Logo chiaro /></Link>
+        <Link to="/t" aria-label={t('La mia giornata')}><Logo /></Link>
         <div className="row-flex" style={{ gap: 8 }}>
           {token && <button className="esci" onClick={async () => { try { await rpc('tecnico_logout', { p_token: token }); } catch { /* già scaduta */ } esci(); }}>{t('Esci')}</button>}
         </div>

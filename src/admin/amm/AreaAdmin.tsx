@@ -26,11 +26,11 @@ export default function AreaAdmin() {
 function Contenuto({ email }: { email: string }) {
   const { t } = useT();
   return (
-    <Layout prodotto={t('Amministrazione')} gruppi={GRUPPI}
-      utilita={<SceltaLingua chiaro />}
-      piede={<>
-        <NavLink className="side-voce" to="/cruscotto"><Icona n="ritorno" /><span>{t('Pannello responsabile')}</span></NavLink>
-        <div className="side-utente"><span>{email}</span><button className="side-esci" onClick={() => supabase.auth.signOut()}>{t('Esci')}</button></div>
+    <Layout prodotto={t('Amministrazione')} gruppi={GRUPPI} email={email}
+      utilita={<SceltaLingua />}
+      menuUtente={<>
+        <NavLink to="/cruscotto"><Icona n="cruscotto" />{t('Pannello responsabile')}</NavLink>
+        <button onClick={() => supabase.auth.signOut()}><Icona n="ritorno" />{t('Esci')}</button>
       </>}>
       <Outlet />
     </Layout>

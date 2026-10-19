@@ -48,6 +48,7 @@ function App() {
           <Route path="/admin/installa-tecnici" element={<Volantino />} />
           <Route path="/admin/sicurezza" element={<Sicurezza />} />
           <Route path="/admin/registro" element={<Registro />} />
+          <Route path="/admin/report" element={<Report />} />
         </Route>
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />

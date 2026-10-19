@@ -939,3 +939,32 @@ tbody tr:hover td { background:#FAFAFC; }
 .side-voce.attiva svg { color:var(--brand); }
 .kpis { margin-bottom:44px; }
 @media (max-width:700px) { .kpis { margin-bottom:32px; } .kpi { min-height:0; gap:14px; } .kpi:not(:has(.sub))::after { height:0; } }
+
+/* ---------- Centro report ---------- */
+.rep-layout { display:grid; grid-template-columns:300px minmax(0, 1fr); gap:28px; align-items:start; }
+.rep-catalogo { display:flex; flex-direction:column; gap:22px; position:sticky; top:76px; max-height:calc(100vh - 96px); overflow-y:auto; padding-bottom:12px; }
+.rep-gtit { font-size:12px; font-weight:600; color:var(--ink-3); padding:0 4px 8px; }
+.rep-gruppo { display:flex; flex-direction:column; gap:4px; }
+.rep-voce { display:flex; flex-direction:column; gap:3px; text-align:start; background:transparent; border:none; border-radius:12px; padding:11px 14px; cursor:pointer; font:inherit; color:var(--ink); }
+.rep-voce b { font-size:14.5px; font-weight:600; }
+.rep-voce span { font-size:12.5px; color:var(--ink-3); line-height:1.4; }
+.rep-voce:hover { background:rgba(0,0,0,.04); }
+.rep-voce.on { background:var(--surface); box-shadow:var(--sh-md); }
+.rep-voce.on b { color:var(--brand); }
+.rep-main { min-width:0; display:flex; flex-direction:column; gap:18px; }
+.rep-filtri { display:flex; flex-direction:column; gap:18px; }
+.rep-titolo { display:flex; flex-direction:column; gap:4px; }
+.rep-titolo h2 { font-size:22px; font-weight:700; letter-spacing:-.02em; }
+.rep-preset { flex-wrap:wrap; align-self:flex-start; }
+.rep-meta { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:13.5px; color:var(--ink-3); padding:0 4px; }
+.rep-riepilogo { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; }
+.rep-riepilogo div { background:var(--surface); border-radius:16px; box-shadow:var(--sh-md); padding:16px 18px; display:flex; flex-direction:column; gap:6px; }
+.rep-riepilogo span { font-size:13px; color:var(--ink-3); }
+.rep-riepilogo b { font-family:var(--f-head); font-size:24px; font-weight:650; letter-spacing:-.02em; }
+.rep-tab td { padding-block:11px; font-size:13.5px; }
+.rep-tab .rep-gr td { background:#F2F2F5; font-weight:600; font-size:14px; padding-block:10px; }
+.rep-targa { font-weight:600; white-space:nowrap; }
+@media (max-width:1100px) { .rep-layout { grid-template-columns:1fr; } .rep-catalogo { position:static; max-height:none; flex-direction:row; overflow-x:auto; gap:16px; } .rep-gruppo { min-width:260px; } }
+.rep-tab td { white-space:nowrap; }
+.rep-tab td.wrap-cell { white-space:normal; min-width:220px; }
+.rep-filtri .field select { min-width:200px; }

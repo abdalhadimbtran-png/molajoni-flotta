@@ -130,7 +130,7 @@ export default function Report() {
           {err && <Banner s="ko">{tm(err)}</Banner>}
           {!righe && !err && <p className="sub" style={{ padding: '20px 4px' }}>{t('Caricamento…')}</p>}
           {righe && <>
-            <div className="rep-meta"><span>{testoPeriodo}{testoFiltri ? ` · ${testoFiltri}` : ''}</span><span>{t('{n} righe', { n: righe.length })}</span></div>
+            <div className="rep-meta"><span dir="ltr">{testoPeriodo}{testoFiltri ? ` · ${testoFiltri}` : ''}</span><span>{t('{n} righe', { n: righe.length })}</span></div>
             {riepilogo.length > 0 && <div className="rep-riepilogo">{riepilogo.map(x => <div key={x.l}><span>{t(x.l)}</span><b>{x.v}</b></div>)}</div>}
             <div className="table-wrap"><table className="rep-tab">
               <thead><tr>{sel.colonne.map(c => <th key={c.k} className={numerica(c.t) ? 'num-c' : ''}>{t(c.l)}</th>)}</tr></thead>

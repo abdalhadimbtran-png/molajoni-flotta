@@ -8,8 +8,9 @@
 -- 2. `tecnici` resta come VISTA dei soli dipendenti con categoria TEC: tutte le funzioni,
 --    i report e le schermate della flotta continuano a funzionare e vedono solo i tecnici.
 --    Le chiavi esterne (movimenti, assegnazioni, assenze, ...) puntano a `dipendenti`.
--- 3. Nuovo ruolo `hr` per l'area Ferie e permessi. `is_responsabile()` diventa vero solo
---    per admin e responsabile: l'HR non entra nella flotta. Nuova `is_hr()` (hr o admin).
+-- 3. Area HR: i responsabili hanno ora un'`area` ('flotta' o 'hr'). `is_responsabile()` è vero
+--    per admin e responsabili flotta; `is_hr()` per admin e responsabili HR (Roberta).
+--    (Scelta senza DROP: il vincolo esistente su `ruolo` resta invariato.)
 -- 4. Il responsabile flotta vede e gestisce solo i dipendenti TEC; HR e admin vedono tutti.
 -- =====================================================================
 
@@ -49,7 +50,6 @@ create view public.tecnici with (security_invoker = true) as
 comment on view public.tecnici is 'Dipendenti con categoria TEC. Usata da flotta, piano, app tecnico e report. Scrivibile: i nuovi record nascono TEC.';
 
 -- stessi permessi di colonna che aveva la tabella (pin_hash mai leggibile dal pannello)
-revoke all on public.tecnici from anon, authenticated;
 grant select (id, codice, nome, cognome, ruolo, telefono, patente_categoria, patente_scadenza, attivo,
               ha_pin, tentativi_falliti, bloccato_fino, creato_il, aggiornato_il, email) on public.tecnici to authenticated;
 grant insert (codice, nome, cognome, ruolo, telefono, patente_categoria, patente_scadenza, attivo, email) on public.tecnici to authenticated;
@@ -64,23 +64,26 @@ grant insert (categoria, reparto, data_assunzione, data_cessazione, contratto, o
 grant update (categoria, reparto, data_assunzione, data_cessazione, contratto, ore_giornaliere, giorni_riposo)
   on public.dipendenti to authenticated;
 
--- 3. Ruolo HR -------------------------------------------------------------
-alter table public.responsabili drop constraint responsabili_ruolo_check;
+-- 3. Area HR ---------------------------------------------------------------
 alter table public.responsabili
-  add constraint responsabili_ruolo_check check (ruolo in ('admin', 'responsabile', 'hr'));
+  add column area text not null default 'flotta'
+    constraint responsabili_area_check check (area in ('flotta', 'hr'));
+comment on column public.responsabili.area is 'Per ruolo responsabile: flotta = pianificazione e veicoli; hr = ferie, permessi e personale.';
 
 create or replace function public.is_responsabile()
  returns boolean language sql stable security definer set search_path to ''
 as $function$
   select exists (select 1 from public.responsabili r
-                  where r.user_id = auth.uid() and r.attivo and r.ruolo in ('admin', 'responsabile'));
+                  where r.user_id = auth.uid() and r.attivo
+                    and (r.ruolo = 'admin' or (r.ruolo = 'responsabile' and r.area = 'flotta')));
 $function$;
 
 create or replace function public.is_hr()
  returns boolean language sql stable security definer set search_path to ''
 as $function$
   select exists (select 1 from public.responsabili r
-                  where r.user_id = auth.uid() and r.attivo and r.ruolo in ('admin', 'hr'));
+                  where r.user_id = auth.uid() and r.attivo
+                    and (r.ruolo = 'admin' or (r.ruolo = 'responsabile' and r.area = 'hr')));
 $function$;
 grant execute on function public.is_hr() to authenticated;
 
@@ -93,6 +96,7 @@ begin
   end if;
 end $function$;
 
+-- p_ruolo: 'admin' | 'responsabile' (area flotta) | 'hr' (responsabile con area hr)
 create or replace function public.admin_imposta_responsabile(p_user uuid, p_ruolo text, p_attivo boolean)
  returns void language plpgsql security definer set search_path to ''
 as $function$
@@ -100,14 +104,38 @@ begin
   perform public.richiedi_admin();
   if p_user = auth.uid() then raise exception 'Non puoi modificare il tuo stesso account'; end if;
   if p_ruolo not in ('admin', 'responsabile', 'hr') then raise exception 'Ruolo non valido'; end if;
-  update public.responsabili set ruolo = p_ruolo, attivo = p_attivo where user_id = p_user;
+  update public.responsabili
+     set ruolo = case when p_ruolo = 'admin' then 'admin' else 'responsabile' end,
+         area = case when p_ruolo = 'hr' then 'hr' else 'flotta' end,
+         attivo = p_attivo
+   where user_id = p_user;
   if not found then raise exception 'Account non trovato'; end if;
 end $function$;
 
 -- 4. Chi vede chi nell'archivio --------------------------------------------
-drop policy resp_tecnici on public.dipendenti;
-create policy dip_hr_admin on public.dipendenti for all to authenticated
-  using ((select public.is_hr())) with check ((select public.is_hr()));
-create policy dip_resp_tecnici on public.dipendenti for all to authenticated
+alter policy resp_tecnici on public.dipendenti
   using ((select public.is_responsabile()) and categoria = 'TEC')
   with check ((select public.is_responsabile()) and categoria = 'TEC');
+alter policy resp_tecnici on public.dipendenti rename to dip_resp_tecnici;
+create policy dip_hr_admin on public.dipendenti for all to authenticated
+  using ((select public.is_hr())) with check ((select public.is_hr()));
+
+-- 5. Correzioni dopo la prova -------------------------------------------------
+-- a) GROUP BY su una vista non usa la chiave primaria: le query aggregate leggono `dipendenti` (TEC).
+-- b) La vista non contiene pin_hash (con security_invoker il pannello non vedeva più i tecnici):
+--    le funzioni che usano il PIN lavorano su `dipendenti` (categoria TEC in questa fase).
+--    Applicate con le migrazioni `fix_group_by_su_vista_tecnici` e `vista_tecnici_senza_pin`
+--    (sostituzioni puntuali nel testo delle funzioni proponi_assegnazioni, report_dati,
+--    tecnico_login, genera_pin, imposta_pin, analisi_admin) e con:
+alter view public.tecnici rename to tecnici_v1_da_eliminare;   -- prima versione, da eliminare con conferma
+create view public.tecnici with (security_invoker = true) as
+  select id, codice, nome, cognome, ruolo, telefono, patente_categoria, patente_scadenza, attivo,
+         ha_pin, tentativi_falliti, bloccato_fino, creato_il, aggiornato_il, email
+    from public.dipendenti
+   where categoria = 'TEC'
+  with local check option;
+grant select (id, codice, nome, cognome, ruolo, telefono, patente_categoria, patente_scadenza, attivo,
+              ha_pin, tentativi_falliti, bloccato_fino, creato_il, aggiornato_il, email) on public.tecnici to authenticated;
+grant insert (codice, nome, cognome, ruolo, telefono, patente_categoria, patente_scadenza, attivo, email) on public.tecnici to authenticated;
+grant update (codice, nome, cognome, ruolo, telefono, patente_categoria, patente_scadenza, attivo, email,
+              tentativi_falliti, bloccato_fino) on public.tecnici to authenticated;

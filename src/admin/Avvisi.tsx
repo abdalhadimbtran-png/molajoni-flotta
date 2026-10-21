@@ -15,7 +15,7 @@ export default function Avvisi() {
   const { data, errore, reload } = useLoad(async () => {
     const [tc, n] = await Promise.all([
       supabase.from('tecnici').select('id,nome,cognome,patente_scadenza').eq('attivo', true).order('cognome'),
-      supabase.from('notifiche').select('id,tecnico_id,dati,creato_il,letta_il,tecnici(nome,cognome)').eq('tipo', 'avviso').order('creato_il', { ascending: false }).limit(100),
+      supabase.from('notifiche').select('id,tecnico_id,dati,creato_il,letta_il,tecnici(nome,cognome)').eq('tipo', 'avviso').not('tecnico_id', 'is', null).or('dati->>categoria.is.null,dati->>categoria.neq.ferie').order('creato_il', { ascending: false }).limit(100),
     ]);
     if (tc.error) throw tc.error; if (n.error) throw n.error;
     return { tecnici: tc.data as T[], inviati: n.data as unknown as Inviato[] };

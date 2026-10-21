@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { rpc } from '../../lib/supabase';
-import { CATEGORIE, fmtEuro, fmtKm, fmtOra } from '../../lib/format';
+import { rpc, supabase } from '../../lib/supabase';
+import { CATEGORIE, fmtData, fmtEuro, fmtKm, fmtOra } from '../../lib/format';
 import { useT } from '../../lib/i18n';
 import { Caricamento, Errore, Pill, useLoad } from '../../ui';
 
@@ -17,7 +17,14 @@ const somma = (l: Mese[], k: keyof Mese) => l.reduce((s, m) => s + Number(m[k] ?
 export default function Panoramica() {
   const { t, locale } = useT();
   const [mesi, setMesi] = useState(6);
-  const { data, errore, reload } = useLoad(() => rpc<Analisi>('analisi_admin', { p_mesi: mesi }), [mesi]);
+  const { data, errore, reload } = useLoad(async () => {
+    const [an, auto, dd] = await Promise.all([
+      rpc<Analisi>('analisi_admin', { p_mesi: mesi }),
+      rpc<AutoDecisione[]>('admin_auto_decisioni', { p_da: null, p_a: null }).catch(() => null),
+      supabase.from('richieste_assenza').select('id', { count: 'exact', head: true }).eq('stato', 'in_attesa'),
+    ]);
+    return { ...an, auto, daDecidere: dd.error ? null : dd.count ?? 0 };
+  }, [mesi]);
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data) return <Caricamento />;
   const M = data.mesi, S = data.sistema;
@@ -54,7 +61,10 @@ export default function Panoramica() {
         <div className="kpi"><div className="lbl">{t('Tempo medio di risoluzione')}</div><div className="num">{oreMedie == null ? '—' : oreMedie < 48 ? t('{n} h', { n: oreMedie }) : t('{n} gg', { n: Math.round(oreMedie / 24) })}</div></div>
         <div className="kpi"><div className="lbl">{t('Avvisi letti')}</div><div className="num">{avv ? `${Math.round((avvLetti / avv) * 100)}%` : '—'}</div><div className="sub">{t('{a} di {b}', { a: avvLetti, b: avv })}</div></div>
         <div className="kpi"><div className="lbl">{t('Piani confermati')}</div><div className="num">{somma(M, 'piani_confermati')}</div><div className="sub">{t('giorni nel periodo')}</div></div>
+        {data.daDecidere != null && <Link to="/hr" className={`kpi ${data.daDecidere ? 'warn' : 'ok'}`}><div className="lbl">{t('Richieste da decidere')}</div><div className="num">{data.daDecidere}</div><div className="sub">{t('ferie e permessi in attesa')}</div></Link>}
       </div>
+
+      {data.auto && <AutoDecisioni elenco={data.auto} />}
 
       <div className="grafici">
         <Barre titolo={t('Km percorsi al mese')} valori={M.map(m => ({ x: nomeMese(m.mese), v: Number(m.km), testo: `${fmtKm(Number(m.km))} km`, breve: fmtKm(Number(m.km)) }))} />
@@ -102,6 +112,49 @@ export default function Panoramica() {
             <td className="mono num-c">{x.multe}</td><td className="mono">{x.ultimo_accesso ? fmtOra(x.ultimo_accesso, locale) : '—'}</td></tr>))}</tbody>
       </table></div>
       <p className="hint">{t('Km dai movimenti registrati con il QR (le rettifiche del responsabile non contano). Tempo di lettura: mediana tra invio e apertura di piani e avvisi.')}</p>
+    </>
+  );
+}
+
+/** Richiesta decisa, inserita o annullata dall'account dell'ufficio personale collegato allo stesso dipendente. */
+interface AutoDecisione {
+  id: number; numero: string; tipo_descrizione: string; primo_giorno: string; ultimo_giorno: string; rientro: string;
+  ora_inizio: string | null; ora_fine: string | null; mezza_giornata: boolean; stato: 'in_attesa' | 'approvata' | 'rifiutata' | 'annullata';
+  quantita: number | null; unita: string; dipendente?: { nome: string } | null; deciso_da?: string | null; deciso_il: string | null;
+  annullata_il: string | null; creato_il: string; creata_da_utente?: string | null; annullata_da_utente?: string | null;
+}
+const STATI_RICH: Record<AutoDecisione['stato'], ['warn' | 'ok' | 'ko' | 'na', string]> = {
+  in_attesa: ['warn', 'In valutazione'], approvata: ['ok', 'Approvata'], rifiutata: ['ko', 'Rifiutata'], annullata: ['na', 'Annullata'],
+};
+
+/** Riquadro per l'amministratore: le decisioni dell'ufficio personale sulle proprie richieste (UX R9). */
+function AutoDecisioni({ elenco }: { elenco: AutoDecisione[] }) {
+  const { t, locale } = useT();
+  const [tutte, setTutte] = useState(false);
+  const periodo = (r: AutoDecisione) => r.ora_inizio ? `${fmtData(r.primo_giorno)} ${r.ora_inizio}–${r.ora_fine}`
+    : r.mezza_giornata ? `${fmtData(r.primo_giorno)} · ${t('mezza giornata')}`
+    : r.primo_giorno === r.ultimo_giorno ? fmtData(r.primo_giorno) : `${fmtData(r.primo_giorno)} – ${fmtData(r.ultimo_giorno)}`;
+  const mostra = tutte ? elenco : elenco.slice(0, 5);
+  return (
+    <>
+      <div className="section-title">{t("Decisioni dell'ufficio personale sulle proprie richieste")} <span className="meta">{elenco.length}</span></div>
+      {elenco.length === 0 ? <div className="banner ok">{t("Nessuna: l'ufficio personale non ha deciso richieste proprie.")}</div> : <>
+        <div className="table-wrap"><table>
+          <thead><tr><th>{t('Richiesta')}</th><th>{t('Dipendente')}</th><th>{t('Periodo')}</th><th>{t('Esito')}</th><th>{t('Chi e quando')}</th></tr></thead>
+          <tbody>{mostra.map(r => {
+            const [s, l] = STATI_RICH[r.stato] ?? ['na', r.stato];
+            const quando = r.annullata_il ?? r.deciso_il ?? r.creato_il;
+            const chi = r.stato === 'annullata' ? r.annullata_da_utente : r.deciso_da ?? r.creata_da_utente;
+            return (
+              <tr key={r.id} className="row-warn"><td className="mono">{r.numero}<div className="sub">{r.tipo_descrizione}</div></td>
+                <td>{r.dipendente?.nome ?? '—'}</td><td className="mono">{periodo(r)}</td>
+                <td><Pill s={s}>{t(l)}</Pill></td><td>{chi ?? '—'}<div className="sub mono">{fmtOra(quando, locale)}</div></td></tr>
+            );
+          })}</tbody>
+        </table></div>
+        <p className="hint">{t("Queste richieste sono state decise dall'account collegato alla stessa persona. Controllale: se serve, l'ufficio personale le può annullare.")}
+          {elenco.length > 5 && <> <button className="link" onClick={() => setTutte(!tutte)}>{tutte ? t('Mostra meno') : t('Mostra tutte ({n})', { n: elenco.length })}</button></>}</p>
+      </>}
     </>
   );
 }

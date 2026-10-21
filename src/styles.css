@@ -968,3 +968,15 @@ tbody tr:hover td { background:#FAFAFC; }
 .rep-tab td { white-space:nowrap; }
 .rep-tab td.wrap-cell { white-space:normal; min-width:220px; }
 .rep-filtri .field select { min-width:200px; }
+
+/* === Flotta e amministrazione: ferie === */
+.presenza { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:6px; }
+.presenza .sub { font-size:13px; }
+tr.row-ko .presenza .pill.ko { font-weight:600; }
+.int-sposta { align-items:flex-start; }
+select.sposta { margin-top:6px; min-height:32px; font-size:13.5px; max-width:220px; }
+.bell-item.bell-ko b { color:var(--ko); }
+.sola-lettura { margin:-4px 0 12px; }
+.seg legend { margin-bottom:4px; }
+.seg label > span { display:flex; flex-direction:column; gap:2px; }
+.seg-d { font-size:13px; line-height:1.4; }

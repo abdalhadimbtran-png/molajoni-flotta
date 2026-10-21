@@ -109,9 +109,9 @@ export const CATALOGO: Report[] = [
   },
   {
     id: 'assenze', gruppo: 'Tecnici', titolo: 'Assenze', periodo: 'intervallo', filtri: { tecnico: true },
-    descrizione: 'Ferie, permessi e altre assenze nel periodo, con i giorni lavorativi interessati.',
+    descrizione: "Assenze a giornata intera dei tecnici nel periodo, con i giorni lavorativi interessati. Il tipo di assenza lo vede solo l'ufficio personale.",
     colonne: [
-      { k: 'tecnico', l: 'Tecnico', t: 'testo', w: 22 }, { k: 'motivo', l: 'Motivo', t: 'testo', w: 14 }, { k: 'dal', l: 'Dal', t: 'data', w: 12 }, { k: 'al', l: 'Al', t: 'data', w: 12 },
+      { k: 'tecnico', l: 'Tecnico', t: 'testo', w: 22 }, { k: 'motivo', l: 'Assenza', t: 'testo', w: 14 }, { k: 'dal', l: 'Dal', t: 'data', w: 12 }, { k: 'al', l: 'Al', t: 'data', w: 12 },
       { k: 'giorni_lavorativi', l: 'Giorni lavorativi nel periodo', t: 'num', tot: true, w: 14 },
     ],
     riepilogo: r => [{ l: 'Assenze', v: String(r.length) }, { l: 'Giorni lavorativi', v: String(somma(r, 'giorni_lavorativi')) }],

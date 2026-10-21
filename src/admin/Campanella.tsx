@@ -1,14 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, rpc } from '../lib/supabase';
-import { CATEGORIE, fmtOra } from '../lib/format';
+import { CATEGORIE, fmtOra, oggiISO } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { attivaPush, registraSW, statoPush, type StatoPush } from '../lib/push';
 import { Targa } from '../ui';
 
 interface N { id: number; tipo: string; dati: Record<string, unknown>; link: string | null; creato_il: string; letta_il: string | null }
 
-/** Notifiche del responsabile: veicoli fermi, incidenti, riepilogo scadenze. */
+/**
+ * Dove porta la notifica. Le notifiche delle assenze (interventi da riassegnare, assenza annullata)
+ * arrivano con link «/piano» senza giorno: si apre il primo giorno dell'assenza ancora da venire.
+ */
+export function linkDi(n: Pick<N, 'link' | 'dati'>): string | null {
+  const d = n.dati as { evento?: string; dal?: string };
+  if (n.link?.startsWith('/piano') && !n.link.includes('data=') && d.dal && /^\d{4}-\d{2}-\d{2}$/.test(d.dal)) {
+    const oggi = oggiISO();
+    return `/piano?data=${d.dal > oggi ? d.dal : oggi}`;
+  }
+  return n.link;
+}
+
+/** Notifiche del responsabile: veicoli fermi, scadenze, interventi da riassegnare per assenze. */
 export default function Campanella() {
   const { t, tm, locale, lingua } = useT();
   const nav = useNavigate();
@@ -26,7 +39,7 @@ export default function Campanella() {
 
   async function apri(n: N) {
     if (!n.letta_il) await supabase.from('notifiche').update({ letta_il: new Date().toISOString() }).eq('id', n.id);
-    setAperta(false); carica(); if (n.link) nav(n.link);
+    setAperta(false); carica(); const l = linkDi(n); if (l) nav(l);
   }
   async function attiva() {
     try { setPush(await attivaPush((e, p, a) => rpc('responsabile_salva_push', { p_endpoint: e, p_p256dh: p, p_auth: a, p_lingua: lingua }))); }
@@ -47,12 +60,16 @@ export default function Campanella() {
           </div>
           {l.length === 0 && <p className="sub" style={{ padding: 14 }}>{t('Nessuna notifica')}</p>}
           {l.map(n => {
-            const d = n.dati as { targa?: string; categoria?: string; descrizione?: string; tecnico?: string; superate?: number; in_scadenza?: number; elenco?: string[] };
+            const d = n.dati as { targa?: string; categoria?: string; descrizione?: string; tecnico?: string; superate?: number; in_scadenza?: number; elenco?: string[]; titolo?: string; testo?: string; livello?: string; evento?: string };
             return (
-              <button key={n.id} className={`bell-item ${n.letta_il ? '' : 'nuova'}`} onClick={() => apri(n)}>
+              <button key={n.id} className={`bell-item ${n.letta_il ? '' : 'nuova'}${d.evento === 'interventi_da_riassegnare' ? ' bell-ko' : ''}`} onClick={() => apri(n)}>
                 {n.tipo === 'segnalazione_fermo' ? <>
                   <div className="row-flex"><b>{t('Veicolo fermo')}</b><Targa t={d.targa} /></div>
                   <div className="sub">{t(CATEGORIE[d.categoria ?? 'altro'])} · {d.tecnico}: {d.descrizione}</div>
+                </> : d.titolo ? <>
+                  {/* notifiche con titolo e testo (assenze dal piano, ufficio personale, auto-decisioni): già senza tipo di assenza */}
+                  <b>{t(d.titolo)}</b>
+                  {d.testo && <div className="sub">{tm(d.testo)}</div>}
                 </> : <>
                   <b>{t('Scadenze flotta')}</b>
                   <div className="sub">{t('{a} superate, {b} in scadenza', { a: d.superate ?? 0, b: d.in_scadenza ?? 0 })}</div>

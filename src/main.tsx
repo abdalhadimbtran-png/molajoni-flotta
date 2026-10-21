@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import '@fontsource-variable/inter/opsz.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-400.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-500.css';
@@ -11,7 +11,7 @@ import '@fontsource/jetbrains-mono/latin-600.css';
 import './styles.css';
 import { configurato } from './lib/supabase';
 import { LinguaProvider } from './lib/i18n';
-import Shell from './admin/Shell';
+import Shell, { Smistamento } from './admin/Shell';
 import Accesso from './admin/Accesso';
 import Cruscotto from './admin/Cruscotto';
 import Piano from './admin/Piano';
@@ -64,7 +64,8 @@ function App() {
           <Route path="/installa-tecnici" element={<Volantino />} />
           <Route path="/avvisi" element={<Avvisi />} />
         </Route>
-        <Route path="*" element={<Navigate to="/cruscotto" replace />} />
+        <Route path="/" element={<Smistamento />} />
+        <Route path="*" element={<Smistamento />} />
       </Routes>
     </BrowserRouter>
   );

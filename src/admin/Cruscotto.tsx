@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { supabase, rpc } from '../lib/supabase';
-import { CATEGORIE, GRAVITA, STATI_VEICOLO, fmtData, fmtGiorno, fmtKm, fmtOra, giorniA, prossimoLavorativo } from '../lib/format';
+import { CATEGORIE, GRAVITA, STATI_VEICOLO, fmtData, fmtGiorno, fmtKm, fmtOra, giorniA, oggiISO, prossimoLavorativo } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { SEL_TECNICI, SEL_VEICOLI, type Piano, type Segnalazione, type Tecnico, type Veicolo } from '../lib/tipi';
 import { Caricamento, Errore, Pill, useLoad , Targa } from '../ui';
@@ -18,8 +18,18 @@ export default function Cruscotto() {
       rpc<Piano>('piano_giorno', { p_data: giorno }),
     ]);
     for (const r of [v, tc, s]) if (r.error) throw r.error;
-    const mu = await supabase.from('multe').select('id,scadenza_comunicazione,stato,veicoli(targa)').in('stato', ['da_identificare', 'da_comunicare']);
-    return { veicoli: v.data as unknown as Veicolo[], tecnici: tc.data as Tecnico[], segn: s.data as Segnalazione[], piano: p, multe: (mu.data ?? []) as unknown as { id: number; scadenza_comunicazione: string | null; stato: string; veicoli: { targa: string } | null }[] };
+    const oggi = oggiISO();
+    const [mu, ints, ass] = await Promise.all([
+      supabase.from('multe').select('id,scadenza_comunicazione,stato,veicoli(targa)').in('stato', ['da_identificare', 'da_comunicare']),
+      supabase.from('interventi').select('tecnico_id,data').gte('data', oggi).order('data').limit(2000),
+      supabase.from('assenze').select('tecnico_id,dal,al').gte('al', oggi),
+    ]);
+    // interventi già pianificati per tecnici che risultano assenti (ferie approvate dall'ufficio personale, assenze)
+    const assenze = (ass.data ?? []) as { tecnico_id: number; dal: string; al: string }[];
+    const scoperti = ((ints.data ?? []) as { tecnico_id: number; data: string }[])
+      .filter(i => assenze.some(a => a.tecnico_id === i.tecnico_id && i.data >= a.dal && i.data <= a.al));
+    return { veicoli: v.data as unknown as Veicolo[], tecnici: tc.data as Tecnico[], segn: s.data as Segnalazione[], piano: p, scoperti,
+      multe: (mu.data ?? []) as unknown as { id: number; scadenza_comunicazione: string | null; stato: string; veicoli: { targa: string } | null }[] };
   }, [giorno]);
 
   if (errore) return <Errore testo={errore} onRetry={reload} />;
@@ -54,6 +64,12 @@ export default function Cruscotto() {
     exc.push({ s, t: `${m.veicoli?.targa ?? ''} · ${m.stato === 'da_identificare' ? t('Multa: conducente da identificare') : t('Multa: conducente da comunicare')}`,
       d: m.scadenza_comunicazione ? (g! < 0 ? t('Termine scaduto il {d}', { d: fmtData(m.scadenza_comunicazione) }) : t('Entro il {d} ({n} giorni)', { d: fmtData(m.scadenza_comunicazione), n: g! })) : t('Senza decurtazione punti'), to: '/multe' });
   });
+  if (data.scoperti.length) {
+    const primo = data.scoperti[0].data;
+    const giorni = [...new Set(data.scoperti.map(i => fmtData(i.data).slice(0, 5)))];
+    exc.unshift({ s: 'ko', t: t('{n} interventi da riassegnare per assenze', { n: data.scoperti.length }),
+      d: t('Giorni: {g}', { g: giorni.slice(0, 5).join(', ') + (giorni.length > 5 ? '…' : '') }), to: `/piano?data=${primo}` });
+  }
   exc.sort((a, b) => (a.s === b.s ? 0 : a.s === 'ko' ? -1 : 1));
   const conta = (s: string) => veicoli.filter(v => v.stato === s).length;
 

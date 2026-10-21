@@ -531,3 +531,14 @@ begin
       using errcode = '42501';
   end if;
 end $$;
+do $$
+declare src text; nuovo text;
+begin
+  src := pg_get_functiondef('privato.richiesta_json(public.richieste_assenza, boolean)'::regprocedure);
+  nuovo := replace(src, $a$from public.responsabili x where x.dipendente_id = r.dipendente_id)$a$,
+                        $a$from public.responsabili x where x.dipendente_id = r.dipendente_id and x.attivo)$a$);
+  nuovo := replace(nuovo, $a$x.dipendente_id = r.dipendente_id and x.user_id is distinct from auth.uid())$a$,
+                          $a$x.dipendente_id = r.dipendente_id and x.attivo and x.user_id is distinct from auth.uid())$a$);
+  if nuovo = src then raise exception 'richiesta_json: testo atteso non trovato'; end if;
+  execute nuovo;
+end $$;

@@ -20,12 +20,16 @@ const P: Record<string, ReactNode> = {
   ritorno: <><path d="M10 6 4 12l6 6" /><path d="M4.5 12H15a5 5 0 0 1 5 5v1" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   chiudi: <path d="M6 6l12 12M18 6 6 18" />,
+  // area Ufficio personale
+  'hr-richieste': <><path d="M3 13.5h4.5l1.5 3h6l1.5-3H21" /><path d="M5 13.5 7 5h10l2 8.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19v-5.5Z" /><path d="m9.5 9.5 2 2 3.5-3.5" /></>,
+  'hr-saldi': <><path d="M6.5 3h11M6.5 21h11" /><path d="M7.5 3v3.5a4.5 4.5 0 0 0 9 0V3M7.5 21v-3.5a4.5 4.5 0 0 1 9 0V21" /></>,
+  'hr-festivita': <><rect x="3" y="4.5" width="18" height="16.5" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /><path d="m12 12 1.1 2.2 2.4.3-1.75 1.7.4 2.4L12 17.5l-2.15 1.1.4-2.4-1.75-1.7 2.4-.3Z" /></>,
 };
 export const Icona = ({ n }: { n: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{P[n]}</svg>
 );
 
-export interface Voce { to: string; label: string; icona: string; end?: boolean }
+export interface Voce { to: string; label: string; icona: string; end?: boolean; badge?: number }
 export interface Gruppo { titolo: string; voci: Voce[] }
 
 /** Struttura delle aree di gestione: barra laterale chiara + barra superiore con utilità e menu utente. */
@@ -50,7 +54,7 @@ export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children 
               <div className="side-gtit">{t(g.titolo)}</div>
               {g.voci.map(v => (
                 <NavLink key={v.to} to={v.to} end={v.end} className={({ isActive }) => `side-voce ${isActive ? 'attiva' : ''}`}>
-                  <Icona n={v.icona} /><span>{t(v.label)}</span>
+                  <Icona n={v.icona} /><span>{t(v.label)}</span>{v.badge ? <span className="side-badge" aria-label={t('{n} da decidere', { n: v.badge })}>{v.badge}</span> : null}
                 </NavLink>
               ))}
             </div>

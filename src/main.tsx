@@ -30,6 +30,14 @@ import AreaAdmin from './admin/amm/AreaAdmin';
 import Panoramica from './admin/amm/Panoramica';
 import Account from './admin/amm/Account';
 import Sicurezza from './admin/amm/Sicurezza';
+import ShellHR from './hr/ShellHR';
+import DaDecidere from './hr/DaDecidere';
+import CalendarioHR from './hr/Calendario';
+import Dipendenti from './hr/Dipendenti';
+import Saldi from './hr/Saldi';
+import Impostazioni from './hr/Impostazioni';
+import ReportHR from './hr/ReportHR';
+import SchedaAccesso from './hr/SchedaAccesso';
 
 function App() {
   if (!configurato) return <div className="wrap"><div className="banner ko">Configurazione mancante: VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.</div></div>;
@@ -49,6 +57,17 @@ function App() {
           <Route path="/admin/sicurezza" element={<Sicurezza />} />
           <Route path="/admin/registro" element={<Registro />} />
           <Route path="/admin/report" element={<Report />} />
+        </Route>
+        <Route element={<ShellHR />}>
+          <Route path="/hr" element={<DaDecidere />} />
+          <Route path="/hr/richieste" element={<DaDecidere />} />
+          <Route path="/hr/calendario" element={<CalendarioHR />} />
+          <Route path="/hr/dipendenti" element={<Dipendenti />} />
+          <Route path="/hr/saldi" element={<Saldi />} />
+          <Route path="/hr/impostazioni" element={<Impostazioni />} />
+          <Route path="/hr/report" element={<ReportHR />} />
+          <Route path="/hr/installa" element={<SchedaAccesso />} />
+          <Route path="/hr/*" element={<Navigate to="/hr" replace />} />
         </Route>
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />

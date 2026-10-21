@@ -14,22 +14,24 @@ export function useSessione() {
   const [sessione, setSessione] = useState<Session | null>(null);
   const [stato, setStato] = useState<Stato>('caricamento');
   const [admin, setAdmin] = useState(false);
+  const [hr, setHr] = useState(false);
   useEffect(() => {
     let attivo = true;
     async function verifica(s: Session | null) {
       if (!attivo) return;
       setSessione(s);
       if (!s) { setStato('anonimo'); return; }
-      const [r, a] = await Promise.all([supabase.rpc('is_responsabile'), supabase.rpc('is_admin')]);
+      const [r, a, h] = await Promise.all([supabase.rpc('is_responsabile'), supabase.rpc('is_admin'), supabase.rpc('is_hr')]);
       if (!attivo) return;
       setAdmin(!a.error && a.data === true);
+      setHr(!h.error && h.data === true);
       setStato(!r.error && r.data === true ? 'ok' : 'non_abilitato');
     }
     supabase.auth.getSession().then(({ data }) => verifica(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { verifica(s); });
     return () => { attivo = false; sub.subscription.unsubscribe(); };
   }, []);
-  return { sessione, stato, admin };
+  return { sessione, stato, admin, hr };
 }
 
 const GRUPPI: Gruppo[] = [
@@ -44,11 +46,13 @@ const GRUPPI: Gruppo[] = [
 ];
 
 export default function Shell() {
-  const { sessione, stato, admin } = useSessione();
+  const { sessione, stato, admin, hr } = useSessione();
   const { t } = useT();
   const loc = useLocation();
   if (stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
   if (stato === 'anonimo') return <Navigate to="/accesso" replace state={{ da: loc.pathname }} />;
+  // account dell'ufficio personale: il pannello flotta non è suo, va nella sua area senza errore
+  if (stato === 'non_abilitato' && hr) return <Navigate to="/hr" replace />;
   if (stato === 'non_abilitato') return (
     <div className="wrap narrow">
       <h1>{t('Account non abilitato')}</h1>
@@ -60,6 +64,7 @@ export default function Shell() {
     <Layout prodotto={t('Gestione flotta')} gruppi={admin ? [...GRUPPI, { titolo: 'Sistema', voci: [{ to: '/admin', label: 'Amministrazione', icona: 'sicurezza' }] }] : GRUPPI} email={sessione?.user.email ?? ''}
       utilita={<><InstallaApp variante="admin" /><Campanella /></>}
       menuUtente={<>
+        {admin && <NavLink to="/hr"><Icona n="tecnici" />{t('Ufficio personale')}</NavLink>}
         {admin && <NavLink to="/admin"><Icona n="sicurezza" />{t('Amministrazione')}</NavLink>}
         <button onClick={() => supabase.auth.signOut()}><Icona n="ritorno" />{t('Esci')}</button>
       </>}>

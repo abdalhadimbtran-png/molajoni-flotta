@@ -1,6 +1,6 @@
 import { numerica, testoCella, type Col, type Report, type Riga } from './catalogo';
 
-export interface Contesto { periodo: string; filtri: string; autore: string; generato: Date }
+export interface Contesto { periodo: string; filtri: string; autore: string; generato: Date; /** intestazione dei file (default «Gestione flotta») */ prodotto?: string }
 
 const nomeFile = (r: Report, c: Contesto, est: string) =>
   `Molajoni_${r.titolo.replace(/[^A-Za-z0-9]+/g, '_')}_${c.periodo.replace(/[^0-9]+/g, '-').replace(/^-|-$/g, '')}.${est}`;
@@ -53,7 +53,7 @@ function valoreXls(v: unknown, c: Col): unknown {
 export async function esportaExcel(rep: Report, righe: Riga[], ctx: Contesto) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Molajoni Antincendi · Gestione flotta'; wb.created = ctx.generato;
+  wb.creator = `Molajoni Antincendi · ${ctx.prodotto ?? 'Gestione flotta'}`; wb.created = ctx.generato;
   const ws = wb.addWorksheet(rep.titolo.slice(0, 31), {
     pageSetup: { orientation: rep.orizzontale ? 'landscape' : 'portrait', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.6, header: 0.2, footer: 0.3 } },
     headerFooter: { oddFooter: `&L&8Molajoni Antincendi · ${rep.titolo}&R&8Pagina &P di &N` },
@@ -131,7 +131,7 @@ export async function esportaPdf(rep: Report, righe: Riga[], ctx: Contesto) {
   const intestazione = () => {
     doc.addImage(lg.dataUrl, 'PNG', M, 9, lw, lh);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(110, 110, 115);
-    doc.text('Gestione flotta', W - M, 12, { align: 'right' });
+    doc.text(ctx.prodotto ?? 'Gestione flotta', W - M, 12, { align: 'right' });
     doc.setFont('helvetica', 'normal'); doc.text(rep.titolo, W - M, 16.5, { align: 'right' });
     doc.setDrawColor(227, 6, 19); doc.setLineWidth(0.6); doc.line(M, 9 + lh + 3, W - M, 9 + lh + 3);
   };
@@ -181,7 +181,7 @@ export async function esportaPdf(rep: Report, righe: Riga[], ctx: Contesto) {
   const pagine = doc.getNumberOfPages();
   for (let p = 1; p <= pagine; p++) {
     doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(142, 142, 147);
-    doc.text(`Molajoni Antincendi · Gestione flotta · ${rep.titolo} · ${ctx.periodo}`, M, H - 7);
+    doc.text(`Molajoni Antincendi · ${ctx.prodotto ?? 'Gestione flotta'} · ${rep.titolo} · ${ctx.periodo}`, M, H - 7);
     doc.text(`Pagina ${p} di ${pagine}`, W - M, H - 7, { align: 'right' });
   }
   scarica(doc.output('blob'), nomeFile(rep, ctx, 'pdf'));

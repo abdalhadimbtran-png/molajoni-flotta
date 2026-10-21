@@ -7,7 +7,7 @@ import { Banner, Logo } from '../ui';
 
 /** Accesso del responsabile flotta. Gli account si creano solo dall'amministratore (nessuna registrazione pubblica). */
 export default function Accesso() {
-  const { stato, admin } = useSessione();
+  const { stato, admin, hr } = useSessione();
   const { t, tm } = useT();
   const loc = useLocation() as { state?: { da?: string } };
   const [email, setEmail] = useState('');
@@ -15,7 +15,13 @@ export default function Accesso() {
   const [msg, setMsg] = useState<{ s: 'ok' | 'ko'; t: string } | null>(null);
   const [invio, setInvio] = useState(false);
 
-  if (stato === 'ok' || stato === 'non_abilitato') return <Navigate to={loc.state?.da ?? (admin ? '/admin' : '/cruscotto')} replace />;
+  if (stato === 'ok' || stato === 'non_abilitato') {
+    // smistamento per ruolo: l'ufficio personale va a /hr; la pagina richiesta solo se il ruolo può aprirla
+    const casa = admin ? '/admin' : stato === 'ok' ? '/cruscotto' : hr ? '/hr' : '/cruscotto';
+    const da = loc.state?.da;
+    const consentita = da && (admin || (da.startsWith('/hr') ? hr : stato === 'ok' && !da.startsWith('/admin')));
+    return <Navigate to={consentita ? da : casa} replace />;
+  }
 
   async function invia(e: FormEvent) {
     e.preventDefault(); setMsg(null); setInvio(true);

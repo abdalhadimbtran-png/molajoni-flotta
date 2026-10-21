@@ -1,14 +1,16 @@
 # Revisione critica del database · Portale Molajoni (Ferie e permessi + Flotta)
 
 Revisore: agente "revisore DB" (sola lettura) · data: 20/10/2026 · progetto Supabase `dhqvyxitcrbqwozgcgno`
-Migrazioni esaminate: 0001 → 0009, **0010_ferie_struttura**, **0010b_assenze_vista_elimina** (applicate in produzione alle 13:37–13:38 UTC), **0011_ferie_calcolo** (file del 15:41; funzioni `privato.*` presenti nel database e provate), **0012_ferie_api** (applicata 13:49 UTC, provata), **0013_ferie_piano** (file del 15:50; letta, non ancora applicata al momento dell'ultima verifica).
+Migrazioni esaminate: 0001 → 0009, **0010_ferie_struttura**, **0010b_assenze_vista_elimina** (applicate in produzione alle 13:37–13:38 UTC), **0011_ferie_calcolo** (file del 15:41; funzioni `privato.*` presenti nel database e provate), **0012_ferie_api** (applicata 13:49 UTC, provata), **0013_ferie_piano** (applicata 13:50 UTC, riverificata il 21/10 con un blocco annullato).
+
+**Decisioni del cliente del 20/10 tenute in conto:** solo HR e admin gestiscono i dipendenti (policy `dip_resp_tecnici` con `with check (false)` ✅ verificata nel codice 0012); le richieste di Roberta le decide solo lei, l'admin le vede con il flag (`controlla_decisore`, `auto_decisione`, `admin_auto_decisioni` ✅); tutti i tipi di assenza esistono, HR decide quali attivi (`tipi_assenza.attivo` ✅).
 
 ### In breve: i 6 punti da correggere per primi
 1. **P0-1** `audit_log` → il responsabile flotta legge tipo `MAL` e note delle richieste (provato).
 2. **P0-6** `notifiche` → il responsabile flotta legge "Malattia: registrata dall'ufficio personale" di qualsiasi dipendente, anche UFFICIO (provato).
 3. **P0-2** `piano_giorno`/`conferma_piano` → piano confermabile con tecnico assente che ha interventi (provato).
 4. **P0-4** `privato.saldo` → part-time: ferie dimezzate all'orizzontale (13 invece di 26) e piene al verticale di 3 giorni (26 invece di 15,6) (provato).
-5. **P1-1 → P0** `imposta_pin` (vecchia funzione flotta) imposta il PIN anche ai dipendenti UFFICIO: con `dipendente_login` (0012, già in produzione) il responsabile flotta entra come un impiegato e invia ferie a suo nome (**catena completa provata**). Corretto nella 0013: va applicata subito.
+5. **P1-1 → P0** `imposta_pin` (vecchia funzione flotta) imposta il PIN anche ai dipendenti UFFICIO: con `dipendente_login` (0012, già in produzione) il responsabile flotta entra come un impiegato e invia ferie a suo nome (**catena completa provata**). ✅ Corretto dalla 0013, applicata: riverificato, ora `imposta_pin(UFFICIO)` → rifiutato.
    (P0-3, funzioni eseguibili da `anon`: nella 0012 tutte le `hr_*`/`dipendente_*` hanno la guardia nel corpo ✅.)
 6. **P1-3** approvare le ferie di un impiegato UFFICIO toglie la conferma al piano dei tecnici (provato).
 
@@ -67,6 +69,7 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 - **Prova:** tecnico di prova con intervento "Collaudo idranti" il 04/11/2026 + ferie/malattia approvata lo stesso giorno → `livello=na, n_interventi=1`; `conferma_piano('2026-11-04')` → **`{"ok": true, "notificati": 0}`**. Nessuno riceve l'intervento, il cliente resta scoperto.
 - Con le ferie che arrivano **da sole** dall'HR (decisione di progetto) questo diventa il caso normale, non un'eccezione: Roberta approva il 10/11, il piano del 12/11 era confermato → la conferma viene tolta (`tg_annulla_piano`), il responsabile riconferma e il sistema lo lascia fare senza riassegnare.
 - ❌ **Non corretto nella 0013**: la nuova `piano_giorno` mantiene lo stesso ramo (`Assente` = solo `info`). La 0011 aggiunge una notifica al flotta "Interventi da riassegnare" all'approvazione (bene), ma la conferma del piano resta possibile.
+- ✅ **Riverificato dopo la 0013 (21/10):** tecnico con malattia approvata il 04/11 e intervento alle 09:00 → `livello = na`, unico messaggio `"Assente: Assente"` (anche il testo è da sistemare). Il piano resta confermabile.
 - Stesso problema per i **permessi a ore** (0013): le note "Permesso 08:00-10:00" sono `info`; un tecnico con permesso 08–10 e intervento alle 08:30 risulta **"Idoneo"**. Serve un `warn`/`ko` se l'orario di un intervento cade nella fascia del permesso.
 - **Correzione:** in `piano_giorno`, se assente **e** `jsonb_array_length(ints) > 0` → messaggio `ko` "Ha N interventi da riassegnare". Aggiungere in `conferma_piano` il controllo esplicito. Facoltativo: funzione `riassegna_interventi(p_da_tecnico, p_a_tecnico, p_data)`.
 
@@ -105,7 +108,11 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 - **Correzione:** in `imposta_pin` e `genera_pin`: `update public.dipendenti … where id = p_tecnico and categoria = 'TEC'` + `if not found then raise exception`. Il PIN dei non-TEC lo gestisce solo `richiedi_hr()`.
 
 - **Aggravato dalla 0012** (`dipendente_login` per **tutte** le categorie): la catena diventa *flotta → `imposta_pin(<id UFFICIO>, '583920')` → `dipendente_login('<codice>', '583920')` → token valido → `dipendente_saldi`, `dipendente_richieste`, `dipendente_invia_richiesta` a nome dell'impiegato*. ✅ **Catena completa provata in produzione dopo l'applicazione della 0012** (blocco annullato): flotta `imposta_pin(UFFICIO)` → OK; `anon` `dipendente_login` → `ok=true`; `dipendente_saldi` → 3 tipi letti; `dipendente_invia_richiesta` → **`RF-2026-0001` creata a nome dell'impiegata**. (Controprova: lo stesso token su `tecnico_veicolo`/`tecnico_home` → `SESSIONE_NON_VALIDA` ✅; flotta su `hr_richieste` e anon su `hr_saldi` → "Accesso riservato all'ufficio HR" ✅.)
-  ✅ **Corretto nella 0013** (`imposta_pin` solo se l'id è nella vista `tecnici`). **Finché la 0013 non è applicata il buco è aperto in produzione**: applicarla subito o non distribuire il nuovo accesso.
+  ✅ **Corretto nella 0013** (`imposta_pin` solo se l'id è nella vista `tecnici`). **Riverificato dopo l'applicazione (21/10): rifiutato.** Il buco è stato aperto in produzione tra 13:49 e 13:50 UTC del 20/10; Non si può verificare dall'audit se in quel minuto qualcuno ha cambiato un PIN: `audit_tecnici` esclude `pin_hash` **e** `ha_pin`, quindi **un cambio di PIN non lascia traccia** (nuovo punto P2-11). Indizio indiretto: sessioni revocate in quella finestra (`select tecnico_id, count(*) from sessioni_tecnico where revocata and creato_il < '2026-10-20 13:51' group by 1`). Rischio reale basso (nessun responsabile flotta attivo oggi: solo l'admin è attivo).
+
+### P2-11 · Il cambio di PIN non è registrato
+- `audit_tecnici` su `dipendenti` esclude `ha_pin` e `tg_audit` toglie sempre `pin_hash`: `imposta_pin`, `genera_pin`, `hr_imposta_pin`, `hr_genera_pin` non lasciano nessuna riga in `audit_log`. Con l'accesso esteso a tutti (e il PIN che apre ferie e saldi) serve sapere **chi** ha cambiato il PIN di chi e quando.
+- **Correzione:** nelle quattro funzioni `insert into audit_log (tabella, record_id, azione, dopo, utente) values ('dipendenti', id, 'PIN', jsonb_build_object('evento','pin_impostato'), auth.uid())` (senza il PIN).
 
 ### P1-2 · Token dei dipendenti e funzioni veicolo: tenere separate le due porte
 - Oggi `_tecnico_da_token` fa join sulla **vista `tecnici`** (solo TEC) e `tecnico_login` filtra `categoria='TEC'`: un UFFICIO non ottiene token e un token di un ex-TEC passato a UFFICIO viene rifiutato (corretto).
@@ -219,7 +226,8 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 - ⚠️ `dipendente_invia_richiesta` accetta `MAL` con note libere: vale P2-6.
 - ⚠️ `hr_report('presenze')` = giorni × dipendenti con 4 sotto-query laterali ciascuno (400 giorni × 50 dipendenti = 20.000 righe): accettabile, ma da misurare; `hr_report('riepilogo')` chiama `privato.saldo` per dipendente × tipo, e `privato.saldo` è **ricorsiva** sugli anni precedenti senza saldo iniziale.
 - ✅ (0013) `piano_giorno` ora mostra `possibile_assenza` e `note_assenza`; `v_veicoli.in_carico_assente`. Restano i limiti di P0-2 (solo `info`) e P0-5 (l'etichetta "Permesso"/"Ferie" arriva al flotta).
-- ⚠️ **"L'admin può tutto"** (decisione di progetto) contro `privato.controlla_decisore` (0012 rivista): le richieste del dipendente collegato a un account HR le decide **solo** quell'account, **neanche l'admin**. Inoltre la funzione non guarda `responsabili.attivo`: se l'account di Roberta viene disattivato (dimissioni, lunga assenza) le sue richieste restano **indecidibili da chiunque**. Correzione minima: `… and l.attivo` e un'eccezione per `is_admin()` (registrata). Domanda D13.
+- ✅ `privato.controlla_decisore` (0012 rivista) applica la **decisione del cliente del 20/10**: le richieste di Roberta le decide solo lei, l'admin le vede con il flag `auto_decisione` (+ `admin_auto_decisioni()` e notifica). Accordo.
+  ⚠️ Resta un caso limite: la funzione non guarda `responsabili.attivo`. Se l'account di Roberta viene **disattivato** (dimissioni, lunga assenza), le richieste ancora in attesa del suo record dipendente restano **indecidibili da chiunque**, e nessuno può annullarle. Correzione minima: `where r.dipendente_id = p_dip and r.attivo` (con account disattivato decide l'admin, registrato). Domanda D13.
 
 ### P3 · Minori
 - `privato.genera_festivita` inserisce anche **Pasqua** (sempre domenica): innocuo, ma nel calendario HR può confondere.
@@ -244,7 +252,7 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 10. **D10 – Malattia nel portale**: il dipendente comunica solo date + protocollo PUC? Roberta deve poter allegare l'attestato (che non contiene diagnosi) o basta il protocollo? Chi oltre Roberta può vedere le malattie (l'admin sì per decisione: anche il titolare)?
 11. **D11 – Saldi negativi**: si può approvare con saldo insufficiente (ferie anticipate)? Fino a quanto?
 12. **D12 – Congedi**: congedo parentale, aspettativa, L. 104: devono fermare la maturazione (N14)? Chi li inserisce?
-13. **D13 – Richieste di Roberta**: chi le approva se Roberta è assente o lascia l'azienda? Va bene che l'admin (titolare) non possa decidere le richieste di Roberta, contro la regola "l'admin può tutto"?
+13. **D13 – Richieste di Roberta** (decisione del 20/10: le decide solo lei, l'admin vede il flag): se il suo account viene disattivato, chi decide o annulla le sue richieste rimaste in attesa? Proposta: l'admin, con registrazione.
 
 ---
 
@@ -271,8 +279,47 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 | Sovrapposizioni a ore (5 casi) | 4 corretti ✅, ROL 10 h su 8 accettato ❌ (P1-4) |
 | Flotta `imposta_pin(UFFICIO)` → `dipendente_login` → `dipendente_invia_richiesta` (0012 applicata) | **richiesta RF-2026-0001 creata** ❌ (P1-1, corretto nella 0013) |
 | Token UFFICIO su `tecnico_veicolo` / `tecnico_home` | `SESSIONE_NON_VALIDA` ✅ |
+| **21/10, dopo 0013:** flotta `imposta_pin(UFFICIO)` | rifiutato ✅ |
+| **21/10:** `prossimo_lavorativo(24/12/2026)` | 28/12/2026 ✅ (salta Natale, S. Stefano, weekend) |
+| **21/10:** flotta legge `audit_log` di richiesta MAL | ancora `MAL/prot 999 influenza` ❌ P0-1 aperto |
+| **21/10:** flotta legge `notifiche` HR | ancora "Malattia: registrata…", "Permesso ROL…", "Ferie…" ❌ P0-6 aperto |
+| **21/10:** piano con tecnico assente e intervento | ancora `na`, confermabile ❌ P0-2 aperto |
+| **21/10:** ferie UFFICIO approvate con piano confermato | conferma ancora tolta ❌ P1-3 aperto |
 | Flotta su `hr_richieste`, anon su `hr_saldi` | "Accesso riservato all'ufficio HR" ✅ |
 | Schema `privato`: `nspacl` | null (nessun accesso API) ✅ |
 | Nuove tabelle: permessi a `anon` | nessuno ✅ (trucco `privato → public` funziona) |
 
-*Il file viene aggiornato quando compaiono nuove migrazioni (0011+) e `docs/API_portale.md`.*
+*Il file viene aggiornato quando compaiono nuove migrazioni (0014+) e `docs/API_portale.md`.*
+
+---
+
+## Stato al 21/10/2026 dopo la 0013
+
+**Chiusi (verificati sul database):** P1-1 `imposta_pin` solo TEC · P1-2 token UFFICIO rifiutato dalle `tecnico_*` · P1-8 `prossimo_lavorativo` con festività · P2-2 conteggio avvisi senza notifiche ferie · P0-3 guardie in tutte le `hr_*`/`dipendente_*` · concorrenza delle richieste (`for update` sul dipendente).
+
+**Ancora aperti, in ordine:**
+| # | Problema | Dove | Correzione proposta |
+|---|---|---|---|
+| P0-1 | Flotta legge tipo `MAL` e note nel registro | `audit_log`, policy `resp_audit`, trigger `audit_richieste_assenza` | `alter policy resp_audit` per area + escludere `note`/motivi dal trigger |
+| P0-6 | Flotta legge le notifiche HR ("Malattia: …") di tutti | `notifiche`, policy `resp_notifiche_sel`, `privato.notifica_dipendente` | escludere `dati.categoria='ferie'` per il flotta; titoli senza tipo |
+| P0-2 | Piano confermabile con tecnico assente che ha interventi; permesso a ore sopra un intervento = "Idoneo" | `piano_giorno`, `conferma_piano` | `ko` "N interventi da riassegnare"; `warn` se l'ora dell'intervento cade nel permesso |
+| P0-4 | Part-time: ferie dimezzate (orizzontale) o gonfiate (verticale) | `privato.saldo` (`fattore`) | giorni: proporzione sui giorni lavorati; ore: sulle ore settimanali |
+| P0-5 | Flotta vede "Ferie"/"Permesso" e per esclusione la malattia | `tipi_assenza.etichetta_piano`, `assenze_da_richieste.etichetta`, `tg_richiesta_notifiche` | etichetta unica "Assente" (o decisione D3) |
+| P1-3 | Ferie di un UFFICIO tolgono la conferma al piano | `tg_annulla_piano` su `assenze_da_richieste` | agire solo per i TEC |
+| P1-4 | ROL di 10 h su orario di 8 accettato; mezza giornata senza "quale metà" | `privato.calcola_richiesta`, `richieste_orario_check` | errore oltre l'orario; campo mattina/pomeriggio |
+| P1-5/6 | Saldi: niente riporto senza saldo iniziale; anni senza festività (2028) | `privato.saldo`, `privato.calcola_richiesta` | riporto sempre; generare festività degli anni toccati |
+| P1-7 | Patrono: `comune_sede` vuoto, una sola sede | `config_azienda`, `festivita` | sede per dipendente |
+| P1-9/10 | Spettanze uguali per tutti; ">=15" fisso; senza data di assunzione = 12 mesi | `spettanze`, `privato.mesi_maturati` | spettanza per dipendente; operatore configurabile; data obbligatoria |
+| P2-1…11 | CHECK non allargabili, vista con `pin_hash` in `public`, conservazione, `service_role`, storico orari, scadenze 18/24 mesi, cambio PIN non registrato | vedi sezioni | vedi sezioni |
+
+---
+
+## Risposte dell'ingegnere DB
+
+*(sezione riservata all'ingegnere DB: per ogni punto scrivere "accolto / non accolto / già fatto" con il motivo e la migrazione)*
+
+---
+
+## Replica del revisore
+
+*(in attesa delle risposte)*

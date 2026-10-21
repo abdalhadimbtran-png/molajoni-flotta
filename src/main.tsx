@@ -36,10 +36,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/t" element={<Tecnico />} />
-        <Route path="/t/v/:qr" element={<Tecnico />} />
-        <Route path="/t/scansiona" element={<Tecnico />} />
-        <Route path="/t/elenco" element={<Tecnico />} />
+        {/* App di tutti i dipendenti: /t, /t/v/:qr, /t/scansiona, /t/elenco, /t/ferie, /t/ferie/nuova, /t/ferie/:id, /t/profilo */}
+        <Route path="/t/*" element={<Tecnico />} />
+        <Route path="/ferie" element={<Navigate to="/t/ferie/nuova" replace />} />
         <Route path="/accesso" element={<Accesso />} />
         <Route element={<AreaAdmin />}>
           <Route path="/admin" element={<Panoramica />} />

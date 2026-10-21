@@ -1,17 +1,20 @@
-import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
 import { rpc, testoErrore } from '../lib/supabase';
 import { CARBURANTE, CATEGORIE, GRAVITA, STATI_SEGN, TIPI_DOC, fmtGiorno, fmtKm, fmtOra, lblCarb, type Messaggio } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { Logo, Pill, Targa } from '../ui';
 import { InstallaApp } from '../Installa';
-import { URL_FUNZIONI, attivaPush, comprimiFoto, registraSW, statoPush, type StatoPush } from '../lib/push';
-
-const CHIAVE = 'molajoni_flotta_token';
-const leggiToken = () => { try { return localStorage.getItem(CHIAVE); } catch { return null; } };
-const scriviToken = (t: string | null) => { try { if (t) localStorage.setItem(CHIAVE, t); else localStorage.removeItem(CHIAVE); } catch { /* nulla */ } };
-const sessioneScaduta = (e: unknown) => testoErrore(e).includes('SESSIONE_NON_VALIDA');
+import { URL_FUNZIONI, comprimiFoto, registraSW } from '../lib/push';
+import { SessioneCtx, leggiToken, scriviToken, sessioneScaduta, type HomeDipendente as DatiHomeDipendente, type Sessione } from '../dipendente/api';
+import Accesso from '../dipendente/Accesso';
+import HomeDipendente, { RiquadroFerieTec } from '../dipendente/Home';
+import NuovaRichiesta from '../dipendente/NuovaRichiesta';
+import Profilo from '../dipendente/Profilo';
+import { DettaglioRichiesta, MieRichieste } from '../dipendente/Richieste';
+import { Attesa, BarraDipendente, VociAlto } from '../dipendente/componenti';
+import { AttivaNotifiche, Notifiche } from '../dipendente/Notifiche';
 
 /* Icone semplici, riconoscibili senza leggere */
 const Ico = ({ d }: { d: ReactNode }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
@@ -22,69 +25,71 @@ const IcoAllarme = () => <Ico d={<><path d="M12 3 2 20h20L12 3z" /><path d="M12 
 const IcoQr = () => <Ico d={<><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M21 14v7h-4M17 21v-2" /></>} />;
 const IcoFoto = () => <Ico d={<><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>} />;
 const IcoDoc = () => <Ico d={<><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h6" /></>} />;
-const IcoTel = () => <Ico d={<path d="M5 3.5h3.5l2 5-2.5 1.5a11 11 0 0 0 6 6l1.5-2.5 5 2V19a1.5 1.5 0 0 1-1.5 1.5A16.5 16.5 0 0 1 3.5 5 1.5 1.5 0 0 1 5 3.5Z" />} />;
 const IcoLista = () => <Ico d={<><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" /></>} />;
 
-/** Contenitore dell'app tecnico: accesso con codice + PIN, poi le pagine. */
+/** Contenitore dell'app di tutti i dipendenti (/t): accesso con codice + PIN, poi le pagine secondo la categoria. */
 export default function Tecnico() {
-  const { t } = useT();
   const [token, setToken] = useState<string | null>(leggiToken);
-  const { qr } = useParams();
+  const [tecLogin, setTecLogin] = useState<boolean | null>(null);
+  const [home, setHome] = useState<DatiHomeDipendente | null>(null);
+  const [errHome, setErrHome] = useState<string | null>(null);
   const loc = useLocation();
-  const esci = useCallback(() => { scriviToken(null); setToken(null); }, []);
-  useEffect(() => { registraSW(); }, []);
-  const pagina = loc.pathname.startsWith('/t/scansiona') ? 'scan' : loc.pathname.startsWith('/t/elenco') ? 'elenco' : qr ? 'veicolo' : 'home';
+  const esci = useCallback(() => { scriviToken(null); setToken(null); setHome(null); setErrHome(null); setTecLogin(null); }, []);
+  const ricarica = useCallback(() => {
+    if (!token) return;
+    rpc<DatiHomeDipendente>('dipendente_home', { p_token: token }).then(h => { setHome(h); setErrHome(null); })
+      .catch(e => { if (sessioneScaduta(e)) esci(); else setErrHome(testoErrore(e)); });
+  }, [token, esci]);
+  useEffect(() => { registraSW(); document.title = 'Molajoni'; }, []);
+  useEffect(() => { ricarica(); }, [ricarica]);
+  const logout = useCallback(async () => { const t = token; esci(); if (t) { try { await rpc('dipendente_logout', { p_token: t }); } catch { /* già scaduta */ } } }, [token, esci]);
+  const sessione: Sessione | null = useMemo(() => (token ? { token, home, errore: errHome, ricarica, esci: logout, scaduta: esci } : null), [token, home, errHome, ricarica, logout, esci]);
+
+  const path = loc.pathname.replace(/\/+$/, '') || '/t';
+  const qr = matchPath('/t/v/:qr', path)?.params.qr;
+  const idRichiesta = matchPath('/t/ferie/:id', path)?.params.id;
+  const pagina = path.startsWith('/t/scansiona') ? 'scan' : path.startsWith('/t/elenco') ? 'elenco' : qr ? 'veicolo'
+    : path === '/t/ferie/nuova' ? 'nuova' : idRichiesta && /^\d+$/.test(idRichiesta) ? 'dettaglio' : path === '/t/ferie' ? 'ferie'
+    : path === '/t/profilo' ? 'profilo' : 'home';
+  const tec = home ? home.tec : tecLogin;
+  const soloTec = pagina === 'veicolo' || pagina === 'scan' || pagina === 'elenco';
+  const conNav = !!token && pagina !== 'nuova' && pagina !== 'scan';
+
+  let corpo: ReactNode;
+  if (pagina === 'scan' && !token) corpo = <Scanner />;
+  else if (!token) corpo = <Accesso conVeicolo={!!qr} onOk={(r, condiviso) => { scriviToken(r.token!, condiviso); setTecLogin(r.tec ?? null); setToken(r.token!); }} />;
+  else if (soloTec && tec === null && !errHome) corpo = <Attesa />;
+  else if (soloTec && tec === false) corpo = <SoloTecnici veicolo={pagina === 'veicolo'} />;
+  else if (pagina === 'veicolo') corpo = <Veicolo token={token} qr={qr!} onScaduta={esci} />;
+  else if (pagina === 'scan') corpo = <Scanner />;
+  else if (pagina === 'elenco') corpo = <Elenco token={token} onScaduta={esci} />;
+  else if (pagina === 'nuova') corpo = <NuovaRichiesta />;
+  else if (pagina === 'dettaglio') corpo = <DettaglioRichiesta key={idRichiesta} id={Number(idRichiesta)} />;
+  else if (pagina === 'ferie') corpo = <MieRichieste />;
+  else if (pagina === 'profilo') corpo = <Profilo />;
+  else if (tec === null && !errHome) corpo = <Attesa />;
+  else corpo = tec !== false ? <Home token={token} onScaduta={esci} /> : <HomeDipendente />;
+
   return (
     <div className="tec">
       <div className="tec-bar">
-        <Link to="/t" aria-label={t('La mia giornata')}><Logo /></Link>
-        <div className="row-flex" style={{ gap: 8 }}>
-          {token && <button className="esci" onClick={async () => { try { await rpc('tecnico_logout', { p_token: token }); } catch { /* già scaduta */ } esci(); }}>{t('Esci')}</button>}
-        </div>
+        <Link to="/t" aria-label="Home"><Logo /></Link>
+        {token && <VociAlto onEsci={logout} />}
       </div>
-      <main className="tec-main">
-        {pagina === 'scan' && !token ? <Scanner />
-          : !token ? <Login onOk={x => { scriviToken(x); setToken(x); }} conVeicolo={!!qr} />
-          : pagina === 'veicolo' ? <Veicolo token={token} qr={qr!} onScaduta={esci} />
-          : pagina === 'scan' ? <Scanner />
-          : pagina === 'elenco' ? <Elenco token={token} onScaduta={esci} />
-          : <Home token={token} onScaduta={esci} />}
+      <main className={`tec-main${conNav ? ' con-nav' : ''}`}>
+        {sessione ? <SessioneCtx.Provider value={sessione}>{corpo}</SessioneCtx.Provider> : corpo}
       </main>
+      {conNav && <BarraDipendente />}
     </div>
   );
 }
 
-function Login({ onOk, conVeicolo }: { onOk: (t: string) => void; conVeicolo: boolean }) {
-  const { t, tm } = useT();
-  const [codice, setCodice] = useState(''); const [pin, setPin] = useState('');
-  const [err, setErr] = useState<string | null>(null); const [invio, setInvio] = useState(false);
-  async function invia(e: FormEvent) {
-    e.preventDefault(); setErr(null); setInvio(true);
-    try {
-      const r = await rpc<{ ok: boolean; token?: string; errore?: string }>('tecnico_login', { p_codice: codice, p_pin: pin });
-      if (r.ok && r.token) onOk(r.token); else { setErr(tm(r.errore ?? 'Accesso non riuscito.')); setPin(''); }
-    } catch (x) { setErr(tm(testoErrore(x))); }
-    finally { setInvio(false); }
-  }
+/** Pagine dei veicoli aperte da un dipendente non tecnico. */
+function SoloTecnici({ veicolo }: { veicolo: boolean }) {
   return (
     <>
-    <div className="tec-hero">
-      <div className="tec-hero-t">{t('La tua giornata e il tuo veicolo, in un QR.')}</div>
-    </div>
-    <form className="tec-card form" onSubmit={invia}>
-      <h1 className="tec-h1">{t('Accedi')}</h1>
-      <p className="sub">{conVeicolo ? t("Accedi una volta: poi il QR del veicolo ti porta direttamente all'operazione.") : t('Codice e PIN te li dà il responsabile flotta.')}</p>
-      <div className="field"><label htmlFor="cod">{t('Codice')}</label><input id="cod" dir="ltr" autoCapitalize="characters" autoComplete="username" required value={codice} onChange={e => setCodice(e.target.value.toUpperCase())} /></div>
-      <div className="field"><label htmlFor="pin">{t('PIN')}</label><input id="pin" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} required value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} className="pin-input" /></div>
-      {err && <div className="ph-msg ko">{err}</div>}
-      <button className="btn brand big" disabled={invio}>{invio ? t('Accesso…') : t('Accedi')}</button>
-      <InstallaApp />
-      {!conVeicolo && <>
-        <div className="oppure"><span>{t('oppure')}</span></div>
-        <Link className="big-btn light" to="/t/scansiona"><IcoQr /><span>{t('Scansiona il QR del veicolo')}<span className="sub">{t('Dopo la scansione inserisci codice e PIN')}</span></span></Link>
-      </>}
-    </form>
-    <p className="tec-foot">Molajoni Antincendi · {t('Problemi di accesso? Chiama il responsabile flotta.')}</p>
+      <div className="ph-msg info">{veicolo ? 'Questo è il QR di un veicolo. Serve solo ai tecnici.' : 'Questa parte è per i tecnici.'}</div>
+      <Link className="btn brand big" to="/t">Torna alla home</Link>
     </>
   );
 }
@@ -108,11 +113,11 @@ function Home({ token, onScaduta }: { token: string; onScaduta: () => void }) {
   const daAprire = mio ? null : oggi?.veicolo;
   return (
     <>
-      <Notifiche token={token} />
+      <Notifiche />
       <h1 className="tec-h1">{t('Ciao {n}', { n: h.nome.split(' ')[0] })}</h1>
       {h.avvisi.map((a, i) => <div key={i} className={`ph-msg ${a.l}`}>{tm(a.m)}</div>)}
       <InstallaApp />
-      <AttivaNotifiche token={token} />
+      <AttivaNotifiche />
 
       {mio && (
         <section className="tec-card tec-oggi">
@@ -143,6 +148,7 @@ function Home({ token, onScaduta }: { token: string; onScaduta: () => void }) {
           </>}
         </section>
       ))}
+      <RiquadroFerieTec />
       {h.segnalazioni.length > 0 && <section className="tec-card">
         <div className="lbl-sm">{t('Le tue segnalazioni')}</div>
         {h.segnalazioni.map((s, i) => { const [st, sl] = STATI_SEGN[s.stato]; return (
@@ -371,88 +377,6 @@ function FormSegnalazione({ token, qr, iniziale, onFatto, onScaduta, onAnnulla }
       <button className="btn brand big" disabled={invio}>{t('Invia segnalazione')}</button>
       <button type="button" className="back-link" onClick={onAnnulla}>{t('Annulla')}</button>
     </form>
-  );
-}
-
-/* ---------- Notifiche nell'app ---------- */
-interface Notifica { id: number; tipo: string; dati: Record<string, unknown>; creato_il: string; letta: boolean }
-interface DatiPiano { data: string; veicolo?: { targa: string; modello: string } | null; veicolo_prima?: { targa: string } | null; interventi?: { ora: string | null; luogo: string; attivita: string }[]; aggiornato?: boolean; annullato?: boolean }
-interface DatiAvviso { livello: 'urgente' | 'importante' | 'info'; titolo: string; testo?: string; ora?: string; luogo?: string; contatto?: string; telefono?: string; targa?: string; da?: string }
-function Notifiche({ token }: { token: string }) {
-  const { t, locale } = useT();
-  const [l, setL] = useState<Notifica[]>([]);
-  const [aperta, setAperta] = useState<number | null>(null);
-  const carica = useCallback(() => { rpc<Notifica[]>('tecnico_notifiche', { p_token: token }).then(setL).catch(() => {}); }, [token]);
-  useEffect(() => { carica(); const k = window.setInterval(carica, 45000); return () => window.clearInterval(k); }, [carica]);
-  const nonLette = l.filter(n => !n.letta).slice(0, 6);
-  if (!nonLette.length) return null;
-  async function letta(id: number) { try { await rpc('tecnico_notifica_letta', { p_token: token, p_id: id }); } catch { /* riprova al prossimo caricamento */ } setAperta(null); carica(); }
-  return <>{nonLette.map(n => {
-    if (n.tipo === 'avviso') {
-      const d = n.dati as unknown as DatiAvviso;
-      const ap = aperta === n.id || d.livello !== 'urgente';
-      return (
-        <section key={n.id} className={`tec-card avviso ${d.livello}`}>
-          <div className="lbl-sm">{d.livello === 'urgente' ? t('URGENTE') : d.livello === 'importante' ? t('Importante') : t('Avviso')} · {fmtOra(n.creato_il, locale)}{d.da ? ` · ${d.da}` : ''}</div>
-          <div className="tec-h2">{d.titolo}</div>
-          {!ap ? <button className="btn big avviso-apri" onClick={() => setAperta(n.id)}>{t('Apri e leggi')}</button> : <>
-            {(d.ora || d.luogo) && <div className="avviso-righe">
-              {d.ora && <div><span className="lbl-sm">{t('Quando')}</span><b>{d.ora}</b></div>}
-              {d.luogo && <div><span className="lbl-sm">{t('Dove')}</span><b>{d.luogo}</b>
-                <a className="link-mappa" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.luogo)}`} target="_blank" rel="noopener noreferrer">{t('Apri mappa')}</a></div>}
-            </div>}
-            {d.testo && <p className="avviso-testo">{d.testo}</p>}
-            {(d.contatto || d.telefono) && <div className="avviso-righe"><div><span className="lbl-sm">{t('Contatto')}</span><b>{d.contatto}</b>
-              {d.telefono && <a className="big-btn light" href={`tel:${d.telefono.replace(/\s/g, '')}`}><IcoTel /><span dir="ltr">{d.telefono}</span></a>}</div></div>}
-            {d.targa && <div className="row-flex"><span>{t('Veicolo:')}</span><Targa t={d.targa} /></div>}
-            <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ricevuto')}</button>
-          </>}
-        </section>
-      );
-    }
-    if (n.tipo === 'piano') {
-      const d = n.dati as unknown as DatiPiano;
-      return (
-        <section key={n.id} className={`tec-card notifica ${d.aggiornato || d.annullato ? 'cambio' : ''}`}>
-          <div className="lbl-sm">{d.annullato ? t('Piano annullato') : d.aggiornato ? t('Piano modificato') : t('Nuovo piano di lavoro')} · {fmtOra(n.creato_il, locale)}</div>
-          <div className="tec-h2">{fmtGiorno(d.data, locale)}</div>
-          {d.annullato ? <p>{t('Non hai più attività o veicolo per questo giorno.')}</p> : <>
-            <div className="row-flex"><span>{t('Veicolo:')}</span>{d.veicolo ? <><Targa t={d.veicolo.targa} big /><span className="sub">{d.veicolo.modello}</span></> : <b>{t('non assegnato')}</b>}</div>
-            {d.veicolo_prima && <div className="ph-msg warn">{t('Prima era {t}: usa il nuovo veicolo.', { t: d.veicolo_prima.targa })}</div>}
-            {(d.interventi ?? []).map((i, k) => <div key={k} className="int"><span className="h">{i.ora ?? '—'}</span><span>{i.luogo}<div className="sub">{i.attivita}</div></span></div>)}
-          </>}
-          <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ho visto')}</button>
-        </section>
-      );
-    }
-    const d = n.dati as { targa?: string; nota?: string };
-    return (
-      <section key={n.id} className="tec-card notifica">
-        <div className="lbl-sm">{t('Problema risolto')} · {fmtOra(n.creato_il, locale)}</div>
-        <div className="row-flex"><Targa t={d.targa} /> <span>{d.nota}</span></div>
-        <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ho visto')}</button>
-      </section>
-    );
-  })}</>;
-}
-
-function AttivaNotifiche({ token }: { token: string }) {
-  const { t, lingua } = useT();
-  const [s, setS] = useState<StatoPush | null>(null);
-  useEffect(() => { statoPush().then(setS); }, []);
-  if (!s || s === 'attive' || s === 'non_supportate') return null;
-  async function attiva() {
-    try { setS(await attivaPush((e, p, a) => rpc('tecnico_salva_push', { p_token: token, p_endpoint: e, p_p256dh: p, p_auth: a, p_lingua: lingua }))); }
-    catch { setS('da_attivare'); }
-  }
-  return (
-    <section className="tec-card">
-      <div className="lbl-sm">{t('Notifiche sul telefono')}</div>
-      {s === 'serve_home' ? <p>{t('Su iPhone: premi Condividi e poi "Aggiungi alla schermata Home". Apri l\'app dalla Home e attiva le notifiche.')}</p>
-        : s === 'negate' ? <p>{t('Le notifiche sono bloccate. Attivale dalle impostazioni del browser per questo sito.')}</p>
-        : <><p>{t('Ricevi un avviso quando il responsabile conferma il tuo veicolo e le tue attività.')}</p>
-            <button className="btn big" onClick={attiva}>{t('Attiva le notifiche')}</button></>}
-    </section>
   );
 }
 

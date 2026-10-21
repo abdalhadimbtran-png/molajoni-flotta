@@ -1,14 +1,15 @@
 # Revisione critica del database · Portale Molajoni (Ferie e permessi + Flotta)
 
 Revisore: agente "revisore DB" (sola lettura) · data: 20/10/2026 · progetto Supabase `dhqvyxitcrbqwozgcgno`
-Migrazioni esaminate: 0001 → 0009, **0010_ferie_struttura**, **0010b_assenze_vista_elimina** (applicate in produzione alle 13:37–13:38 UTC), **0011_ferie_calcolo** (file del 15:41; funzioni `privato.*` presenti nel database e provate).
+Migrazioni esaminate: 0001 → 0009, **0010_ferie_struttura**, **0010b_assenze_vista_elimina** (applicate in produzione alle 13:37–13:38 UTC), **0011_ferie_calcolo** (file del 15:41; funzioni `privato.*` presenti nel database e provate), **0012_ferie_api** (applicata 13:49 UTC, provata), **0013_ferie_piano** (file del 15:50; letta, non ancora applicata al momento dell'ultima verifica).
 
 ### In breve: i 6 punti da correggere per primi
 1. **P0-1** `audit_log` → il responsabile flotta legge tipo `MAL` e note delle richieste (provato).
 2. **P0-6** `notifiche` → il responsabile flotta legge "Malattia: registrata dall'ufficio personale" di qualsiasi dipendente, anche UFFICIO (provato).
 3. **P0-2** `piano_giorno`/`conferma_piano` → piano confermabile con tecnico assente che ha interventi (provato).
 4. **P0-4** `privato.saldo` → part-time: ferie dimezzate all'orizzontale (13 invece di 26) e piene al verticale di 3 giorni (26 invece di 15,6) (provato).
-5. **P0-3** funzioni nuove in `public` eseguibili da `anon`: ogni `hr_*`/`dipendente_*` deve controllare l'accesso nel corpo.
+5. **P1-1 → P0** `imposta_pin` (vecchia funzione flotta) imposta il PIN anche ai dipendenti UFFICIO: con `dipendente_login` (0012, già in produzione) il responsabile flotta entra come un impiegato e invia ferie a suo nome (**catena completa provata**). Corretto nella 0013: va applicata subito.
+   (P0-3, funzioni eseguibili da `anon`: nella 0012 tutte le `hr_*`/`dipendente_*` hanno la guardia nel corpo ✅.)
 6. **P1-3** approvare le ferie di un impiegato UFFICIO toglie la conferma al piano dei tecnici (provato).
 
 Metodo: lettura delle migrazioni + verifica sul database reale con `SELECT` e blocchi `DO … raise exception` (tutto annullato, niente salvato). Per ogni problema c'è la **prova** (risultato reale) o un **esempio riproducibile**.
@@ -65,6 +66,8 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 - **Dove:** `piano_giorno()` (0001, ancora attiva): se `ass is not null` aggiunge solo `info "Assente: …"` (e un `warn` per il veicolo in carico) → livello **`na`/`warn`, mai `ko`**. `conferma_piano()` blocca solo i `ko`.
 - **Prova:** tecnico di prova con intervento "Collaudo idranti" il 04/11/2026 + ferie/malattia approvata lo stesso giorno → `livello=na, n_interventi=1`; `conferma_piano('2026-11-04')` → **`{"ok": true, "notificati": 0}`**. Nessuno riceve l'intervento, il cliente resta scoperto.
 - Con le ferie che arrivano **da sole** dall'HR (decisione di progetto) questo diventa il caso normale, non un'eccezione: Roberta approva il 10/11, il piano del 12/11 era confermato → la conferma viene tolta (`tg_annulla_piano`), il responsabile riconferma e il sistema lo lascia fare senza riassegnare.
+- ❌ **Non corretto nella 0013**: la nuova `piano_giorno` mantiene lo stesso ramo (`Assente` = solo `info`). La 0011 aggiunge una notifica al flotta "Interventi da riassegnare" all'approvazione (bene), ma la conferma del piano resta possibile.
+- Stesso problema per i **permessi a ore** (0013): le note "Permesso 08:00-10:00" sono `info`; un tecnico con permesso 08–10 e intervento alle 08:30 risulta **"Idoneo"**. Serve un `warn`/`ko` se l'orario di un intervento cade nella fascia del permesso.
 - **Correzione:** in `piano_giorno`, se assente **e** `jsonb_array_length(ints) > 0` → messaggio `ko` "Ha N interventi da riassegnare". Aggiungere in `conferma_piano` il controllo esplicito. Facoltativo: funzione `riassegna_interventi(p_da_tecnico, p_a_tecnico, p_data)`.
 
 ### P0-3 · Ogni nuova funzione in `public` è eseguibile da `anon` (e nessuna migrazione può toglierlo)  ✅ PROVATO
@@ -101,11 +104,15 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 - La 0010 ha corretto le assenze (policy `assenze_man_resp` con `exists (select 1 from tecnici …)`). **`imposta_pin` resta aperta**: se in fase 3 i dipendenti UFFICIO accederanno con codice+PIN, il responsabile flotta potrà **cambiare il PIN di Roberta o di un impiegato** e chiedere le ferie a suo nome.
 - **Correzione:** in `imposta_pin` e `genera_pin`: `update public.dipendenti … where id = p_tecnico and categoria = 'TEC'` + `if not found then raise exception`. Il PIN dei non-TEC lo gestisce solo `richiedi_hr()`.
 
+- **Aggravato dalla 0012** (`dipendente_login` per **tutte** le categorie): la catena diventa *flotta → `imposta_pin(<id UFFICIO>, '583920')` → `dipendente_login('<codice>', '583920')` → token valido → `dipendente_saldi`, `dipendente_richieste`, `dipendente_invia_richiesta` a nome dell'impiegato*. ✅ **Catena completa provata in produzione dopo l'applicazione della 0012** (blocco annullato): flotta `imposta_pin(UFFICIO)` → OK; `anon` `dipendente_login` → `ok=true`; `dipendente_saldi` → 3 tipi letti; `dipendente_invia_richiesta` → **`RF-2026-0001` creata a nome dell'impiegata**. (Controprova: lo stesso token su `tecnico_veicolo`/`tecnico_home` → `SESSIONE_NON_VALIDA` ✅; flotta su `hr_richieste` e anon su `hr_saldi` → "Accesso riservato all'ufficio HR" ✅.)
+  ✅ **Corretto nella 0013** (`imposta_pin` solo se l'id è nella vista `tecnici`). **Finché la 0013 non è applicata il buco è aperto in produzione**: applicarla subito o non distribuire il nuovo accesso.
+
 ### P1-2 · Token dei dipendenti e funzioni veicolo: tenere separate le due porte
 - Oggi `_tecnico_da_token` fa join sulla **vista `tecnici`** (solo TEC) e `tecnico_login` filtra `categoria='TEC'`: un UFFICIO non ottiene token e un token di un ex-TEC passato a UFFICIO viene rifiutato (corretto).
 - **Rischio di regressione:** per far entrare tutti i dipendenti nel portale è facile "allargare" `_tecnico_da_token` o `tecnico_login` a `dipendenti`. Da quel momento un impiegato UFFICIO potrebbe chiamare `tecnico_movimento` (prendere in carico un furgone), `tecnico_segnalazione`, `tecnico_documenti` (libretto, assicurazione), `tecnico_elenco_veicoli`.
 - **Esempio riproducibile da mettere nei test:** login UFFICIO → `rpc/tecnico_veicolo {p_token, p_qr}` deve dare `SESSIONE_NON_VALIDA`.
-- **Correzione:** nuova `privato._dipendente_da_token()` (tutti) per le funzioni `dipendente_*`; `_tecnico_da_token` resta legata alla vista TEC. Le sessioni restano nella stessa tabella `sessioni_tecnico` ma la verifica della categoria è nella funzione.
+- ✅ **Fatto nella 0012:** `privato.dipendente_da_token` (tutte le categorie) per le `dipendente_*`; `_tecnico_da_token` resta sulla vista `tecnici`. Restano da aggiungere ai test: token UFFICIO su `tecnico_veicolo`, `tecnico_movimento`, `tecnico_documenti` → `SESSIONE_NON_VALIDA`.
+- **Correzione (originale):** nuova `privato._dipendente_da_token()` (tutti) per le funzioni `dipendente_*`; `_tecnico_da_token` resta legata alla vista TEC. Le sessioni restano nella stessa tabella `sessioni_tecnico` ma la verifica della categoria è nella funzione.
 - Nota: se un dipendente passa da TEC a UFFICIO e poi torna TEC, le vecchie sessioni (30 giorni) "rivivono". Revocarle al cambio di categoria (trigger `before update of categoria`).
 
 ### P1-3 · Approvare o annullare una richiesta toglie la conferma del piano **senza avvisare nessuno**
@@ -145,6 +152,7 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 
 ### P1-8 · `prossimo_lavorativo()` ignora le festività ed è `IMMUTABLE`
 - `tecnico_home` mostra "domani" = prossimo lun-ven: il 24/12/2026 (gio) mostra il 25/12 (Natale) come giorno di lavoro.
+- ✅ **Corretto nella 0013** (`stable`, esclude le festività attive). Resta: non considera i `giorni_riposo` del tecnico.
 - Se viene corretta leggendo `festivita`, **deve diventare `STABLE`**: una funzione `immutable` che legge una tabella può dare risultati vecchi (costanti piegate nei piani di query). `create or replace function … stable` è ammesso (nessun DROP).
 
 ### P1-9 · Spettanze uguali per tutti: mancano anzianità e neo-assunti
@@ -166,6 +174,7 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 - **Correzione:** per i valori che possono crescere usare una tabella di riferimento + FK (aggiungere un valore = `insert`); per `notifiche` prevedere una tabella `notifiche_hr` (vedi anche P2-2).
 
 ### P2-2 · Notifiche HR nella tabella `notifiche`
+- ✅ Il conteggio negli avvisi è **corretto nella 0013** (`dati->>'categoria' is distinct from 'ferie'` in `report_dati` e `analisi_admin`). La lettura diretta della tabella resta P0-6.
 - Diventato **P0-6** con la 0011 (provato). Resta il punto di progetto: la 0011 aggira la CHECK usando `tipo='avviso'` + `dati.categoria='ferie'`; funziona, ma `report_dati('avvisi')` e `analisi_admin` (conteggio "avvisi" e "avvisi letti" dei tecnici) ora **contano anche le notifiche HR** come avvisi del responsabile flotta e le mostrano nel report con titolo ("Malattia: …"). Filtrare `dati->>'categoria' is distinct from 'ferie'` in quelle due funzioni.
 
 ### P2-3 · Tecnico con veicolo in carico in ferie lunghe
@@ -201,6 +210,17 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 - `tg_richiesta_sincronizza` scatta solo su `insert or update of stato`: se una funzione HR correggesse date o orari di una richiesta già approvata senza cambiare stato, la riga del piano (`assenze_da_richieste`) resterebbe quella vecchia. Regola: date mai modificabili (annulla e rifai), oppure trigger anche su `primo_giorno, ultimo_giorno, ora_inizio, ora_fine, mezza_giornata`.
 - `privato.saldo` usa `ore_giornaliere` **di oggi** per tutto l'anno (vedi P2-8).
 
+### P2-10 · Funzioni API della 0012 (lettura del codice)
+- ✅ **Guardie presenti** in tutte le `hr_*` (`perform public.richiedi_hr()`) e `dipendente_*` (`privato.dipendente_da_token`): il rischio P0-3 è gestito per queste funzioni. Il commento finale della 0012 lo dichiara esplicitamente.
+- ✅ `dipendente_invia_richiesta` blocca la riga del dipendente (`for update`): risolve la concorrenza segnalata in P1-4. Anche `hr_inserisci_richiesta`.
+- ✅ `dipendente_annulla_richiesta` solo se `in_attesa`; HR annulla con motivo obbligatorio.
+- ⚠️ `hr_decidi_richiesta` approva anche con saldo negativo (solo avviso in risposta): coerente con "decide l'ufficio personale", ma va confermato (D11).
+- ⚠️ **Auto-decisione** (Roberta approva le proprie ferie): registrata e notificata agli admin, ma resta possibile. È una scelta del cliente (0012 §A.2); suggerito almeno che l'admin veda un elenco "auto-decisioni da controllare".
+- ⚠️ `dipendente_invia_richiesta` accetta `MAL` con note libere: vale P2-6.
+- ⚠️ `hr_report('presenze')` = giorni × dipendenti con 4 sotto-query laterali ciascuno (400 giorni × 50 dipendenti = 20.000 righe): accettabile, ma da misurare; `hr_report('riepilogo')` chiama `privato.saldo` per dipendente × tipo, e `privato.saldo` è **ricorsiva** sugli anni precedenti senza saldo iniziale.
+- ✅ (0013) `piano_giorno` ora mostra `possibile_assenza` e `note_assenza`; `v_veicoli.in_carico_assente`. Restano i limiti di P0-2 (solo `info`) e P0-5 (l'etichetta "Permesso"/"Ferie" arriva al flotta).
+- ⚠️ **"L'admin può tutto"** (decisione di progetto) contro `privato.controlla_decisore` (0012 rivista): le richieste del dipendente collegato a un account HR le decide **solo** quell'account, **neanche l'admin**. Inoltre la funzione non guarda `responsabili.attivo`: se l'account di Roberta viene disattivato (dimissioni, lunga assenza) le sue richieste restano **indecidibili da chiunque**. Correzione minima: `… and l.attivo` e un'eccezione per `is_admin()` (registrata). Domanda D13.
+
 ### P3 · Minori
 - `privato.genera_festivita` inserisce anche **Pasqua** (sempre domenica): innocuo, ma nel calendario HR può confondere.
 - `genera_festivita` usa `on conflict do nothing`: se HR ha disattivato per errore una festività nazionale, la rigenerazione non la ripristina (va bene, ma documentarlo).
@@ -224,6 +244,7 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 10. **D10 – Malattia nel portale**: il dipendente comunica solo date + protocollo PUC? Roberta deve poter allegare l'attestato (che non contiene diagnosi) o basta il protocollo? Chi oltre Roberta può vedere le malattie (l'admin sì per decisione: anche il titolare)?
 11. **D11 – Saldi negativi**: si può approvare con saldo insufficiente (ferie anticipate)? Fino a quanto?
 12. **D12 – Congedi**: congedo parentale, aspettativa, L. 104: devono fermare la maturazione (N14)? Chi li inserisce?
+13. **D13 – Richieste di Roberta**: chi le approva se Roberta è assente o lascia l'azienda? Va bene che l'admin (titolare) non possa decidere le richieste di Roberta, contro la regola "l'admin può tutto"?
 
 ---
 
@@ -248,6 +269,9 @@ Le fonti sono aperte. Distinguo **LEGGE** (obbligo), **CCNL** (dipende dal contr
 | `calcola_richiesta` a cavallo d'anno 28/12 → 07/01 | 6 giorni (4+2) ✅ · riporto 2026→2027 assente ❌ (P1-6) |
 | `calcola_richiesta` 24-25/04/2028 | 2 giorni, Liberazione non esclusa ❌ (P1-6) |
 | Sovrapposizioni a ore (5 casi) | 4 corretti ✅, ROL 10 h su 8 accettato ❌ (P1-4) |
+| Flotta `imposta_pin(UFFICIO)` → `dipendente_login` → `dipendente_invia_richiesta` (0012 applicata) | **richiesta RF-2026-0001 creata** ❌ (P1-1, corretto nella 0013) |
+| Token UFFICIO su `tecnico_veicolo` / `tecnico_home` | `SESSIONE_NON_VALIDA` ✅ |
+| Flotta su `hr_richieste`, anon su `hr_saldi` | "Accesso riservato all'ufficio HR" ✅ |
 | Schema `privato`: `nspacl` | null (nessun accesso API) ✅ |
 | Nuove tabelle: permessi a `anon` | nessuno ✅ (trucco `privato → public` funziona) |
 

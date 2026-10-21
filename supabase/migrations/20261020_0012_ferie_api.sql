@@ -5,8 +5,10 @@
 --     1. solo HR e admin creano/modificano i dipendenti (anche i TEC): la policy del
 --        responsabile flotta su `dipendenti` diventa di SOLA LETTURA per i TEC;
 --     2. un account HR può essere collegato al proprio record dipendente
---        (responsabili.dipendente_id): l'auto-decisione è permessa ma registrata
---        (richieste_assenza.auto_decisione) e segnalata agli admin;
+--        (responsabili.dipendente_id). Le richieste di quel dipendente le decide SOLO
+--        l'account collegato (né l'admin né altri HR): approvazione, rifiuto, inserimento già
+--        approvato e annullamento. L'auto-decisione è registrata (richieste_assenza.auto_decisione,
+--        audit) e sempre visibile all'admin (notifica + admin_auto_decisioni());
 --     3. tutti i tipi di assenza esistono; HR decide quali sono attivi (tipi_assenza.attivo).
 --  B. Accesso codice + PIN per TUTTE le categorie: dipendente_login (la risposta contiene la
 --     categoria). Le funzioni tecnico_* restano solo TEC (usano la vista `tecnici`).
@@ -58,9 +60,33 @@ language sql stable set search_path = '' as $$
   select exists (select 1 from public.responsabili r where r.user_id = auth.uid() and r.dipendente_id = p_dip);
 $$;
 
+-- Account collegato al dipendente (se esiste): solo lui decide le richieste di quel dipendente
+create or replace function privato.controlla_decisore(p_dip bigint) returns void
+language plpgsql stable set search_path = '' as $$
+declare l public.responsabili;
+begin
+  select * into l from public.responsabili r where r.dipendente_id = p_dip;
+  if l.user_id is not null and l.user_id is distinct from auth.uid() then
+    raise exception 'Questa richiesta riguarda %, che ha un account dell''ufficio personale: la decide solo lei/lui dal proprio account.', l.nome
+      using errcode = '42501';
+  end if;
+end $$;
+
 create or replace function privato.nome_account(p_user uuid) returns text
 language sql stable set search_path = '' as $$
   select coalesce((select r.nome from public.responsabili r where r.user_id = p_user), case when p_user is not null then 'Account HR' end);
+$$;
+
+-- Auto-decisione: avviso a tutti gli admin attivi (diversi da chi ha deciso)
+create or replace function privato.avvisa_admin_auto(r public.richieste_assenza, p_azione text) returns void
+language sql set search_path = '' as $$
+  insert into public.notifiche (user_id, tipo, dati, link)
+  select x.user_id, 'avviso', jsonb_build_object('categoria', 'ferie', 'livello', 'importante',
+           'titolo', 'Auto-decisione HR',
+           'testo', privato.nome_account(auth.uid()) || ' ha ' || p_azione || ' una propria richiesta (' || r.numero || ', '
+                    || privato.periodo_testo(r.primo_giorno, r.ultimo_giorno, r.ora_inizio, r.ora_fine, r.mezza_giornata) || ').',
+           'richiesta_id', r.id, 'numero', r.numero, 'evento', 'auto_decisione'), '/hr/richieste'
+    from public.responsabili x where x.attivo and x.ruolo = 'admin' and x.user_id is distinct from auth.uid();
 $$;
 
 -- Rappresentazione JSON di una richiesta (p_hr = campi in più per l'ufficio personale)
@@ -85,6 +111,8 @@ language sql stable set search_path = '' as $$
        'deciso_da', privato.nome_account(r.deciso_da), 'creata_da_utente', privato.nome_account(r.creata_da_utente),
        'annullata_da_utente', privato.nome_account(r.annullata_da_utente),
        'auto_decisione', r.auto_decisione,
+       'decide_solo', (select x.nome from public.responsabili x where x.dipendente_id = r.dipendente_id),
+       'puo_decidere', not exists (select 1 from public.responsabili x where x.dipendente_id = r.dipendente_id and x.user_id is distinct from auth.uid()),
        'annullabile', r.stato in ('in_attesa', 'approvata'))
      else '{}'::jsonb end
   from public.tipi_assenza t where t.codice = r.tipo;
@@ -337,6 +365,7 @@ begin
   if p_decisione not in ('approva', 'rifiuta') then raise exception 'Decisione non valida: usa approva o rifiuta.'; end if;
   select * into r from public.richieste_assenza where id = p_id for update;
   if not found then raise exception 'Richiesta non trovata.'; end if;
+  perform privato.controlla_decisore(r.dipendente_id);
   if r.stato <> 'in_attesa' then
     raise exception 'La richiesta % non è più in attesa (stato: %).', r.numero, replace(r.stato, '_', ' ');
   end if;
@@ -358,14 +387,7 @@ begin
                      where g.richiesta_id = r.id group by 1) y) s
      where s.s is not null and (s.s->>'saldo')::numeric < 0;
   end if;
-  if auto then
-    -- auto-decisione: avviso agli altri amministratori
-    insert into public.notifiche (user_id, tipo, dati, link)
-    select x.user_id, 'avviso', jsonb_build_object('categoria', 'ferie', 'livello', 'importante',
-             'titolo', 'Auto-decisione HR', 'testo', privato.nome_account(auth.uid()) || ' ha ' || case when nuovo = 'approvata' then 'approvato' else 'rifiutato' end
-                       || ' una propria richiesta (' || r.numero || ').', 'richiesta_id', r.id, 'numero', r.numero, 'evento', 'auto_decisione'), '/hr/richieste'
-      from public.responsabili x where x.attivo and x.ruolo = 'admin' and x.user_id <> auth.uid();
-  end if;
+  if auto then perform privato.avvisa_admin_auto(r, case when nuovo = 'approvata' then 'approvato' else 'non approvato' end); end if;
   return jsonb_build_object('ok', true, 'id', r.id, 'numero', r.numero, 'stato', nuovo, 'auto_decisione', auto, 'avvisi', avv);
 end $$;
 
@@ -387,6 +409,7 @@ declare c jsonb; r public.richieste_assenza; auto boolean;
 begin
   perform public.richiedi_hr();
   perform 1 from public.dipendenti where id = p_dipendente for update;
+  if coalesce(p_approva, true) then perform privato.controlla_decisore(p_dipendente); end if;
   if length(coalesce(p_note, '')) > 500 then raise exception 'Note troppo lunghe: massimo 500 caratteri.'; end if;
   c := privato.calcola_richiesta(p_dipendente, p_tipo, p_primo_giorno, p_rientro, p_ora_inizio, p_ora_fine, p_mezza_giornata, false);
   if not (c->>'ok')::boolean then
@@ -394,7 +417,10 @@ begin
   end if;
   r := privato.salva_richiesta(c, p_note, 'hr', auth.uid(), coalesce(p_approva, true));
   auto := privato.e_auto(p_dipendente);
-  if auto then update public.richieste_assenza set auto_decisione = true where id = r.id; end if;
+  if auto then
+    update public.richieste_assenza set auto_decisione = true where id = r.id;
+    perform privato.avvisa_admin_auto(r, case when r.stato = 'approvata' then 'registrato e approvato' else 'registrato' end);
+  end if;
   return jsonb_build_object('ok', true, 'id', r.id, 'numero', r.numero, 'stato', r.stato, 'auto_decisione', auto,
     'messaggio', 'Richiesta ' || r.numero || ' registrata (' || replace(r.stato, '_', ' ') || '): ' || privato.fmt_q(r.quantita, r.unita) || '.',
     'avvisi', c->'avvisi', 'saldo_insufficiente', (c->>'saldo_insufficiente')::boolean, 'calcolo', c);
@@ -410,6 +436,7 @@ begin
   if length(mot) > 500 then raise exception 'Motivo troppo lungo: massimo 500 caratteri.'; end if;
   select * into r from public.richieste_assenza where id = p_id for update;
   if not found then raise exception 'Richiesta non trovata.'; end if;
+  perform privato.controlla_decisore(r.dipendente_id);
   if r.stato not in ('in_attesa', 'approvata') then
     raise exception 'La richiesta % è già %: non si può annullare.', r.numero, case r.stato when 'rifiutata' then 'non approvata' else 'annullata' end;
   end if;
@@ -417,6 +444,7 @@ begin
   update public.richieste_assenza set stato = 'annullata', annullata_da = 'hr', annullata_da_utente = auth.uid(), annullata_il = now(),
          motivo_annullamento = mot, auto_decisione = auto_decisione or auto
    where id = r.id;
+  if auto then perform privato.avvisa_admin_auto(r, 'annullato'); end if;
   return jsonb_build_object('ok', true, 'id', r.id, 'numero', r.numero, 'stato', 'annullata', 'auto_decisione', auto);
 end $$;
 
@@ -621,6 +649,17 @@ begin
   if not found then raise exception 'Dipendente non trovato'; end if;
 end $$;
 
+-- Elenco per l'admin delle richieste con auto-decisione (decise/inserite/annullate dall'account
+-- collegato allo stesso dipendente), più recenti prima. Sola lettura.
+create or replace function public.admin_auto_decisioni(p_da date default null, p_a date default null) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform public.richiedi_admin();
+  return coalesce((select jsonb_agg(privato.richiesta_json(r, true) order by coalesce(r.deciso_il, r.annullata_il, r.creato_il) desc)
+                     from public.richieste_assenza r
+                    where r.auto_decisione and (p_da is null or r.ultimo_giorno >= p_da) and (p_a is null or r.primo_giorno <= p_a)), '[]');
+end $$;
+
 -- Collegamento account HR/admin ↔ record dipendente (solo admin)
 create or replace function public.admin_collega_dipendente(p_user uuid, p_dipendente bigint) returns void
 language plpgsql security definer set search_path = '' as $$
@@ -652,5 +691,5 @@ grant execute on function
   public.hr_rettifica_saldo(bigint, int, text, numeric, text), public.hr_calendario(date, date, text, bigint),
   public.hr_report(text, date, date, text, bigint), public.hr_genera_festivita(int),
   public.hr_genera_pin(bigint), public.hr_imposta_pin(bigint, text), public.hr_sblocca_accesso(bigint),
-  public.admin_collega_dipendente(uuid, bigint), public.richiedi_hr()
+  public.admin_collega_dipendente(uuid, bigint), public.admin_auto_decisioni(date, date), public.richiedi_hr()
   to authenticated;

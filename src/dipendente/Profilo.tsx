@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { InstallaApp } from '../Installa';
+import { rpc } from '../lib/supabase';
 import { nomeTipo, useSessione, type Saldo } from './api';
 import { Attesa } from './componenti';
 import { AttivaNotifiche } from './Notifiche';
@@ -25,9 +27,24 @@ function BloccoSaldo({ s }: { s: Saldo }) {
   );
 }
 
+const STATO_CARTA: Record<string, string> = { attiva: 'Attiva', sospesa: 'Sospesa', smarrita: 'Smarrita', restituita: 'Restituita' };
+/** La propria carta carburante: solo ultime 4 cifre e stato. */
+function LaTuaCarta({ token }: { token: string }) {
+  const [carte, setCarte] = useState<{ ultime4: string; circuito: string; stato: string }[]>([]);
+  useEffect(() => { rpc<typeof carte>('dipendente_carta', { p_token: token }).then(setCarte).catch(() => setCarte([])); }, [token]);
+  if (!carte.length) return null;
+  return (
+    <section className="tec-card">
+      <div className="lbl-sm">Carta carburante</div>
+      {carte.map((c, i) => <p key={i} style={{ margin: 0 }}>La tua carta: <b className="mono">•••• {c.ultime4}</b> · {c.circuito} · {STATO_CARTA[c.stato] ?? c.stato}</p>)}
+      <span className="sub">Carta smarrita? Avvisa subito l'ufficio personale.</span>
+    </section>
+  );
+}
+
 /** Profilo in sola lettura (UX § 2.6). «Esci» sta qui, così non si tocca per sbaglio. */
 export default function Profilo() {
-  const { home, errore, esci } = useSessione();
+  const { home, errore, esci, token } = useSessione();
   if (!home) return <>{errore ? <div className="ph-msg ko">{errore}</div> : <Attesa />}<button className="big-btn light" onClick={esci}>Esci</button></>;
   const p = home.profilo;
   return (
@@ -54,6 +71,7 @@ export default function Profilo() {
         </dl>
         <span className="sub">Vedi un dato sbagliato? Avvisa l'ufficio personale.</span>
       </section>
+      <LaTuaCarta token={token} />
       <AttivaNotifiche sempre />
       <InstallaApp />
       <p className="sub">Hai dimenticato il PIN? Chiedi un nuovo PIN all'ufficio personale{home.tec ? ' o al responsabile flotta' : ''}.</p>

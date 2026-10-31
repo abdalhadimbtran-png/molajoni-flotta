@@ -78,6 +78,8 @@ export default function ShellHR() {
       { to: '/hr/calendario', label: 'Calendario assenze', icona: 'piano' }] },
     { titolo: 'Persone', voci: [
       { to: '/hr/dipendenti', label: 'Dipendenti', icona: 'tecnici' }, { to: '/hr/saldi', label: 'Saldi', icona: 'hr-saldi' }] },
+    { titolo: 'Carburante', voci: [
+      { to: '/hr/carte', label: 'Carte carburante', icona: 'carburante' }, { to: '/hr/carburante', label: 'Rifornimenti e anomalie', icona: 'carburante' }] },
     { titolo: 'Impostazioni', voci: [
       { to: '/hr/impostazioni', label: 'Festività e regole', icona: 'hr-festivita' }, { to: '/hr/report', label: 'Report', icona: 'report' }] },
   ];

@@ -22,6 +22,7 @@ import Segnalazioni from './admin/Segnalazioni';
 import Registro from './admin/Registro';
 import Multe from './admin/Multe';
 import Carburante from './admin/Carburante';
+import CarteCarburante from './admin/CarteCarburante';
 import Report from './admin/Report';
 import Volantino from './admin/Volantino';
 import Avvisi from './admin/Avvisi';
@@ -65,6 +66,8 @@ function App() {
           <Route path="/hr/saldi" element={<Saldi />} />
           <Route path="/hr/impostazioni" element={<Impostazioni />} />
           <Route path="/hr/report" element={<ReportHR />} />
+          <Route path="/hr/carte" element={<CarteCarburante gestione />} />
+          <Route path="/hr/carburante" element={<Carburante gestione />} />
           <Route path="/hr/installa" element={<SchedaAccesso />} />
           <Route path="/hr/*" element={<Navigate to="/hr" replace />} />
         </Route>
@@ -78,6 +81,7 @@ function App() {
           <Route path="/registro" element={<Registro />} />
           <Route path="/multe" element={<Multe />} />
           <Route path="/carburante" element={<Carburante />} />
+          <Route path="/carte" element={<CarteCarburante />} />
           <Route path="/report" element={<Report />} />
           <Route path="/installa-tecnici" element={<Volantino />} />
           <Route path="/avvisi" element={<Avvisi />} />

@@ -149,6 +149,28 @@ export const CATALOGO: Report[] = [
     riepilogo: r => [{ l: 'Rifornimenti', v: String(r.length) }, { l: 'Litri', v: somma(r, 'litri').toLocaleString('it-IT', { maximumFractionDigits: 1 }) }, { l: 'Importo', v: eur(somma(r, 'importo')) }],
   },
   {
+    id: 'consumi_veicoli', gruppo: 'Controllo e costi', titolo: 'Consumi carburante per veicolo', periodo: 'intervallo', filtri: { veicolo: true },
+    descrizione: 'Litri, spesa, km percorsi (letture QR) e consumo medio in litri ogni 100 km per ogni veicolo.',
+    colonne: [
+      { k: 'targa', l: 'Targa', t: 'targa', w: 11 }, { k: 'modello', l: 'Modello', t: 'testo', w: 22 }, { k: 'alimentazione', l: 'Alimentazione', t: 'testo', w: 12 },
+      { k: 'rifornimenti', l: 'Rifornimenti', t: 'num', tot: true, w: 10 }, { k: 'litri', l: 'Litri', t: 'dec1', tot: true, w: 10 },
+      { k: 'importo', l: 'Importo', t: 'euro', tot: true, w: 12 }, { k: 'km_percorsi', l: 'Km percorsi', t: 'km', tot: true, w: 12 },
+      { k: 'l_100km', l: 'l/100 km', t: 'dec1', w: 9 }, { k: 'eur_km', l: '€/km', t: 'dec3', w: 9 },
+    ],
+    orizzontale: true,
+    riepilogo: r => { const l = somma(r, 'litri'), k = somma(r, 'km_percorsi'); return [{ l: 'Veicoli', v: String(r.length) }, { l: 'Litri', v: l.toLocaleString('it-IT', { maximumFractionDigits: 1 }) }, { l: 'Importo', v: eur(somma(r, 'importo')) }, { l: 'Media l/100 km', v: k > 0 ? (l * 100 / k).toLocaleString('it-IT', { maximumFractionDigits: 1 }) : '—' }]; },
+  },
+  {
+    id: 'spesa_mensile', gruppo: 'Controllo e costi', titolo: 'Spesa carburante mensile', periodo: 'intervallo', filtri: { veicolo: true, tecnico: true },
+    descrizione: 'Spesa e litri per mese, veicolo e dipendente (dalla carta carburante assegnata o dal tecnico pianificato).',
+    colonne: [
+      { k: 'mese', l: 'Mese', t: 'testo', w: 9 }, { k: 'targa', l: 'Targa', t: 'targa', w: 11 }, { k: 'dipendente', l: 'Dipendente', t: 'testo', w: 22 },
+      { k: 'rifornimenti', l: 'Rifornimenti', t: 'num', tot: true, w: 10 }, { k: 'litri', l: 'Litri', t: 'dec1', tot: true, w: 10 }, { k: 'importo', l: 'Importo', t: 'euro', tot: true, w: 12 },
+    ],
+    raggruppa: { k: 'mese', etichetta: r => String(r.mese) },
+    riepilogo: r => [{ l: 'Righe', v: String(r.length) }, { l: 'Litri', v: somma(r, 'litri').toLocaleString('it-IT', { maximumFractionDigits: 1 }) }, { l: 'Importo', v: eur(somma(r, 'importo')) }],
+  },
+  {
     id: 'multe', gruppo: 'Controllo e costi', titolo: 'Multe', periodo: 'intervallo', filtri: { veicolo: true, tecnico: true },
     descrizione: 'Verbali con conducente, importo, decurtazione punti, termine di comunicazione e stato.',
     colonne: [

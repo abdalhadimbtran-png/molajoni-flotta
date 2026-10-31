@@ -19,16 +19,18 @@ export default function Cruscotto() {
     ]);
     for (const r of [v, tc, s]) if (r.error) throw r.error;
     const oggi = oggiISO();
-    const [mu, ints, ass] = await Promise.all([
+    const [mu, ints, ass, anc] = await Promise.all([
       supabase.from('multe').select('id,scadenza_comunicazione,stato,veicoli(targa)').in('stato', ['da_identificare', 'da_comunicare']),
       supabase.from('interventi').select('tecnico_id,data').gte('data', oggi).order('data').limit(2000),
       supabase.from('assenze').select('tecnico_id,dal,al').gte('al', oggi),
+      supabase.rpc('anomalie_carburante', { p_da: null, p_a: null }),
     ]);
     // interventi già pianificati per tecnici che risultano assenti (ferie approvate dall'ufficio personale, assenze)
     const assenze = (ass.data ?? []) as { tecnico_id: number; dal: string; al: string }[];
     const scoperti = ((ints.data ?? []) as { tecnico_id: number; data: string }[])
       .filter(i => assenze.some(a => a.tecnico_id === i.tecnico_id && i.data >= a.dal && i.data <= a.al));
-    return { veicoli: v.data as unknown as Veicolo[], tecnici: tc.data as Tecnico[], segn: s.data as Segnalazione[], piano: p, scoperti,
+    const anomalieCarb = new Set(((anc.data ?? []) as { rifornimento_id: number }[]).map(x => x.rifornimento_id)).size;
+    return { anomalieCarb, veicoli: v.data as unknown as Veicolo[], tecnici: tc.data as Tecnico[], segn: s.data as Segnalazione[], piano: p, scoperti,
       multe: (mu.data ?? []) as unknown as { id: number; scadenza_comunicazione: string | null; stato: string; veicoli: { targa: string } | null }[] };
   }, [giorno]);
 
@@ -70,6 +72,7 @@ export default function Cruscotto() {
     exc.unshift({ s: 'ko', t: t('{n} interventi da riassegnare per assenze', { n: data.scoperti.length }),
       d: t('Giorni: {g}', { g: giorni.slice(0, 5).join(', ') + (giorni.length > 5 ? '…' : '') }), to: `/piano?data=${primo}` });
   }
+  if (data.anomalieCarb) exc.push({ s: 'warn', t: t('{n} rifornimenti con anomalie', { n: data.anomalieCarb }), d: t('Carta carburante · ultimi 90 giorni'), to: '/carburante' });
   exc.sort((a, b) => (a.s === b.s ? 0 : a.s === 'ko' ? -1 : 1));
   const conta = (s: string) => veicoli.filter(v => v.stato === s).length;
 

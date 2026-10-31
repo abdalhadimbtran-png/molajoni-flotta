@@ -89,7 +89,7 @@ const GRUPPI: Gruppo[] = [
   { titolo: 'Risorse', voci: [
     { to: '/flotta', label: 'Flotta', icona: 'flotta' }, { to: '/tecnici', label: 'Tecnici', icona: 'tecnici' }] },
   { titolo: 'Controllo', voci: [
-    { to: '/segnalazioni', label: 'Segnalazioni', icona: 'segnalazioni' }, { to: '/multe', label: 'Multe', icona: 'multe' }, { to: '/carburante', label: 'Carburante', icona: 'carburante' }] },
+    { to: '/segnalazioni', label: 'Segnalazioni', icona: 'segnalazioni' }, { to: '/multe', label: 'Multe', icona: 'multe' }, { to: '/carburante', label: 'Carburante', icona: 'carburante' }, { to: '/carte', label: 'Carte carburante', icona: 'carburante' }] },
   { titolo: 'Dati', voci: [
     { to: '/report', label: 'Report', icona: 'report' }, { to: '/registro', label: 'Registro movimenti', icona: 'registro' }] },
 ];

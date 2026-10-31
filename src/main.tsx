@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import '@fontsource-variable/inter/opsz.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-400.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-500.css';

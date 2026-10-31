@@ -57,7 +57,7 @@ export default function Report() {
   const fT = sel.filtri.tecnico && tecnico ? Number(tecnico) : null;
   useEffect(() => {
     let attivo = true; setRighe(null); setErr(null);
-    rpc<{ righe: Riga[] }>('report_dati', { p_tipo: sel.id, p_da: pDa, p_a: pA, p_veicolo: fV, p_tecnico: fT })
+    rpc<{ righe: Riga[] }>(['consumi_veicoli', 'spesa_mensile'].includes(sel.id) ? 'report_carburante' : 'report_dati', { p_tipo: sel.id, p_da: pDa, p_a: pA, p_veicolo: fV, p_tecnico: fT })
       .then(r => { if (attivo) setRighe(r.righe.map(normalizza)); }).catch(e => { if (attivo) setErr(testoErrore(e)); });
     return () => { attivo = false; };
   }, [sel.id, pDa, pA, fV, fT]);

@@ -138,7 +138,7 @@ async function account(req: Request) {
     db.from("audit_log").insert({ tabella: "account", record_id: record, azione, dopo, utente: io.user.id });
 
   if (b.azione === "elenco") {
-    const { data: rs, error } = await db.from("responsabili").select("user_id,nome,email,ruolo,attivo,creato_il").order("creato_il");
+    const { data: rs, error } = await db.from("responsabili").select("user_id,nome,email,ruolo,area,dipendente_id,attivo,creato_il").order("creato_il");
     if (error) return json({ errore: "Errore del server" }, 500);
     const out = [];
     for (const r of rs ?? []) {

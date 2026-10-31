@@ -4,10 +4,11 @@ import { fmtData, fmtEuro, normTarga } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { Banner, Caricamento, Errore, Targa, toast, useLoad } from '../ui';
 
-interface Rif { id: number; data: string; litri: number | null; importo: number; prodotto: string | null; fornitore: string | null; veicoli: { targa: string } | null }
-type Campo = 'data' | 'targa' | 'litri' | 'importo' | 'km' | 'prodotto';
-const CAMPI: [Campo, string, boolean][] = [['data', 'Data', true], ['targa', 'Targa', true], ['importo', 'Importo (€)', true], ['litri', 'Litri', false], ['km', 'Km', false], ['prodotto', 'Prodotto', false]];
-const INDIZI: Record<Campo, RegExp> = { data: /data|date/i, targa: /targa|plate|veicolo/i, importo: /importo|totale|amount|euro|€/i, litri: /litri|quantit|qta|liters/i, km: /^km|chilometr|odometro/i, prodotto: /prodotto|carburante|product|descr/i };
+interface Rif { id: number; data: string; ora: string | null; carte_carburante: { ultime4: string } | null; dipendenti: { nome: string; cognome: string } | null; litri: number | null; importo: number; prodotto: string | null; fornitore: string | null; veicoli: { targa: string } | null }
+type Campo = 'data' | 'ora' | 'targa' | 'carta' | 'litri' | 'importo' | 'km' | 'prodotto';
+export interface Anomalia { rifornimento_id: number; data: string; ora: string | null; targa: string; dipendente: string | null; carta: string | null; litri: number | null; importo: number; tipo: string; dettaglio: string }
+const CAMPI: [Campo, string, boolean][] = [['data', 'Data', true], ['ora', 'Ora', false], ['targa', 'Targa', false], ['carta', 'Numero carta', false], ['importo', 'Importo (€)', true], ['litri', 'Litri', false], ['km', 'Km', false], ['prodotto', 'Prodotto', false]];
+const INDIZI: Record<Campo, RegExp> = { data: /^data|date/i, ora: /^ora|orario|time/i, carta: /carta|card|pan|tessera/i, targa: /targa|plate|veicolo/i, importo: /importo|totale|amount|euro|€/i, litri: /litri|quantit|qta|liters/i, km: /^km|chilometr|odometro/i, prodotto: /prodotto|carburante|product|descr/i };
 
 /** CSV con ; o , — gestisce virgolette semplici. */
 function leggiCsv(testo: string): string[][] {
@@ -22,17 +23,22 @@ function data(s: string): string | null {
   const a = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/); if (a) { const y = a[3].length === 2 ? '20' + a[3] : a[3]; return `${y}-${a[2].padStart(2, '0')}-${a[1].padStart(2, '0')}`; }
   const b = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return b ? `${b[1]}-${b[2]}-${b[3]}` : null;
 }
+function ora(s: string): string | null { const m = s.match(/(\d{1,2})[:.](\d{2})/); return m && Number(m[1]) < 24 ? `${m[1].padStart(2, '0')}:${m[2]}` : null; }
+const ultime4 = (s: string) => { const c = s.replace(/\D/g, ''); return c.length >= 4 ? c.slice(-4) : null; };
 async function hash(s: string) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
 
-export default function Carburante() {
+/** gestione = HR/admin (import); il responsabile flotta vede in sola lettura. */
+export default function Carburante({ gestione = false }: { gestione?: boolean }) {
   const { t, tm } = useT();
   const { data: d, errore, reload } = useLoad(async () => {
-    const [r, v] = await Promise.all([
-      supabase.from('rifornimenti').select('id,data,litri,importo,prodotto,fornitore,veicoli(targa)').order('data', { ascending: false }).limit(200),
+    const [r, v, c, an] = await Promise.all([
+      supabase.from('rifornimenti').select('id,data,ora,litri,importo,prodotto,fornitore,veicoli(targa),carte_carburante(ultime4),dipendenti(nome,cognome)').order('data', { ascending: false }).limit(200),
       supabase.from('veicoli').select('id,targa'),
+      supabase.from('carte_carburante').select('id,ultime4,stato'),
+      supabase.rpc('anomalie_carburante', { p_da: null, p_a: null }),
     ]);
-    if (r.error) throw r.error; if (v.error) throw v.error;
-    return { rif: r.data as unknown as Rif[], veicoli: v.data as { id: number; targa: string }[] };
+    for (const x of [r, v, c, an]) if (x.error) throw x.error;
+    return { rif: r.data as unknown as Rif[], veicoli: v.data as { id: number; targa: string }[], carte: c.data as { id: number; ultime4: string; stato: string }[], anomalie: an.data as Anomalia[] };
   });
   const [righe, setRighe] = useState<string[][] | null>(null);
   const [nomeFile, setNomeFile] = useState('');
@@ -54,19 +60,25 @@ export default function Carburante() {
   const anteprima = useMemo(() => {
     if (!righe || !d) return [];
     const perTarga = new Map(d.veicoli.map(v => [normTarga(v.targa).replace(/\s/g, ''), v.id]));
+    // stesse ultime 4 cifre su più carte: si preferisce quella attiva
+    const perCarta = new Map<string, number>();
+    [...d.carte].sort((a, b) => (a.stato === 'attiva' ? 1 : 0) - (b.stato === 'attiva' ? 1 : 0)).forEach(c => perCarta.set(c.ultime4, c.id));
     return righe.slice(1).map(r => {
       const get = (c: Campo) => (mappa[c] !== undefined ? r[mappa[c]!] ?? '' : '');
       const targa = normTarga(get('targa')).replace(/\s/g, '');
-      return { raw: r.join('|'), data: data(get('data')), targa: get('targa'), veicolo_id: perTarga.get(targa) ?? null, importo: numero(get('importo')), litri: numero(get('litri')), km: numero(get('km')), prodotto: get('prodotto') || null };
+      const u4 = ultime4(get('carta'));
+      return { raw: r.join('|'), data: data(get('data')), ora: ora(get('ora')) ?? ora(get('data').replace(/^\S+\s*/, '')), targa: get('targa'), veicolo_id: perTarga.get(targa) ?? null,
+        u4, carta_id: u4 ? perCarta.get(u4) ?? null : null, importo: numero(get('importo')), litri: numero(get('litri')), km: numero(get('km')), prodotto: get('prodotto') || null };
     });
   }, [righe, mappa, d]);
-  const valide = anteprima.filter(a => a.data && a.veicolo_id && a.importo != null);
-  const senzaVeicolo = [...new Set(anteprima.filter(a => !a.veicolo_id && a.targa).map(a => a.targa))];
+  const valide = anteprima.filter(a => a.data && (a.veicolo_id || a.carta_id) && a.importo != null);
+  const carteIgnote = [...new Set(anteprima.filter(a => a.u4 && !a.carta_id).map(a => a.u4))];
+  const senzaVeicolo = [...new Set(anteprima.filter(a => !a.veicolo_id && !a.carta_id && a.targa).map(a => a.targa))];
 
   async function importa() {
     setInvio(true); setEsito(null);
     try {
-      const rec = await Promise.all(valide.map(async a => ({ veicolo_id: a.veicolo_id!, data: a.data!, importo: a.importo!, litri: a.litri, km: a.km ? Math.round(a.km) : null,
+      const rec = await Promise.all(valide.map(async a => ({ veicolo_id: a.veicolo_id, carta_id: a.carta_id, ora: a.ora, data: a.data!, importo: a.importo!, litri: a.litri, km: a.km ? Math.round(a.km) : null,
         prodotto: a.prodotto, fornitore: fornitore || null, importazione: nomeFile, riga_hash: await hash(a.raw) })));
       const { error, count } = await supabase.from('rifornimenti').upsert(rec, { onConflict: 'riga_hash', ignoreDuplicates: true, count: 'exact' });
       if (error) throw error;
@@ -81,6 +93,8 @@ export default function Carburante() {
   const totale = d.rif.reduce((s, r) => s + Number(r.importo), 0);
   return (
     <>
+      <AnomalieCarburante righe={d.anomalie} />
+      {gestione && <>
       <div className="section-title">{t('Importa il file della carta carburante')}</div>
       <div className="panel form">
         <p className="sub" style={{ margin: 0 }}>{t('Esporta il file CSV dal portale del fornitore della carta carburante e caricalo qui. Il tecnico non deve scrivere niente.')}</p>
@@ -94,24 +108,40 @@ export default function Carburante() {
             <div className="field" key={c}><label htmlFor={`col-${c}`}>{t(l)}{obbl ? ' *' : ''}</label>
               <select id={`col-${c}`} value={mappa[c] ?? ''} onChange={e => setMappa({ ...mappa, [c]: e.target.value === '' ? undefined : Number(e.target.value) })}>
                 <option value="">—</option>{righe[0].map((h, i) => <option key={i} value={i}>{h || `#${i + 1}`}</option>)}</select></div>))}</div>
-          <Banner s={valide.length ? 'ok' : 'warn'}>{t('{a} righe pronte su {b}.', { a: valide.length, b: anteprima.length })}{senzaVeicolo.length > 0 && ` ${t('Targhe non trovate nella flotta: {l}', { l: senzaVeicolo.slice(0, 8).join(', ') })}`}</Banner>
+          <Banner s={valide.length ? 'ok' : 'warn'}>{t('{a} righe pronte su {b}.', { a: valide.length, b: anteprima.length })}{senzaVeicolo.length > 0 && ` ${t('Targhe non trovate nella flotta: {l}', { l: senzaVeicolo.slice(0, 8).join(', ') })}`}{carteIgnote.length > 0 && ` ${t('Carte non registrate: {l}', { l: carteIgnote.slice(0, 8).map(x => '•••• ' + x).join(', ') })}`}</Banner>
           <div className="table-wrap"><table>
-            <thead><tr><th>{t('Data')}</th><th>{t('Targa')}</th><th>{t('Litri')}</th><th>{t('Importo')}</th><th>{t('Prodotto')}</th></tr></thead>
-            <tbody>{anteprima.slice(0, 8).map((a, i) => <tr key={i} className={a.veicolo_id && a.data && a.importo != null ? '' : 'muted'}>
-              <td className="mono">{a.data ? fmtData(a.data) : '—'}</td><td>{a.targa}</td><td className="mono">{a.litri ?? '—'}</td><td className="mono">{fmtEuro(a.importo)}</td><td>{a.prodotto ?? '—'}</td></tr>)}</tbody>
+            <thead><tr><th>{t('Data')}</th><th>{t('Ora')}</th><th>{t('Targa')}</th><th>{t('Carta')}</th><th>{t('Litri')}</th><th>{t('Importo')}</th><th>{t('Prodotto')}</th></tr></thead>
+            <tbody>{anteprima.slice(0, 8).map((a, i) => <tr key={i} className={(a.veicolo_id || a.carta_id) && a.data && a.importo != null ? '' : 'muted'}>
+              <td className="mono">{a.data ? fmtData(a.data) : '—'}</td><td className="mono">{a.ora ?? '—'}</td><td>{a.targa}</td><td className="mono">{a.u4 ? `•••• ${a.u4}` : '—'}</td><td className="mono">{a.litri ?? '—'}</td><td className="mono">{fmtEuro(a.importo)}</td><td>{a.prodotto ?? '—'}</td></tr>)}</tbody>
           </table></div>
           <div className="row-flex"><button className="btn" disabled={!valide.length || invio} onClick={importa}>{t('Importa {n} righe', { n: valide.length })}</button>
             <button className="btn-ghost" onClick={() => setRighe(null)}>{t('Annulla')}</button></div>
         </>}
         {esito && <Banner s={esito.s}>{esito.t}</Banner>}
       </div>
+      </>}
 
       <div className="section-title">{t('Ultimi rifornimenti')} <span className="meta">{fmtEuro(totale)}</span></div>
       <div className="table-wrap"><table>
-        <thead><tr><th>{t('Data')}</th><th>{t('Veicolo')}</th><th>{t('Litri')}</th><th>{t('Importo')}</th><th>{t('Prodotto')}</th><th>{t('Fornitore')}</th></tr></thead>
-        <tbody>{d.rif.length ? d.rif.map(r => <tr key={r.id}><td className="mono">{fmtData(r.data)}</td><td><Targa t={r.veicoli?.targa} /></td><td className="mono">{r.litri ?? '—'}</td>
-          <td className="mono">{fmtEuro(r.importo)}</td><td>{r.prodotto ?? '—'}</td><td>{r.fornitore ?? '—'}</td></tr>) : <tr><td colSpan={6} className="sub">{t('Nessun rifornimento importato')}</td></tr>}</tbody>
+        <thead><tr><th>{t('Data')}</th><th>{t('Veicolo')}</th><th>{t('Carta')}</th><th>{t('Dipendente')}</th><th>{t('Litri')}</th><th>{t('Importo')}</th><th>{t('Prodotto')}</th><th>{t('Fornitore')}</th></tr></thead>
+        <tbody>{d.rif.length ? d.rif.map(r => <tr key={r.id}><td className="mono">{fmtData(r.data)}{r.ora ? ` ${r.ora.slice(0, 5)}` : ''}</td><td><Targa t={r.veicoli?.targa} /></td><td className="mono">{r.carte_carburante ? `•••• ${r.carte_carburante.ultime4}` : '—'}</td><td>{r.dipendenti ? `${r.dipendenti.nome} ${r.dipendenti.cognome}` : '—'}</td><td className="mono">{r.litri ?? '—'}</td>
+          <td className="mono">{fmtEuro(r.importo)}</td><td>{r.prodotto ?? '—'}</td><td>{r.fornitore ?? '—'}</td></tr>) : <tr><td colSpan={8} className="sub">{t('Nessun rifornimento importato')}</td></tr>}</tbody>
       </table></div>
+    </>
+  );
+}
+
+/** Anomalie carburante (ultimi 90 giorni). */
+export function AnomalieCarburante({ righe }: { righe: Anomalia[] }) {
+  const { t } = useT();
+  return (
+    <>
+      <div className="section-title">{t('Anomalie carburante')} <span className="meta">{t('ultimi 90 giorni')} · {righe.length}</span></div>
+      {righe.length ? <div className="table-wrap"><table>
+        <thead><tr><th>{t('Data')}</th><th>{t('Veicolo')}</th><th>{t('Dipendente')}</th><th>{t('Carta')}</th><th>{t('Litri')}</th><th>{t('Importo')}</th><th>{t('Anomalia')}</th></tr></thead>
+        <tbody>{righe.map((a, i) => <tr key={i}><td className="mono">{fmtData(a.data)}{a.ora ? ` ${a.ora.slice(0, 5)}` : ''}</td><td><Targa t={a.targa} /></td>
+          <td>{a.dipendente ?? '—'}</td><td className="mono">{a.carta ?? '—'}</td><td className="mono">{a.litri ?? '—'}</td><td className="mono">{fmtEuro(a.importo)}</td><td>{a.dettaglio}</td></tr>)}</tbody>
+      </table></div> : <Banner s="ok">{t('Nessuna anomalia nei rifornimenti.')}</Banner>}
     </>
   );
 }

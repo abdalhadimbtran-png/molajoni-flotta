@@ -1,14 +1,22 @@
 import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase, rpc, testoErrore } from '../lib/supabase';
-import { fmtData, giorniA, oggiISO } from '../lib/format';
+import { fmtData, giorniA, oggiISO, prossimoLavorativo } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { SEL_TECNICI, type Tecnico } from '../lib/tipi';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
 
-interface Assenza { id: number; tecnico_id: number; dal: string; al: string; motivo: string }
-const MOTIVI = ['Ferie', 'Permesso', 'Assenza', 'Formazione', 'Altro'];
+/** Riga di «Assenze in corso e future»: mai il tipo di assenza, mai il motivo. */
+interface RigaAssenza { chiave: string; tecnico_id: number; dal: string; al: string; rientro: string | null; fascia: string | null; possibile: boolean }
+interface RigaRichiesta { richiesta_id: number; dipendente_id: number; dal: string; al: string; tipo_riga: 'assenza' | 'possibile' | 'nota'; etichetta: string; ora_inizio: string | null; ora_fine: string | null }
 
+const hhmm = (o: string | null) => (o ? o.slice(0, 5) : '');
+
+/**
+ * Tecnici e conducenti. Dal 20/10/2026 i dati dei dipendenti (anche dei tecnici) li crea e modifica
+ * solo l'ufficio personale o l'amministratore: il responsabile flotta li vede in sola lettura e
+ * gestisce solo PIN e scheda dell'app. Le assenze arrivano dall'ufficio personale (sola lettura).
+ */
 export default function Tecnici() {
   const { t, tm } = useT();
   const [modifica, setModifica] = useState<Tecnico | 'nuovo' | null>(null);
@@ -17,25 +25,40 @@ export default function Tecnici() {
   const base = useLocation().pathname.startsWith('/admin') ? '/admin' : '';
   const [mostraInattivi, setMostraInattivi] = useState(false);
   const { data, errore, reload } = useLoad(async () => {
-    const [tc, a] = await Promise.all([
+    const oggi = oggiISO();
+    const [tc, a, rq, hr] = await Promise.all([
       supabase.from('tecnici').select(SEL_TECNICI).order('cognome'),
-      supabase.from('assenze').select('*').gte('al', oggiISO()).order('dal'),
+      supabase.from('assenze').select('id,tecnico_id,dal,al').gte('al', oggi).order('dal'),
+      supabase.from('assenze_da_richieste').select('richiesta_id,dipendente_id,dal,al,tipo_riga,etichetta,ora_inizio,ora_fine')
+        .eq('attiva', true).in('tipo_riga', ['possibile', 'nota']).gte('al', oggi).order('dal'),
+      supabase.rpc('is_hr'),
     ]);
     if (tc.error) throw tc.error; if (a.error) throw a.error;
-    return { tecnici: tc.data as Tecnico[], assenze: a.data as Assenza[] };
+    const righe: RigaAssenza[] = [
+      ...((a.data ?? []) as { id: number; tecnico_id: number; dal: string; al: string }[])
+        .map(x => ({ chiave: `a${x.id}`, tecnico_id: x.tecnico_id, dal: x.dal, al: x.al, rientro: null, fascia: null, possibile: false })),
+      ...((rq.data ?? []) as RigaRichiesta[]).map(x => ({
+        chiave: `r${x.richiesta_id}`, tecnico_id: x.dipendente_id, dal: x.dal, al: x.al, rientro: null, possibile: x.tipo_riga === 'possibile',
+        fascia: x.ora_inizio ? `${hhmm(x.ora_inizio)}–${hhmm(x.ora_fine)}` : x.tipo_riga === 'nota' ? (/mattin/i.test(x.etichetta) ? 'Mattina' : /pomerig/i.test(x.etichetta) ? 'Pomeriggio' : 'Mezza giornata') : null,
+      })),
+    ].sort((x, y) => x.dal.localeCompare(y.dal));
+    // rientro = primo giorno lavorativo dopo l'ultimo giorno di assenza (festività comprese: lo calcola il server)
+    const rientri: Record<string, string> = {};
+    await Promise.all([...new Set(righe.filter(r => !r.fascia).map(r => r.al))].map(async al => {
+      try { rientri[al] = await rpc<string>('prossimo_lavorativo', { p_da: al }); } catch { rientri[al] = prossimoLavorativo(al); }
+    }));
+    righe.forEach(r => { if (!r.fascia) r.rientro = rientri[r.al] ?? null; });
+    return { tecnici: tc.data as Tecnico[], assenze: righe, modifica: !hr.error && hr.data === true };
   });
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data) return <Caricamento />;
   const lista = data.tecnici.filter(x => mostraInattivi || x.attivo);
   const nome = (id: number) => { const x = data.tecnici.find(y => y.id === id); return x ? `${x.nome} ${x.cognome}` : '—'; };
+  const puoModificare = data.modifica;
 
   async function sblocca(x: Tecnico) {
     const { error } = await supabase.from('tecnici').update({ tentativi_falliti: 0, bloccato_fino: null }).eq('id', x.id);
     if (error) toast(tm(testoErrore(error))); else { toast(t('Accesso sbloccato')); reload(); }
-  }
-  async function eliminaAssenza(id: number) {
-    const { error } = await supabase.from('assenze').delete().eq('id', id);
-    if (error) toast(tm(testoErrore(error))); else reload();
   }
 
   return (
@@ -43,7 +66,8 @@ export default function Tecnici() {
       <div className="section-title">{t('Tecnici e conducenti')} <span className="meta">{lista.length}</span><span className="spacer" />
         <label className="sub chk"><input type="checkbox" checked={mostraInattivi} onChange={e => setMostraInattivi(e.target.checked)} /> {t('Mostra non attivi')}</label>
         <Link className="btn-ghost btn-sm" to={`${base}/installa-tecnici`}>{t('Scheda app vuota')}</Link>
-        <button className="btn btn-sm" onClick={() => setModifica('nuovo')}>{t('Nuovo tecnico')}</button></div>
+        {puoModificare && <button className="btn btn-sm" onClick={() => setModifica('nuovo')}>{t('Nuovo tecnico')}</button>}</div>
+      {!puoModificare && <p className="hint sola-lettura">{t("I nuovi tecnici e le modifiche ai dati (patente, contatti, ruolo) li inserisce l'ufficio personale. Qui gestisci il PIN e la scheda dell'app.")}</p>}
       <div className="table-wrap"><table>
         <thead><tr><th>{t('Tecnico')}</th><th>{t('Codice app')}</th><th>{t('Ruolo')}</th><th>{t('Patente')}</th><th>{t('Accesso app')}</th><th></th></tr></thead>
         <tbody>{lista.length ? lista.map(x => {
@@ -58,29 +82,28 @@ export default function Tecnici() {
                 : <><Pill s={g < 0 ? 'ko' : g <= 30 ? 'warn' : 'ok'}>{g < 0 ? t('Scaduta') : g <= 30 ? t('Tra {n} gg', { n: g }) : t('Valida')}</Pill><span className="mono sub">{fmtData(x.patente_scadenza)}</span></>}</div></td>
               <td>{bloccato ? <Pill s="ko">{t('Bloccato')}</Pill> : x.ha_pin ? <Pill s="ok">{t('PIN attivo')}</Pill> : <Pill s="warn">{t('PIN da impostare')}</Pill>}</td>
               <td className="nowrap actions">
-                <button className="btn-ghost btn-sm" onClick={() => setModifica(x)}>{t('Modifica')}</button>
+                {puoModificare && <button className="btn-ghost btn-sm" onClick={() => setModifica(x)}>{t('Modifica')}</button>}
                 {x.attivo && <button className="btn btn-sm" onClick={() => setScheda(x)}>{t('Scheda app + PIN')}</button>}
                 <button className="btn-ghost btn-sm" onClick={() => setPin(x)}>{x.ha_pin ? t('Nuovo PIN') : t('Imposta PIN')}</button>
-                {bloccato && <button className="btn-ghost btn-sm" onClick={() => sblocca(x)}>{t('Sblocca')}</button>}
+                {bloccato && puoModificare && <button className="btn-ghost btn-sm" onClick={() => sblocca(x)}>{t('Sblocca')}</button>}
                 {g != null && g <= 30 && <Link className="btn-ghost btn-sm" to={`/avvisi?t=${x.id}&modello=patente&d=${fmtData(x.patente_scadenza)}`}>{t('Avvisa')}</Link>}
               </td>
             </tr>
           );
-        }) : <tr><td colSpan={6} className="sub">{t('Nessun tecnico. Usa "Nuovo tecnico".')}</td></tr>}</tbody>
+        }) : <tr><td colSpan={6} className="sub">{puoModificare ? t('Nessun tecnico. Usa "Nuovo tecnico".') : t("Nessun tecnico. I tecnici li inserisce l'ufficio personale.")}</td></tr>}</tbody>
       </table></div>
 
       <div className="section-title">{t('Assenze in corso e future')} <span className="meta">{t('i tecnici assenti non ricevono veicoli nel piano')}</span></div>
-      <NuovaAssenza tecnici={data.tecnici.filter(x => x.attivo)} onSalvato={reload} />
-      <div className="table-wrap" style={{ marginTop: 12 }}><table>
-        <thead><tr><th>{t('Tecnico')}</th><th>{t('Dal')}</th><th>{t('Al')}</th><th>{t('Motivo')}</th><th></th></tr></thead>
+      <div className="table-wrap"><table>
+        <thead><tr><th>{t('Tecnico')}</th><th>{t('Primo giorno')}</th><th>{t('Rientro')}</th><th>{t('Assenza')}</th></tr></thead>
         <tbody>{data.assenze.length ? data.assenze.map(a => (
-          <tr key={a.id}><td>{nome(a.tecnico_id)}</td><td className="mono">{fmtData(a.dal)}</td><td className="mono">{fmtData(a.al)}</td><td>{t(a.motivo)}</td>
-            <td><button className="btn-ghost btn-sm" onClick={() => eliminaAssenza(a.id)}>{t('Elimina')}</button></td></tr>
-        )) : <tr><td colSpan={5} className="sub">{t('Nessuna assenza registrata')}</td></tr>}</tbody>
+          <tr key={a.chiave}><td>{nome(a.tecnico_id)}</td><td className="mono">{fmtData(a.dal)}</td><td className="mono">{a.rientro ? fmtData(a.rientro) : '—'}</td>
+            <td><span className="row-flex" style={{ gap: 6 }}>{a.fascia ? t(a.fascia) : t('Assente')}{a.possibile && <Pill s="warn">{t('Possibile')}</Pill>}</span></td></tr>
+        )) : <tr><td colSpan={4} className="sub">{t('Nessuna assenza in corso o futura')}</td></tr>}</tbody>
       </table></div>
-      <p className="hint">{t('Le assenze qui sono temporanee: in seguito arriveranno dal sistema HR, così non si inseriscono due volte.')}</p>
+      <p className="hint">{t("Le assenze le gestisce l'ufficio personale. Per una correzione contatta l'ufficio personale.")} {t('«Possibile» = richiesta in attesa di risposta: non blocca il piano.')}</p>
 
-      {modifica && <FormTecnico x={modifica === 'nuovo' ? null : modifica} onClose={() => setModifica(null)} onSalvato={() => { setModifica(null); reload(); }} />}
+      {modifica && puoModificare && <FormTecnico x={modifica === 'nuovo' ? null : modifica} onClose={() => setModifica(null)} onSalvato={() => { setModifica(null); reload(); }} />}
       {scheda && <ModaleScheda x={scheda} base={base} onClose={() => setScheda(null)} />}
       {pin && <ModalePin x={pin} onClose={() => setPin(null)} onSalvato={() => { setPin(null); reload(); }} />}
     </>
@@ -179,26 +202,3 @@ function ModaleScheda({ x, base, onClose }: { x: Tecnico; base: string; onClose:
   );
 }
 
-function NuovaAssenza({ tecnici, onSalvato }: { tecnici: Tecnico[]; onSalvato: () => void }) {
-  const { t, tm } = useT();
-  const [f, setF] = useState({ tecnico_id: '', dal: oggiISO(), al: oggiISO(), motivo: 'Ferie' });
-  const [err, setErr] = useState<string | null>(null);
-  async function salva(e: FormEvent) {
-    e.preventDefault(); setErr(null);
-    const { error } = await supabase.from('assenze').insert({ ...f, tecnico_id: Number(f.tecnico_id) });
-    if (error) { setErr(error.message.includes('check') ? t('La data "al" non può essere prima della data "dal".') : tm(testoErrore(error))); return; }
-    toast(t('Assenza registrata')); onSalvato();
-  }
-  return (
-    <form className="row-flex wrap-end" onSubmit={salva}>
-      <div className="field"><label htmlFor="a-t">{t('Tecnico')}</label><select id="a-t" required value={f.tecnico_id} onChange={e => setF({ ...f, tecnico_id: e.target.value })}>
-        <option value="">{t('Seleziona')}</option>{tecnici.map(x => <option key={x.id} value={x.id}>{x.nome} {x.cognome}</option>)}</select></div>
-      <div className="field"><label htmlFor="a-dal">{t('Dal')}</label><input id="a-dal" type="date" required value={f.dal} onChange={e => setF({ ...f, dal: e.target.value })} /></div>
-      <div className="field"><label htmlFor="a-al">{t('Al')}</label><input id="a-al" type="date" required value={f.al} onChange={e => setF({ ...f, al: e.target.value })} /></div>
-      <div className="field"><label htmlFor="a-m">{t('Motivo')}</label><select id="a-m" value={f.motivo} onChange={e => setF({ ...f, motivo: e.target.value })}>
-        {MOTIVI.map(m => <option key={m} value={m}>{t(m)}</option>)}</select></div>
-      <button className="btn">{t('Aggiungi assenza')}</button>
-      {err && <div className="msg ko">{err}</div>}
-    </form>
-  );
-}

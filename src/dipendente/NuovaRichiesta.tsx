@@ -82,7 +82,7 @@ export default function NuovaRichiesta() {
   const args = completo && !bloccato ? {
     p_token: token, p_tipo: tipo!.codice, p_primo_giorno: b.primo,
     p_rientro: aOre || mezza ? null : b.rientro,
-    p_ora_inizio: aOre ? b.dalle : null, p_ora_fine: aOre ? b.alle : null, p_mezza_giornata: mezza,
+    p_ora_inizio: aOre ? b.dalle : null, p_ora_fine: aOre ? b.alle : null, p_mezza_giornata: mezza, p_meta: mezza ? b.meta : null,
   } : null;
   const chiave = args ? JSON.stringify(args) : '';
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function NuovaRichiesta() {
   if (!home) return errore ? <div className="ph-msg ko">{errore}</div> : <Attesa />;
 
   const esci = () => { salvaBozza(null); nav('/t/ferie'); };
-  const notaFinale = () => [mezza ? `Mezza giornata: ${b.meta}` : '', b.note.trim()].filter(Boolean).join(' · ') || null;
+  const notaFinale = () => b.note.trim() || null;
 
   async function invia(e: FormEvent) {
     e.preventDefault(); if (!args) return;

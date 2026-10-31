@@ -1,0 +1,52 @@
+# API portale ferie / flotta (Supabase RPC)
+
+Chiamata: `supabase.rpc(nome, { parametri })`. Tutte restituiscono `jsonb` salvo diversa indicazione.
+Errori: eccezione con messaggio in italiano pronto da mostrare.
+
+## Dipendente (app con codice + PIN) — ruolo `anon`, autenticazione via `p_token`
+| RPC | Parametri |
+|---|---|
+| `dipendente_login` | `p_codice, p_pin` → `{token,...}` |
+| `dipendente_logout` | `p_token` (void) |
+| `dipendente_home` | `p_token` |
+| `dipendente_saldi` | `p_token, p_anno` |
+| `dipendente_richieste` | `p_token, p_anno` |
+| `dipendente_anteprima` | `p_token, p_tipo, p_primo_giorno, p_rientro?, p_ora_inizio?, p_ora_fine?, p_mezza_giornata=false, p_meta?` |
+| `dipendente_invia_richiesta` | come anteprima + `p_note?` (prima di `p_meta`) |
+| `dipendente_annulla_richiesta` | `p_token, p_id` |
+| `dipendente_notifiche` / `dipendente_notifica_letta` | `p_token` / `p_token, p_id` |
+| `dipendente_salva_push` | `p_token, p_endpoint, p_p256dh, p_auth, p_lingua` |
+
+`p_meta` = parte della giornata: `'mattina' | 'pomeriggio'`, **obbligatorio** se `p_mezza_giornata=true`, vietato altrimenti.
+`p_rientro` = primo giorno di nuovo al lavoro (ultimo giorno assenza = rientro − 1).
+
+## Ufficio personale — `authenticated` + `richiedi_hr()` (ruolo hr/admin), altrimenti "Accesso riservato all'ufficio HR"
+| RPC | Parametri |
+|---|---|
+| `hr_anteprima` | `p_dipendente, p_tipo, p_primo_giorno, p_rientro?, p_ora_inizio?, p_ora_fine?, p_mezza_giornata, p_meta?` |
+| `hr_inserisci_richiesta` | come anteprima + `p_note?, p_approva=true`, poi `p_meta?` |
+| `hr_decidi_richiesta` | `p_id, p_decisione ('approvata'/'rifiutata'), p_motivo?` |
+| `hr_annulla_richiesta` | `p_id, p_motivo` |
+| `hr_impatto_richiesta` | `p_id` |
+| `hr_richieste` | `p_stato?, p_da?, p_a?, p_categoria?, p_dipendente?` |
+| `hr_calendario` | `p_da, p_a, p_categoria?, p_dipendente?` |
+| `hr_saldi` | `p_anno, p_categoria?, p_dipendente?, p_alla?` |
+| `hr_rettifica_saldo` | `p_dipendente, p_anno, p_tipo, p_quantita, p_motivo` |
+| `hr_report` | `p_tipo ('riepilogo'/'presenze'/'registro'), p_da, p_a, p_categoria?, p_dipendente?` |
+| `hr_imposta_pin` / `hr_genera_pin` / `hr_sblocca_accesso` | `p_dipendente[, p_pin]` |
+| `hr_genera_festivita` | `p_anno` → integer |
+
+## Responsabile flotta / admin — `authenticated`
+| RPC | Parametri | Note |
+|---|---|---|
+| `piano_giorno` | `p_data` | per tecnico: `assenza` ("Assente", mai il tipo), `rientro`, `parte_giornata`, `note_assenza`, `messaggi` |
+| `report_dati` | `p_tipo, p_da, p_a, p_veicolo?, p_tecnico?` | `assenze`: `motivo` = Assente / Assenza / Formazione / Trasferta / Altro |
+| vista `assenze` | — | unione assenze manuali + richieste approvate |
+
+Notifiche al responsabile flotta per assenze approvate/annullate: `link = /piano?data=AAAA-MM-GG`.
+
+## Edge function `flotta` (verify_jwt off, controlli interni)
+- `/account` (solo admin, JWT): `azione` = `elenco` (campi: user_id, nome, email, ruolo, area, dipendente_id, attivo, creato_il, ultimo_accesso, io) · `crea` · `password` · `stato`.
+- `/push` (solo database, header segreto) · `/foto`, `/documento` (token tecnico).
+
+Nota: le RPC `hr_*` hanno EXECUTE anche per `anon` (grant di default), ma rifiutano chi non è HR.

@@ -205,7 +205,7 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
   const [tipi, setTipi] = useState<TipoAssenza[]>([]);
   const [fest, setFest] = useState<Set<string>>(new Set());
   const [cerca, setCerca] = useState('');
-  const [f, setF] = useState({ dip: preDipendente ? String(preDipendente) : '', tipo: 'FERIE', modo: 'giorni' as Modo, primo: '', rientro: '', rientroMano: false, dalle: '09:00', alle: '11:00', note: '', approva: true });
+  const [f, setF] = useState({ dip: preDipendente ? String(preDipendente) : '', tipo: 'FERIE', modo: 'giorni' as Modo, primo: '', rientro: '', rientroMano: false, dalle: '09:00', alle: '11:00', meta: 'mattina' as 'mattina' | 'pomeriggio', note: '', approva: true });
   const [ant, setAnt] = useState<Anteprima | null>(null);
   const [calcolo, setCalcolo] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -235,13 +235,13 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
     if (!f.dip || !f.primo || !tipo) return;
     const args = { p_dipendente: Number(f.dip), p_tipo: f.tipo, p_primo_giorno: f.primo,
       p_rientro: modo === 'giorni' ? f.rientro || null : null, p_ora_inizio: modo === 'ore' ? f.dalle : null, p_ora_fine: modo === 'ore' ? f.alle : null,
-      p_mezza_giornata: modo === 'mezza' };
+      p_mezza_giornata: modo === 'mezza', p_meta: modo === 'mezza' ? f.meta : null };
     setCalcolo(true);
     const k = window.setTimeout(() => {
       rpc<Anteprima>('hr_anteprima', args).then(setAnt).catch(e => setErr(erroreHR(e))).finally(() => setCalcolo(false));
     }, 300);
     return () => window.clearTimeout(k);
-  }, [f.dip, f.tipo, f.primo, f.rientro, f.dalle, f.alle, modo, tipo]);
+  }, [f.dip, f.tipo, f.primo, f.rientro, f.dalle, f.alle, f.meta, modo, tipo]);
 
   async function salva(e: FormEvent) {
     e.preventDefault(); if (!ant?.ok) return;
@@ -249,7 +249,7 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
     try {
       const x = await rpc<{ messaggio: string }>('hr_inserisci_richiesta', { p_dipendente: Number(f.dip), p_tipo: f.tipo, p_primo_giorno: f.primo,
         p_rientro: modo === 'giorni' ? f.rientro : null, p_ora_inizio: modo === 'ore' ? f.dalle : null, p_ora_fine: modo === 'ore' ? f.alle : null,
-        p_mezza_giornata: modo === 'mezza', p_note: f.note.trim() || null, p_approva: f.approva });
+        p_mezza_giornata: modo === 'mezza', p_meta: modo === 'mezza' ? f.meta : null, p_note: f.note.trim() || null, p_approva: f.approva });
       toast(x.messaggio); onSalvato();
     } catch (x) { setErr(erroreHR(x)); setInvio(false); }
   }
@@ -272,6 +272,8 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
             <input id="ins-primo" type="date" required value={f.primo} onChange={e => setPrimo(e.target.value)} disabled={!f.dip} /></div>
           {modo === 'giorni' && <div className="field"><label htmlFor="ins-rientro">Rientro (primo giorno di nuovo al lavoro)</label>
             <input id="ins-rientro" type="date" required min={f.primo ? piuGiorni(f.primo, 1) : undefined} value={f.rientro} onChange={e => setF({ ...f, rientro: e.target.value, rientroMano: true })} disabled={!f.primo} /></div>}
+          {modo === 'mezza' && <div className="field"><label>Parte della giornata</label>
+            <div className="segmented" role="group" aria-label="Parte della giornata">{(['mattina', 'pomeriggio'] as const).map(k => <button type="button" key={k} className={f.meta === k ? 'on' : ''} aria-pressed={f.meta === k} onClick={() => setF({ ...f, meta: k })}>{k === 'mattina' ? 'Mattina' : 'Pomeriggio'}</button>)}</div></div>}
           {modo === 'ore' && <div className="row-flex"><div className="field"><label htmlFor="ins-dalle">Dalle</label><input id="ins-dalle" type="time" step={900} value={f.dalle} onChange={e => setF({ ...f, dalle: e.target.value })} /></div>
             <div className="field"><label htmlFor="ins-alle">Alle</label><input id="ins-alle" type="time" step={900} value={f.alle} onChange={e => setF({ ...f, alle: e.target.value })} /></div></div>}
         </div>

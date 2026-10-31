@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase, rpc } from '../lib/supabase';
 import { oggiISO } from '../lib/format';
 import { Banner, toast } from '../ui';
-import { numerica, testoCella, type Report, type Riga } from '../admin/report/catalogo';
+import { CATALOGO, numerica, testoCella, type Report, type Riga } from '../admin/report/catalogo';
 import { CATEGORIE, fmtQ, giornoLungo, nomeCategoria, type Unita } from './comune';
 import { erroreHR } from './componenti';
 
 /** Report del personale: stessi file premium (Excel e PDF con logo) del centro report flotta. */
-type Id = 'riepilogo' | 'presenze' | 'registro';
+type Id = 'riepilogo' | 'presenze' | 'registro' | 'consumi_veicoli' | 'spesa_mensile';
+const CARBURANTE: Id[] = ['consumi_veicoli', 'spesa_mensile'];
 const n = (v: unknown) => Number(v ?? 0) || 0;
 const somma = (r: Riga[], k: string) => r.reduce((s, x) => s + n(x[k]), 0);
 const fmtN = (v: number) => v.toLocaleString('it-IT', { maximumFractionDigits: 1 });
@@ -65,6 +66,8 @@ function normalizza(id: Id, r: Riga): Riga {
   return x;
 }
 
+for (const id of CARBURANTE) { const r = CATALOGO.find(x => x.id === id); if (r) REPORT.push({ ...r, gruppo: 'Controllo e costi', filtri: {}, hrId: id }); }
+
 export default function ReportHR() {
   const [sel, setSel] = useState(REPORT[0]);
   const [preset, setPreset] = useState<Preset>('mese_scorso');
@@ -87,7 +90,9 @@ export default function ReportHR() {
   }, []);
   useEffect(() => {
     let vivo = true; setRighe(null); setErr(null);
-    rpc<{ righe: Riga[] }>('hr_report', { p_tipo: sel.hrId, p_da: da, p_a: a, p_categoria: cat || null, p_dipendente: dip ? Number(dip) : null })
+    (CARBURANTE.includes(sel.hrId)
+      ? rpc<{ righe: Riga[] }>('report_carburante', { p_tipo: sel.hrId, p_da: da, p_a: a, p_veicolo: null, p_tecnico: dip ? Number(dip) : null })
+      : rpc<{ righe: Riga[] }>('hr_report', { p_tipo: sel.hrId, p_da: da, p_a: a, p_categoria: cat || null, p_dipendente: dip ? Number(dip) : null }))
       .then(r => { if (vivo) setRighe(r.righe.map(x => normalizza(sel.hrId, x))); }).catch(e => { if (vivo) setErr(erroreHR(e)); });
     return () => { vivo = false; };
   }, [sel.hrId, da, a, cat, dip]);

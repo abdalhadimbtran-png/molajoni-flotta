@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { AreaBilingue, SceltaLingua, useT } from '../../lib/i18n';
 import { Caricamento } from '../../ui';
 import { Icona, Layout, type Gruppo } from '../Barra';
-import { useSessione } from '../Shell';
+import { homeDi, useSessione } from '../Shell';
 import { URL_FUNZIONI } from '../../lib/push';
 
 const GRUPPI: Gruppo[] = [
@@ -15,11 +15,12 @@ const GRUPPI: Gruppo[] = [
 
 /** Area dell'amministratore del sistema: unico livello con la scelta italiano/arabo. */
 export default function AreaAdmin() {
-  const { sessione, stato, admin } = useSessione();
+  const s = useSessione();
+  const { sessione, stato, admin } = s;
   const loc = useLocation();
   if (stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
   if (stato === 'anonimo') return <Navigate to="/accesso" replace state={{ da: loc.pathname }} />;
-  if (!admin) return <Navigate to="/cruscotto" replace />;
+  if (!admin) return <Navigate to={homeDi(s) ?? '/cruscotto'} replace />;
   return <AreaBilingue><Contenuto email={sessione?.user.email ?? ''} /></AreaBilingue>;
 }
 
@@ -29,7 +30,8 @@ function Contenuto({ email }: { email: string }) {
     <Layout prodotto={t('Amministrazione')} gruppi={GRUPPI} email={email}
       utilita={<SceltaLingua />}
       menuUtente={<>
-        <NavLink to="/cruscotto"><Icona n="cruscotto" />{t('Pannello responsabile')}</NavLink>
+        <NavLink to="/cruscotto"><Icona n="cruscotto" />{t('Pannello flotta')}</NavLink>
+        <NavLink to="/hr"><Icona n="tecnici" />{t('Ufficio personale')}</NavLink>
         <button onClick={() => supabase.auth.signOut()}><Icona n="ritorno" />{t('Esci')}</button>
       </>}>
       <Outlet />

@@ -630,6 +630,11 @@ const AR: Record<string, string> = {
   'Intervento salvato, ma avviso non inviato: {e}': 'تم حفظ المهمة، لكن لم يُرسل التنبيه: {e}',
   'Allega il PDF appena scaricato (lo trovi in Download).': 'أرفق ملف PDF الذي تم تنزيله للتو (تجده في مجلد التنزيلات).',
   'Si apre il tuo programma di posta con il messaggio già scritto, senza PIN: allega il PDF, controlla e premi Invia. Il PIN è visibile solo adesso: se chiudi la pagina, per rivederlo devi generarne uno nuovo.': 'يُفتح برنامج البريد مع رسالة جاهزة بدون رمز PIN: أرفق ملف PDF، راجع ثم اضغط إرسال. رمز PIN ظاهر الآن فقط: إذا أغلقت الصفحة يجب إنشاء رمز جديد لرؤيته.',
+  'Email notifiche ferie': 'إشعارات الإجازات بالبريد', "un'email all'ufficio personale per ogni nuova richiesta": 'رسالة إلى قسم الموارد البشرية عند كل طلب جديد',
+  "Email dell'ufficio personale": 'بريد قسم الموارد البشرية', 'Invia email di prova': 'إرسال بريد تجريبي', 'Indirizzo salvato': 'تم حفظ العنوان',
+  'Email di prova in invio': 'جارٍ إرسال البريد التجريبي', 'Inviata': 'أُرسلت', 'In coda': 'في الانتظار', 'Errore': 'خطأ',
+  'Chiave Resend mancante': 'مفتاح Resend غير موجود', 'Saltata': 'تم تخطيها', 'Indirizzo email non valido.': 'عنوان البريد غير صالح.',
+  'Impostazione non valida.': 'إعداد غير صالح.',
 };
 
 /** Traduzione dei messaggi generati dal database (regole, errori). */

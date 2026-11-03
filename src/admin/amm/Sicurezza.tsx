@@ -2,6 +2,7 @@ import { rpc, supabase, testoErrore } from '../../lib/supabase';
 import { fmtOra } from '../../lib/format';
 import { useT } from '../../lib/i18n';
 import { Caricamento, Errore, Pill, toast, useLoad } from '../../ui';
+import EmailNotifiche from './EmailNotifiche';
 
 interface Tc { id: number; nome: string; codice: string; ultimo_accesso: string | null; sessioni_attive: number; dispositivi: number; bloccato: boolean; ha_pin: boolean }
 interface Riga { id: number; azione: string; record_id: string; dopo: Record<string, unknown> | null; creato_il: string }
@@ -32,6 +33,7 @@ export default function Sicurezza() {
 
   return (
     <>
+      <EmailNotifiche />
       <div className="section-title">{t('Accessi dei tecnici')} <span className="meta">{t('un telefono perso? Chiudi le sessioni e genera un PIN nuovo')}</span></div>
       <div className="table-wrap"><table>
         <thead><tr><th>{t('Tecnico')}</th><th>{t('Stato')}</th><th className="num-c">{t('Telefoni connessi')}</th><th className="num-c">{t('Notifiche attive')}</th><th>{t('Ultimo accesso')}</th><th></th></tr></thead>

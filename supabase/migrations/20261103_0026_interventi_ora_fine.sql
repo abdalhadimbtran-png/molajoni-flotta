@@ -13,7 +13,7 @@ declare d text; n text;
 begin
   foreach n in array array['public.piano_giorno(date)', 'public.tecnico_home(text)'] loop
     d := pg_get_functiondef(n::regprocedure);
-    if position('ora_fine' in d) = 0 then
+    if position('to_char(i.ora_fine' in d) = 0 then
       if position($q$'ora', to_char(i.ora,'HH24:MI'), $q$ in d) = 0 then raise exception 'frammento ora non trovato in %', n; end if;
       execute replace(d, $q$'ora', to_char(i.ora,'HH24:MI'), $q$, $q$'ora', to_char(i.ora,'HH24:MI'), 'ora_fine', to_char(i.ora_fine,'HH24:MI'), $q$);
     end if;

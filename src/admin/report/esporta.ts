@@ -157,14 +157,14 @@ export async function esportaPdf(rep: Report, righe: Riga[], ctx: Contesto) {
   const totW = cols.reduce((s, c) => s + (c.w ?? 14), 0);
   const tabella = (rr: Riga[], startY: number, conGruppi: boolean) => {
     const corpo: unknown[][] = [];
-    const stili: Record<number, 'gruppo' | 'subtotale' | 'totale' | 'assente' | 'vuoto'> = {};
+    const stili: Record<number, 'gruppo' | 'subtotale' | 'totale' | 'assente' | 'vuoto' | 'urgente'> = {};
     const voci = conGruppi ? struttura(rep, rr) : struttura({ ...rep, raggruppa: undefined }, rr);
     for (const v of voci) {
       if (v.tipo === 'gruppo') { stili[corpo.length] = 'gruppo'; corpo.push([{ content: v.testo, colSpan: cols.length }]); }
       else if (v.tipo === 'riga') {
         const st = v.r.stato;
         if (st === 'Assente' || st === 'Vuoto') { stili[corpo.length] = st === 'Assente' ? 'assente' : 'vuoto'; corpo.push([testoCella(v.r[cols[0].k], cols[0].t), { content: st === 'Assente' ? 'Assente' : '—', colSpan: cols.length - 1 }]); }
-        else corpo.push(cols.map(c => testoCella(v.r[c.k], c.t)));
+        else { if (v.r.urgente === 'URGENTE') stili[corpo.length] = 'urgente'; corpo.push(cols.map(c => testoCella(v.r[c.k], c.t))); }
       }
       else { stili[corpo.length] = v.tipo; corpo.push(cols.map((c, i) => i === 0 ? (v.tipo === 'totale' ? 'TOTALE' : v.testo) : c.tot ? testoCella(v.valori[c.k], c.t) : '')); }
     }
@@ -182,6 +182,7 @@ export async function esportaPdf(rep: Report, righe: Riga[], ctx: Contesto) {
         if (s === 'subtotale') { d.cell.styles.fillColor = [242, 242, 245]; d.cell.styles.fontStyle = 'bold'; }
         if (s === 'totale') { d.cell.styles.fillColor = [227, 6, 19]; d.cell.styles.textColor = 255; d.cell.styles.fontStyle = 'bold'; }
         if (s === 'assente') { d.cell.styles.fillColor = [228, 228, 232]; d.cell.styles.fontStyle = 'bold'; d.cell.styles.textColor = [90, 90, 96]; }
+        if (s === 'urgente') { d.cell.styles.textColor = [176, 0, 16]; d.cell.styles.fontStyle = 'bold'; }
         if (s === 'vuoto') { d.cell.styles.fillColor = [255, 255, 255]; d.cell.styles.textColor = [160, 160, 166]; }
       },
       didDrawPage: d => { if (d.pageNumber > 1) intestazione(); },

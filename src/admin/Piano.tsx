@@ -5,7 +5,7 @@ import { fascia, fmtGiorno, fmtOra, prossimoLavorativo, STATI_VEICOLO } from '..
 import { useT } from '../lib/i18n';
 import { SEL_VEICOLI, type Intervento, type Piano as TPiano, type RigaPiano, type Veicolo } from '../lib/tipi';
 import { Banner, Caricamento, Errore, Msgs, Pill, toast, useLoad } from '../ui';
-import Settimana, { CampiOrario, SceltaAttivita, conDurata, erroreOrario, sovrapposti } from './Settimana';
+import Settimana, { CampiOrario, SceltaAttivita, SceltaPriorita, avvisaUrgente, conDurata, erroreOrario, sovrapposti } from './Settimana';
 import PillPresenza, { presenzaDaNota, type Presenza } from './PillPresenza';
 
 /** Campi aggiunti a piano_giorno dal modulo ferie (migrazioni 0013-0014): mai il tipo di assenza. */
@@ -138,8 +138,8 @@ function PianoGiorno() {
                   {riassegna && <div className="presenza"><Pill s="ko">{t('Da riassegnare')}</Pill></div>}</td>
                 <td className="cell-int">
                   {r.interventi.map(i => (
-                    <div key={i.id} className={`int${riassegna ? ' int-sposta' : ''}`}><span className="h">{fascia(i.ora, i.ora_fine)}</span>
-                      <span className="grow">{i.luogo}<div className="sub">{i.attivita}</div>
+                    <div key={i.id} className={`int${riassegna ? ' int-sposta' : ''}${i.priorita === 'urgente' ? ' int-urg' : ''}`}><span className="h">{fascia(i.ora, i.ora_fine)}</span>
+                      <span className="grow">{i.priorita === 'urgente' && <span className="badge-urg">{t('URGENTE')}</span>}{i.luogo}<div className="sub">{i.attivita}</div>
                         {riassegna && <select className="sposta" aria-label={t('Sposta a…')} value="" onChange={e => { const a = presenti.find(x => x.tecnico_id === Number(e.target.value)); if (a) sposta(i, a); }}>
                           <option value="">{t('Sposta a…')}</option>
                           {presenti.map(a => <option key={a.tecnico_id} value={a.tecnico_id}>{a.nome}{a.note_assenza?.length ? ` · ${t('non disponibile per alcune ore')}` : ''}</option>)}
@@ -175,7 +175,7 @@ function PianoGiorno() {
 function NuovoIntervento({ giorno, tecnico, altri, onSalvato }: { giorno: string; tecnico: number; altri: Intervento[]; onSalvato: () => void }) {
   const { t, tm } = useT();
   const [aperto, setAperto] = useState(false);
-  const [ora, setOra] = useState('08:00'); const [fine, setFine] = useState('12:00'); const [luogo, setLuogo] = useState(''); const [att, setAtt] = useState('');
+  const [ora, setOra] = useState('08:00'); const [fine, setFine] = useState('12:00'); const [prio, setPrio] = useState('normale'); const [luogo, setLuogo] = useState(''); const [att, setAtt] = useState('');
   const [err, setErr] = useState<string | null>(null);
   if (!aperto) return <button className="link" onClick={() => setAperto(true)}>{t('+ Aggiungi intervento')}</button>;
   async function salva(e: FormEvent) {
@@ -184,12 +184,15 @@ function NuovoIntervento({ giorno, tecnico, altri, onSalvato }: { giorno: string
     const eo = erroreOrario(ora, fine); if (eo) { setErr(t(eo)); return; }
     const sov = sovrapposti(ora, fine, altri);
     if (sov.length && !window.confirm(t('Attenzione: in questo orario il tecnico ha già «{l}». Salvare lo stesso?', { l: sov.map(x => `${fascia(x.ora, x.ora_fine)} ${x.luogo}`).join(', ') }))) return;
-    const { error } = await supabase.from('interventi').insert({ data: giorno, tecnico_id: tecnico, ora: ora || null, ora_fine: fine || null, luogo: luogo.trim(), attivita: att.trim() });
+    const rec = { data: giorno, tecnico_id: tecnico, ora: ora || null, ora_fine: fine || null, priorita: prio, luogo: luogo.trim(), attivita: att.trim() };
+    const { error } = await supabase.from('interventi').insert(rec);
     if (error) { setErr(tm(testoErrore(error))); return; }
-    setLuogo(''); setAtt(''); setAperto(false); onSalvato();
+    await avvisaUrgente(rec, t);
+    setLuogo(''); setAtt(''); setPrio('normale'); setAperto(false); onSalvato();
   }
   return (
     <form className="mini-form" onSubmit={salva}>
+      <SceltaPriorita valore={prio} onChange={setPrio} />
       <CampiOrario compatto dalle={ora} alle={fine} onChange={(a, b) => { setOra(a); setFine(b); }} />
       <input type="text" aria-label={t('Cliente / luogo')} placeholder={t('Cliente / luogo')} required value={luogo} onChange={e => setLuogo(e.target.value)} />
       <SceltaAttivita valore={att} onChange={(nome, durata) => { setAtt(nome); const x = conDurata({ ora, ora_fine: fine }, durata); setOra(x.ora); setFine(x.ora_fine); }} />

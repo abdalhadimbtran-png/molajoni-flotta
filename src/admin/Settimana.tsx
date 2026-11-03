@@ -8,9 +8,9 @@ import { CATALOGO, type Riga } from './report/catalogo';
 import type { AttivitaPred } from './ElencoAttivita';
 
 /** Vista settimanale: inserimento rapido degli interventi lun–ven, pensata per chi usa poco il computer. */
-interface Int { id: number; data: string; tecnico_id: number; ora: string | null; ora_fine: string | null; luogo: string; attivita: string; note: string | null }
+interface Int { id: number; data: string; tecnico_id: number; ora: string | null; ora_fine: string | null; priorita: string; luogo: string; attivita: string; note: string | null }
 interface Tec { id: number; nome: string; cognome: string }
-type Bozza = { id?: number; data: string; tecnico_id: number; ora: string; ora_fine: string; luogo: string; attivita: string; note: string };
+type Bozza = { id?: number; data: string; tecnico_id: number; ora: string; ora_fine: string; priorita: string; luogo: string; attivita: string; note: string };
 
 const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
 const pd = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
@@ -33,7 +33,7 @@ export default function Settimana() {
     const ven = add(lun, 4);
     const [tc, it, as, st] = await Promise.all([
       supabase.from('tecnici').select('id,nome,cognome').eq('attivo', true).order('cognome'),
-      supabase.from('interventi').select('id,data,tecnico_id,ora,ora_fine,luogo,attivita,note').gte('data', lun).lte('data', ven).order('ora', { nullsFirst: false }),
+      supabase.from('interventi').select('id,data,tecnico_id,ora,ora_fine,priorita,luogo,attivita,note').gte('data', lun).lte('data', ven).order('ora', { nullsFirst: false }),
       supabase.from('assenze').select('tecnico_id,dal,al').lte('dal', ven).gte('al', lun),
       supabase.from('interventi').select('luogo,attivita').order('id', { ascending: false }).limit(1500),
     ]);
@@ -59,7 +59,7 @@ export default function Settimana() {
   function apriNuovo(tec: number, g: string) {
     if (data?.fest.has(g)) { window.alert(t('{g} è un giorno festivo: non si possono aggiungere interventi.', { g: fmtG(g) })); return; }
     if (assente(tec, g)) { window.alert(t('{n} è assente il {g}: non si possono aggiungere interventi.', { n: nomeT(tec), g: fmtG(g) })); return; }
-    setBozza({ data: g, tecnico_id: tec, ora: '', ora_fine: '', luogo: '', attivita: '', note: '' });
+    setBozza({ data: g, tecnico_id: tec, ora: '', ora_fine: '', priorita: 'normale', luogo: '', attivita: '', note: '' });
   }
 
   /** Inserisce copie saltando giorni bloccati e duplicati già presenti. */
@@ -79,12 +79,12 @@ export default function Settimana() {
     esegui(async () => { const { error } = await supabase.from('interventi').delete().eq('id', i.id); if (error) throw error; toast(t('Intervento eliminato.')); });
   };
 
-  const ripeti = (i: Int) => esegui(() => inserisciCopie(giorni.filter(g => g !== i.data).map(g => ({ data: g, tecnico_id: i.tecnico_id, ora: i.ora, ora_fine: i.ora_fine, luogo: i.luogo, attivita: i.attivita, note: i.note }))));
+  const ripeti = (i: Int) => esegui(() => inserisciCopie(giorni.filter(g => g !== i.data).map(g => ({ data: g, tecnico_id: i.tecnico_id, ora: i.ora, ora_fine: i.ora_fine, priorita: i.priorita, luogo: i.luogo, attivita: i.attivita, note: i.note }))));
 
   const copiaPrecedente = (tec: Tec) => {
     if (!window.confirm(t('Copiare gli interventi della settimana precedente di {n} in questa settimana? I giorni di assenza e gli interventi già presenti vengono saltati.', { n: `${tec.nome} ${tec.cognome}` }))) return;
     esegui(async () => {
-      const { data: prec, error } = await supabase.from('interventi').select('data,tecnico_id,ora,ora_fine,luogo,attivita,note').eq('tecnico_id', tec.id).gte('data', add(lun, -7)).lte('data', add(lun, -3));
+      const { data: prec, error } = await supabase.from('interventi').select('data,tecnico_id,ora,ora_fine,priorita,luogo,attivita,note').eq('tecnico_id', tec.id).gte('data', add(lun, -7)).lte('data', add(lun, -3));
       if (error) throw error;
       if (!prec?.length) { toast(t('La settimana precedente non ha interventi per {n}.', { n: tec.nome })); return; }
       await inserisciCopie(prec.map(p => ({ ...p, data: add(p.data, 7) })));
@@ -119,17 +119,18 @@ export default function Settimana() {
                 <button className="link wk-prec" onClick={() => copiaPrecedente(tec)}>{t('Copia la settimana precedente')}</button></th>
               {giorni.map((g, gi) => {
                 const ass = assente(tec.id, g), fes = data.fest.has(g);
-                const lista = data.interventi.filter(i => i.tecnico_id === tec.id && i.data === g);
+                const lista = data.interventi.filter(i => i.tecnico_id === tec.id && i.data === g).sort((a, b) => Number(b.priorita === 'urgente') - Number(a.priorita === 'urgente'));
                 return (
                   <td key={g} className={`wk-cell${ass || fes ? ' wk-off' : ''}`} data-giorno={t(GIORNI[gi])}
                     onClick={e => { if (e.target === e.currentTarget) apriNuovo(tec.id, g); }}>
                     {(ass || fes) && <div className="wk-stato">{fes ? t('Festivo') : t('Assente')}</div>}
                     {lista.map(i => (
-                      <div key={i.id} className="wk-card">
+                      <div key={i.id} className={`wk-card${i.priorita === 'urgente' ? ' wk-urg' : ''}`}>
+                        {i.priorita === 'urgente' && <span className="badge-urg">{t('URGENTE')}</span>}
                         <div><b>{fascia(i.ora, i.ora_fine)}</b> · {i.luogo}</div>
                         <div className="sub">{i.attivita}{i.note ? ` — ${i.note}` : ''}</div>
                         <div className="wk-azioni">
-                          <button className="btn-ghost btn-sm" onClick={() => setBozza({ id: i.id, data: i.data, tecnico_id: i.tecnico_id, ora: hhmm(i.ora), ora_fine: hhmm(i.ora_fine), luogo: i.luogo, attivita: i.attivita, note: i.note ?? '' })}>{t('Modifica')}</button>
+                          <button className="btn-ghost btn-sm" onClick={() => setBozza({ id: i.id, data: i.data, tecnico_id: i.tecnico_id, ora: hhmm(i.ora), ora_fine: hhmm(i.ora_fine), priorita: i.priorita, luogo: i.luogo, attivita: i.attivita, note: i.note ?? '' })}>{t('Modifica')}</button>
                           <button className="btn-ghost btn-sm" onClick={() => setCopia(i)}>{t('Copia su…')}</button>
                           <button className="btn-ghost btn-sm" onClick={() => ripeti(i)}>{t('Ripeti tutta la settimana')}</button>
                           <button className="btn-ghost btn-sm wk-del" onClick={() => elimina(i)}>{t('Elimina')}</button>
@@ -148,7 +149,7 @@ export default function Settimana() {
       {bozza && data && <ModaleIntervento b={bozza} titolo={`${nomeT(bozza.tecnico_id)} · ${fmtG(bozza.data)}`} luoghi={data.luoghi} attivita={data.attivita} altri={data.interventi.filter(x => x.tecnico_id === bozza.tecnico_id && x.data === bozza.data && x.id !== bozza.id)}
         onClose={() => setBozza(null)} onSalvato={() => { setBozza(null); reload(); }} />}
       {copia && data && <ModaleCopia i={copia} giorni={giorni} tecnici={data.tecnici} fmtG={fmtG} bloccato={bloccato}
-        onClose={() => setCopia(null)} onCopia={dest => { setCopia(null); esegui(() => inserisciCopie(dest.map(d => ({ data: d.g, tecnico_id: d.tec, ora: copia.ora, ora_fine: copia.ora_fine, luogo: copia.luogo, attivita: copia.attivita, note: copia.note })))); }} />}
+        onClose={() => setCopia(null)} onCopia={dest => { setCopia(null); esegui(() => inserisciCopie(dest.map(d => ({ data: d.g, tecnico_id: d.tec, ora: copia.ora, ora_fine: copia.ora_fine, priorita: copia.priorita, luogo: copia.luogo, attivita: copia.attivita, note: copia.note })))); }} />}
     </>
   );
 }
@@ -165,11 +166,12 @@ function ModaleIntervento({ b, titolo, luoghi, attivita, altri, onClose, onSalva
     const sov = sovrapposti(f.ora, f.ora_fine, altri);
     if (sov.length && !window.confirm(t('Attenzione: in questo orario il tecnico ha già «{l}». Salvare lo stesso?', { l: sov.map(x => `${fascia(x.ora, x.ora_fine)} ${x.luogo}`).join(', ') }))) return;
     setInv(true);
-    const rec = { data: f.data, tecnico_id: f.tecnico_id, ora: f.ora || null, ora_fine: f.ora_fine || null, luogo: f.luogo.trim(), attivita: f.attivita.trim(), note: f.note.trim() || null };
+    const rec = { data: f.data, tecnico_id: f.tecnico_id, ora: f.ora || null, ora_fine: f.ora_fine || null, priorita: f.priorita, luogo: f.luogo.trim(), attivita: f.attivita.trim(), note: f.note.trim() || null };
     const { error } = f.id ? await supabase.from('interventi').update(rec).eq('id', f.id) : await supabase.from('interventi').insert(rec);
     setInv(false);
     if (error) { setErr(tm(testoErrore(error))); return; }
     toast(f.id ? t('Intervento modificato.') : t('Intervento aggiunto.'));
+    await avvisaUrgente(rec, t);
     onSalvato();
   }
   return (
@@ -179,6 +181,7 @@ function ModaleIntervento({ b, titolo, luoghi, attivita, altri, onClose, onSalva
           <input id="wk-l" list="wk-luoghi" autoFocus autoComplete="off" value={f.luogo} onChange={e => setF({ ...f, luogo: e.target.value })} placeholder={t('Es. Scuola Verdi, Roma')} />
           <datalist id="wk-luoghi">{luoghi.map(x => <option key={x} value={x} />)}</datalist></div>
         <SceltaAttivita valore={f.attivita} precedenti={attivita} onChange={(nome, durata) => setF(conDurata({ ...f, attivita: nome }, durata))} />
+        <SceltaPriorita valore={f.priorita} onChange={priorita => setF({ ...f, priorita })} />
         <CampiOrario dalle={f.ora} alle={f.ora_fine} onChange={(ora, ora_fine) => setF({ ...f, ora, ora_fine })} />
         <div className="field"><label htmlFor="wk-n">{t('Note (facoltative)')}</label>
           <input id="wk-n" type="text" value={f.note} onChange={e => setF({ ...f, note: e.target.value })} /></div>
@@ -333,4 +336,27 @@ export function SceltaAttivita({ valore, precedenti = [], onChange }: { valore: 
         <datalist id="att-prec">{precedenti.map(x => <option key={x} value={x} />)}</datalist></>}
     </div>
   );
+}
+
+/** Due grandi pulsanti: Normale / Urgente. */
+export function SceltaPriorita({ valore, onChange }: { valore: string; onChange: (p: string) => void }) {
+  const { t } = useT();
+  return (
+    <div className="field"><label>{t('Priorità')}</label>
+      <div className="wk-prio">
+        <button type="button" className={valore !== 'urgente' ? 'on' : ''} aria-pressed={valore !== 'urgente'} onClick={() => onChange('normale')}>{t('Normale')}</button>
+        <button type="button" className={`urg${valore === 'urgente' ? ' on' : ''}`} aria-pressed={valore === 'urgente'} onClick={() => onChange('urgente')}>{t('Urgente')}</button>
+      </div></div>
+  );
+}
+
+/** Intervento urgente per oggi o domani: avviso immediato al tecnico (stesso canale degli avvisi). Mai per le copie in blocco. */
+export async function avvisaUrgente(r: { data: string; tecnico_id: number; ora: string | null; ora_fine: string | null; priorita: string; luogo: string; attivita: string; note?: string | null }, t: (k: string, v?: Record<string, string | number>) => string) {
+  const oggi = oggiISO();
+  if (r.priorita !== 'urgente' || (r.data !== oggi && r.data !== add(oggi, 1))) return;
+  try {
+    await rpc('invia_avviso', { p_tecnici: [r.tecnico_id], p_livello: 'urgente', p_titolo: `Intervento urgente ${r.data === oggi ? 'oggi' : 'domani'}: ${r.attivita}`,
+      p_testo: r.note || r.attivita, p_ora: fascia(r.ora, r.ora_fine), p_luogo: r.luogo, p_contatto: null, p_telefono: null, p_targa: null });
+    toast(t('Avviso urgente inviato al tecnico.'));
+  } catch (e) { toast(t('Intervento salvato, ma avviso non inviato: {e}', { e: testoErrore(e) })); }
 }

@@ -624,6 +624,10 @@ const AR: Record<string, string> = {
   'disattivata': 'معطّل',
   'Rinomina': 'إعادة تسمية',
   "Le attività non si cancellano: se non servono più, togli la spunta «Attiva». Gli interventi già fatti restano com'erano.": 'الأنشطة لا تُحذف: إذا لم تعد لازمة، أزل علامة «مفعّل». المهمات السابقة تبقى كما هي.',
+  'Normale': 'عادي',
+  'Priorità': 'الأولوية',
+  'Avviso urgente inviato al tecnico.': 'تم إرسال تنبيه عاجل إلى الفني.',
+  'Intervento salvato, ma avviso non inviato: {e}': 'تم حفظ المهمة، لكن لم يُرسل التنبيه: {e}',
 };
 
 /** Traduzione dei messaggi generati dal database (regole, errori). */

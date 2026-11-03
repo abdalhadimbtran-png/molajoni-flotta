@@ -21,7 +21,7 @@ export interface Segnalazione {
   veicoli?: { targa: string } | null; tecnici?: { nome: string; cognome: string } | null; foto?: string[];
 }
 
-export interface Intervento { id: number; ora: string | null; ora_fine?: string | null; luogo: string; attivita: string; note: string | null }
+export interface Intervento { id: number; ora: string | null; ora_fine?: string | null; priorita?: string; luogo: string; attivita: string; note: string | null }
 
 export interface RigaPiano {
   tecnico_id: number; nome: string; codice: string; ruolo: string | null; patente: string | null;

@@ -5,6 +5,7 @@ import { fmtGiorno, fmtOra, prossimoLavorativo, STATI_VEICOLO } from '../lib/for
 import { useT } from '../lib/i18n';
 import { SEL_VEICOLI, type Intervento, type Piano as TPiano, type RigaPiano, type Veicolo } from '../lib/tipi';
 import { Banner, Caricamento, Errore, Msgs, Pill, toast, useLoad } from '../ui';
+import Settimana from './Settimana';
 import PillPresenza, { presenzaDaNota, type Presenza } from './PillPresenza';
 
 /** Campi aggiunti a piano_giorno dal modulo ferie (migrazioni 0013-0014): mai il tipo di assenza. */
@@ -16,6 +17,22 @@ const DATA_OK = /^\d{4}-\d{2}-\d{2}$/;
 const RIDONDANTI = new Set(['Assente: Assente', 'Possibile assenza: richiesta in attesa di decisione']);
 
 export default function Piano() {
+  const { t } = useT();
+  const [sp, setSp] = useSearchParams();
+  const sett = sp.get('vista') === 'settimana';
+  const vai = (v: boolean) => { const n = new URLSearchParams(sp); if (v) n.set('vista', 'settimana'); else n.delete('vista'); setSp(n, { replace: true }); };
+  return (
+    <>
+      <div className="wk-seg wk-vista" role="tablist">
+        <button role="tab" aria-selected={!sett} className={!sett ? 'on' : ''} onClick={() => vai(false)}>{t('Giorno')}</button>
+        <button role="tab" aria-selected={sett} className={sett ? 'on' : ''} onClick={() => vai(true)}>{t('Settimana')}</button>
+      </div>
+      {sett ? <Settimana /> : <PianoGiorno />}
+    </>
+  );
+}
+
+function PianoGiorno() {
   const { t, tm, locale } = useT();
   const [sp, setSp] = useSearchParams();
   const daUrl = sp.get('data');

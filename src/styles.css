@@ -1172,3 +1172,51 @@ select.sposta { margin-top:6px; min-height:32px; font-size:13.5px; max-width:220
 .seg legend { margin-bottom:4px; }
 .seg label > span { display:flex; flex-direction:column; gap:2px; }
 .seg-d { font-size:13px; line-height:1.4; }
+
+/* Pianificazione settimanale */
+.wk-seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; background:var(--surface); }
+.wk-seg button { border:none; background:none; padding:10px 18px; font:inherit; font-weight:500; cursor:pointer; color:var(--ink-2); min-height:44px; }
+.wk-seg button.on { background:var(--ink); color:var(--surface); }
+.wk-vista { margin-bottom:16px; }
+.wk-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+.wk-nav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.wk-titolo { font-weight:600; font-size:17px; min-width:200px; text-align:center; }
+.wk-big { min-height:48px; min-width:48px; font-size:18px; justify-content:center; }
+.wk-wrap { overflow-x:auto; }
+table.wk { border-collapse:collapse; width:100%; min-width:900px; table-layout:fixed; }
+table.wk th, table.wk td { border:1px solid var(--line); vertical-align:top; padding:8px; text-align:start; }
+table.wk thead th { background:var(--surface-2); font-size:14px; }
+.wk-tec { width:170px; background:var(--surface); font-weight:600; }
+.wk-nome { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+.wk-prec { font-size:12.5px; font-weight:400; margin-top:6px; }
+.wk-cell { min-height:110px; height:110px; cursor:pointer; background:var(--surface); }
+.wk-cell:hover { background:var(--surface-2); }
+.wk-off, .wk-cell.wk-off { background:repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 6px, var(--bg) 6px, var(--bg) 12px); cursor:not-allowed; }
+.wk-stato { font-weight:600; color:var(--ink-2); font-size:13px; }
+.wk-card { background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; padding:6px 8px; margin-bottom:6px; font-size:13.5px; cursor:default; }
+.wk-azioni { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.wk-azioni .btn-sm { padding:6px 8px; font-size:12px; min-height:32px; }
+.wk-del { color:var(--brand-ink); }
+.wk-add { width:100%; min-height:40px; border:1.5px dashed var(--line-strong); border-radius:8px; background:none; font-size:22px; color:var(--ink-2); cursor:pointer; }
+.wk-add:hover { border-color:var(--ink-2); color:var(--ink); }
+.wk-vuoto { font-size:12px; color:var(--ink-3); text-align:center; margin-top:4px; pointer-events:none; }
+.wk-form input { font-size:17px; min-height:48px; }
+.wk-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.wk-btns .wk-big { flex:1; }
+.wk-checks { display:flex; flex-wrap:wrap; gap:8px; }
+.wk-check { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-height:44px; cursor:pointer; font-weight:400; }
+.wk-check input { width:20px; height:20px; }
+.wk-stampa { position:relative; display:inline-block; }
+.wk-ico { border:1px solid var(--line); background:var(--surface); border-radius:8px; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-2); }
+.wk-ico:hover { color:var(--ink); border-color:var(--ink-3); }
+.wk-pop { position:absolute; z-index:30; top:calc(100% + 6px); inset-inline-end:0; background:var(--surface); border:1px solid var(--line-strong); border-radius:12px; box-shadow:var(--shadow); padding:12px; width:280px; display:flex; flex-direction:column; gap:10px; font-weight:400; }
+.wk-tec .wk-pop { inset-inline-end:auto; inset-inline-start:0; }
+.wk-pop .wk-seg button { padding:8px 12px; }
+@media (max-width:700px) {
+  table.wk, table.wk thead, table.wk tbody, table.wk tr, table.wk th, table.wk td { display:block; min-width:0; width:auto; }
+  table.wk thead { display:none; }
+  table.wk tr { margin-bottom:14px; border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; }
+  table.wk th.wk-tec { width:auto; background:var(--surface-2); }
+  .wk-cell { height:auto; min-height:64px; }
+  .wk-cell::before { content:attr(data-giorno); display:block; font-weight:600; font-size:13px; color:var(--ink-2); margin-bottom:4px; }
+}

@@ -7,6 +7,8 @@ export interface Report {
   filtri: { veicolo?: boolean; tecnico?: boolean };
   colonne: Col[]; raggruppa?: { k: string; etichetta: (r: Riga) => string };
   orizzontale?: boolean;
+  /** PDF: ogni gruppo (es. tecnico) inizia su una nuova pagina con la propria intestazione. */
+  nuovaPaginaPerGruppo?: boolean;
   riepilogo?: (righe: Riga[]) => { l: string; v: string }[];
 }
 export type Riga = Record<string, unknown>;
@@ -94,8 +96,8 @@ export const CATALOGO: Report[] = [
       { k: 'attivita', l: 'Attività', t: 'testo', w: 40 }, { k: 'veicolo', l: 'Veicolo', t: 'targa', w: 11 }, { k: 'note', l: 'Note', t: 'testo', w: 22 },
       { k: 'fatto', l: 'Fatto ☐', t: 'testo', w: 8 },
     ],
-    raggruppa: { k: 'tecnico', etichetta: r => String(r.tecnico) }, orizzontale: true,
-    riepilogo: r => [{ l: 'Tecnici', v: String(new Set(r.map(x => x.tecnico)).size) }, { l: 'Lavori', v: String(r.filter(x => x.stato !== 'Assente').length) }, { l: 'Giorni di assenza', v: String(r.filter(x => x.stato === 'Assente').length) }],
+    raggruppa: { k: 'tecnico', etichetta: r => String(r.tecnico) }, orizzontale: true, nuovaPaginaPerGruppo: true,
+    riepilogo: r => [{ l: 'Tecnici', v: String(new Set(r.map(x => x.tecnico)).size) }, { l: 'Lavori', v: String(r.filter(x => x.stato !== 'Assente' && x.stato !== 'Vuoto').length) }, { l: 'Giorni di assenza', v: String(r.filter(x => x.stato === 'Assente').length) }],
   },
   {
     id: 'giornaliero', gruppo: 'Tecnici', titolo: 'Giornate di lavoro', periodo: 'intervallo', filtri: { veicolo: true, tecnico: true },

@@ -154,30 +154,57 @@ export async function esportaPdf(rep: Report, righe: Riga[], ctx: Contesto) {
     y += 24;
   }
   const cols = rep.colonne;
-  const corpo: unknown[][] = [];
-  const stili: Record<number, 'gruppo' | 'subtotale' | 'totale'> = {};
-  for (const v of struttura(rep, righe)) {
-    if (v.tipo === 'gruppo') { stili[corpo.length] = 'gruppo'; corpo.push([{ content: v.testo, colSpan: cols.length }]); }
-    else if (v.tipo === 'riga') corpo.push(cols.map(c => testoCella(v.r[c.k], c.t)));
-    else { stili[corpo.length] = v.tipo; corpo.push(cols.map((c, i) => i === 0 ? (v.tipo === 'totale' ? 'TOTALE' : v.testo) : c.tot ? testoCella(v.valori[c.k], c.t) : '')); }
-  }
   const totW = cols.reduce((s, c) => s + (c.w ?? 14), 0);
-  autoTable(doc, {
-    startY: y + 2, margin: { left: M, right: M, top: 9 + lh + 9, bottom: 14 },
-    head: [cols.map(c => c.l)], body: corpo.length ? corpo as never : [[{ content: 'Nessun dato nel periodo selezionato.', colSpan: cols.length }]],
-    styles: { font: 'helvetica', fontSize: 8, cellPadding: { top: 2, bottom: 2, left: 2.2, right: 2.2 }, textColor: [29, 29, 31], lineColor: [229, 229, 234], lineWidth: { bottom: 0.15 }, overflow: 'linebreak', valign: 'top' },
-    headStyles: { fillColor: [29, 29, 31], textColor: 255, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
-    alternateRowStyles: { fillColor: [249, 249, 251] },
-    columnStyles: Object.fromEntries(cols.map((c, i) => [i, { halign: numerica(c.t) ? 'right' : 'left', cellWidth: ((c.w ?? 14) / totW) * (W - 2 * M), fontStyle: c.t === 'targa' ? 'bold' : 'normal' }])),
-    didParseCell: d => {
-      if (d.section === 'head') { d.cell.styles.halign = numerica(cols[d.column.index]?.t ?? 'testo') ? 'right' : 'left'; return; }
-      const s = stili[d.row.index];
-      if (s === 'gruppo') { d.cell.styles.fillColor = [237, 237, 240]; d.cell.styles.fontStyle = 'bold'; d.cell.styles.fontSize = 9; }
-      if (s === 'subtotale') { d.cell.styles.fillColor = [242, 242, 245]; d.cell.styles.fontStyle = 'bold'; }
-      if (s === 'totale') { d.cell.styles.fillColor = [227, 6, 19]; d.cell.styles.textColor = 255; d.cell.styles.fontStyle = 'bold'; }
-    },
-    didDrawPage: d => { if (d.pageNumber > 1) intestazione(); },
-  });
+  const tabella = (rr: Riga[], startY: number, conGruppi: boolean) => {
+    const corpo: unknown[][] = [];
+    const stili: Record<number, 'gruppo' | 'subtotale' | 'totale' | 'assente' | 'vuoto'> = {};
+    const voci = conGruppi ? struttura(rep, rr) : struttura({ ...rep, raggruppa: undefined }, rr);
+    for (const v of voci) {
+      if (v.tipo === 'gruppo') { stili[corpo.length] = 'gruppo'; corpo.push([{ content: v.testo, colSpan: cols.length }]); }
+      else if (v.tipo === 'riga') {
+        const st = v.r.stato;
+        if (st === 'Assente' || st === 'Vuoto') { stili[corpo.length] = st === 'Assente' ? 'assente' : 'vuoto'; corpo.push([testoCella(v.r[cols[0].k], cols[0].t), { content: st === 'Assente' ? 'Assente' : '—', colSpan: cols.length - 1 }]); }
+        else corpo.push(cols.map(c => testoCella(v.r[c.k], c.t)));
+      }
+      else { stili[corpo.length] = v.tipo; corpo.push(cols.map((c, i) => i === 0 ? (v.tipo === 'totale' ? 'TOTALE' : v.testo) : c.tot ? testoCella(v.valori[c.k], c.t) : '')); }
+    }
+    autoTable(doc, {
+      startY, margin: { left: M, right: M, top: 9 + lh + 9, bottom: 14 },
+      head: [cols.map(c => c.l)], body: corpo.length ? corpo as never : [[{ content: 'Nessun dato nel periodo selezionato.', colSpan: cols.length }]],
+      styles: { font: 'helvetica', fontSize: 8, cellPadding: { top: 2, bottom: 2, left: 2.2, right: 2.2 }, textColor: [29, 29, 31], lineColor: [229, 229, 234], lineWidth: { bottom: 0.15 }, overflow: 'linebreak', valign: 'top' },
+      headStyles: { fillColor: [29, 29, 31], textColor: 255, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
+      alternateRowStyles: { fillColor: [249, 249, 251] },
+      columnStyles: Object.fromEntries(cols.map((c, i) => [i, { halign: numerica(c.t) ? 'right' : 'left', cellWidth: ((c.w ?? 14) / totW) * (W - 2 * M), fontStyle: c.t === 'targa' ? 'bold' : 'normal' }])),
+      didParseCell: d => {
+        if (d.section === 'head') { d.cell.styles.halign = numerica(cols[d.column.index]?.t ?? 'testo') ? 'right' : 'left'; return; }
+        const s = stili[d.row.index];
+        if (s === 'gruppo') { d.cell.styles.fillColor = [237, 237, 240]; d.cell.styles.fontStyle = 'bold'; d.cell.styles.fontSize = 9; }
+        if (s === 'subtotale') { d.cell.styles.fillColor = [242, 242, 245]; d.cell.styles.fontStyle = 'bold'; }
+        if (s === 'totale') { d.cell.styles.fillColor = [227, 6, 19]; d.cell.styles.textColor = 255; d.cell.styles.fontStyle = 'bold'; }
+        if (s === 'assente') { d.cell.styles.fillColor = [228, 228, 232]; d.cell.styles.fontStyle = 'bold'; d.cell.styles.textColor = [90, 90, 96]; }
+        if (s === 'vuoto') { d.cell.styles.fillColor = [255, 255, 255]; d.cell.styles.textColor = [160, 160, 166]; }
+      },
+      didDrawPage: d => { if (d.pageNumber > 1) intestazione(); },
+    });
+  };
+  if (rep.nuovaPaginaPerGruppo && rep.raggruppa && righe.length) {
+    // un gruppo per pagina: nome, periodo, veicoli, poi la tabella ordinata per giorno e ora
+    const rg = rep.raggruppa;
+    const gruppi = new Map<string, Riga[]>();
+    righe.forEach(r => { const k = rg.etichetta(r); gruppi.set(k, [...(gruppi.get(k) ?? []), r]); });
+    let primo = true;
+    for (const [nome, rr] of gruppi) {
+      if (!primo) { doc.addPage(); intestazione(); y = 9 + lh + 12; }
+      const yy = primo ? y + 4 : y;
+      primo = false;
+      rr.sort((p, q) => String(p.data ?? '').localeCompare(String(q.data ?? '')) || String(p.ora ?? '').localeCompare(String(q.ora ?? '')));
+      const veicoli = [...new Set(rr.map(r => String(r.veicolo ?? '')).filter(Boolean))];
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(29, 29, 31); doc.text(nome, M, yy);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(110, 110, 115);
+      doc.text(`Periodo: ${ctx.periodo}   ·   Veicolo: ${veicoli.length ? veicoli.join(', ') : '—'}`, M, yy + 5.5);
+      tabella(rr, yy + 9, false);
+    }
+  } else tabella(righe, y + 2, true);
   const pagine = doc.getNumberOfPages();
   for (let p = 1; p <= pagine; p++) {
     doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(142, 142, 147);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase, rpc, testoErrore } from '../lib/supabase';
 import { useT } from '../lib/i18n';
 import { Banner, toast } from '../ui';
@@ -33,10 +34,13 @@ const normalizza = (r: Riga): Riga => ('proprieta' in r ? { ...r, proprieta: PRO
 
 export default function Report() {
   const { t, tm } = useT();
-  const [sel, setSel] = useState<Report>(CATALOGO[0]);
-  const [preset, setPreset] = useState<Preset>('mese');
-  const [da, setDa] = useState(() => intervallo('mese')[0]);
-  const [a, setA] = useState(() => intervallo('mese')[1]);
+  // link diretto (es. «Stampa settimana» dal piano): ?report=agenda&da=AAAA-MM-GG&a=AAAA-MM-GG
+  const [sp] = useSearchParams();
+  const qDa = sp.get('da'), qA = sp.get('a'), qOk = !!qDa && !!qA && /^\d{4}-\d{2}-\d{2}$/.test(qDa) && /^\d{4}-\d{2}-\d{2}$/.test(qA);
+  const [sel, setSel] = useState<Report>(() => CATALOGO.find(c => c.id === sp.get('report')) ?? CATALOGO[0]);
+  const [preset, setPreset] = useState<Preset>(qOk ? 'personalizzato' : 'mese');
+  const [da, setDa] = useState(() => (qOk ? qDa! : intervallo('mese')[0]));
+  const [a, setA] = useState(() => (qOk ? qA! : intervallo('mese')[1]));
   const [entro, setEntro] = useState(() => iso(piu(oggiRoma(), 60)));
   const [veicolo, setVeicolo] = useState(''); const [tecnico, setTecnico] = useState('');
   const [opz, setOpz] = useState<{ veicoli: { id: number; targa: string; marca_modello: string }[]; tecnici: { id: number; nome: string; cognome: string }[] }>({ veicoli: [], tecnici: [] });

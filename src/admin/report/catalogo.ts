@@ -87,6 +87,17 @@ export const CATALOGO: Report[] = [
     riepilogo: r => [{ l: 'Tecnici', v: String(r.length) }, { l: 'Km guidati', v: km(somma(r, 'km_percorsi')) }, { l: 'Segnalazioni', v: String(somma(r, 'segnalazioni')) }],
   },
   {
+    id: 'agenda', gruppo: 'Tecnici', titolo: 'Agenda lavori per tecnico', periodo: 'intervallo', filtri: { tecnico: true },
+    descrizione: 'Elenco stampabile dei lavori di ogni tecnico (giorno, settimana o mese): ora, luogo, attività, veicolo e giorni di assenza, con colonna da spuntare.',
+    colonne: [
+      { k: 'data', l: 'Data', t: 'data', w: 11 }, { k: 'ora', l: 'Ora', t: 'testo', w: 6 }, { k: 'luogo', l: 'Luogo', t: 'testo', w: 34 },
+      { k: 'attivita', l: 'Attività', t: 'testo', w: 40 }, { k: 'veicolo', l: 'Veicolo', t: 'targa', w: 11 }, { k: 'note', l: 'Note', t: 'testo', w: 22 },
+      { k: 'fatto', l: 'Fatto ☐', t: 'testo', w: 8 },
+    ],
+    raggruppa: { k: 'tecnico', etichetta: r => String(r.tecnico) }, orizzontale: true,
+    riepilogo: r => [{ l: 'Tecnici', v: String(new Set(r.map(x => x.tecnico)).size) }, { l: 'Lavori', v: String(r.filter(x => x.stato !== 'Assente').length) }, { l: 'Giorni di assenza', v: String(r.filter(x => x.stato === 'Assente').length) }],
+  },
+  {
     id: 'giornaliero', gruppo: 'Tecnici', titolo: 'Giornate di lavoro', periodo: 'intervallo', filtri: { veicolo: true, tecnico: true },
     descrizione: 'Per ogni giorno lavorativo e tecnico: veicolo assegnato, interventi, assenze, km e stato del piano.',
     colonne: [

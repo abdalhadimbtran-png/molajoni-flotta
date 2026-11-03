@@ -9,11 +9,15 @@ const iso = (d: Date) => d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome'
 function oggiRoma() { const [y, m, d] = iso(new Date()).split('-').map(Number); return new Date(y, m - 1, d); }
 const piu = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const lunedi = (d: Date) => piu(d, -((d.getDay() + 6) % 7));
-type Preset = 'settimana' | 'settimana_scorsa' | 'mese' | 'mese_scorso' | '30' | 'anno' | 'personalizzato';
-const PRESET: [Preset, string][] = [['settimana', 'Questa settimana'], ['settimana_scorsa', 'Settimana scorsa'], ['mese', 'Questo mese'], ['mese_scorso', 'Mese scorso'], ['30', 'Ultimi 30 giorni'], ['anno', "Quest'anno"], ['personalizzato', 'Personalizzato']];
+type Preset = 'oggi' | 'domani' | 'settimana_prossima' | 'mese_prossimo' | 'settimana' | 'settimana_scorsa' | 'mese' | 'mese_scorso' | '30' | 'anno' | 'personalizzato';
+const PRESET: [Preset, string][] = [['oggi', 'Oggi'], ['domani', 'Domani'], ['settimana_prossima', 'Settimana prossima'], ['mese_prossimo', 'Mese prossimo'], ['settimana', 'Questa settimana'], ['settimana_scorsa', 'Settimana scorsa'], ['mese', 'Questo mese'], ['mese_scorso', 'Mese scorso'], ['30', 'Ultimi 30 giorni'], ['anno', "Quest'anno"], ['personalizzato', 'Personalizzato']];
 function intervallo(p: Preset): [string, string] {
   const o = oggiRoma();
   switch (p) {
+    case 'oggi': return [iso(o), iso(o)];
+    case 'domani': return [iso(piu(o, 1)), iso(piu(o, 1))];
+    case 'settimana_prossima': return [iso(piu(lunedi(o), 7)), iso(piu(lunedi(o), 13))];
+    case 'mese_prossimo': return [iso(new Date(o.getFullYear(), o.getMonth() + 1, 1)), iso(new Date(o.getFullYear(), o.getMonth() + 2, 0))];
     case 'settimana': return [iso(lunedi(o)), iso(piu(lunedi(o), 6))];
     case 'settimana_scorsa': return [iso(piu(lunedi(o), -7)), iso(piu(lunedi(o), -1))];
     case 'mese': return [iso(new Date(o.getFullYear(), o.getMonth(), 1)), iso(new Date(o.getFullYear(), o.getMonth() + 1, 0))];
@@ -57,7 +61,7 @@ export default function Report() {
   const fT = sel.filtri.tecnico && tecnico ? Number(tecnico) : null;
   useEffect(() => {
     let attivo = true; setRighe(null); setErr(null);
-    rpc<{ righe: Riga[] }>(['consumi_veicoli', 'spesa_mensile'].includes(sel.id) ? 'report_carburante' : 'report_dati', { p_tipo: sel.id, p_da: pDa, p_a: pA, p_veicolo: fV, p_tecnico: fT })
+    rpc<{ righe: Riga[] }>(sel.id === 'agenda' ? 'report_agenda' : ['consumi_veicoli', 'spesa_mensile'].includes(sel.id) ? 'report_carburante' : 'report_dati', sel.id === 'agenda' ? { p_da: pDa, p_a: pA, p_tecnico: fT } : { p_tipo: sel.id, p_da: pDa, p_a: pA, p_veicolo: fV, p_tecnico: fT })
       .then(r => { if (attivo) setRighe(r.righe.map(normalizza)); }).catch(e => { if (attivo) setErr(testoErrore(e)); });
     return () => { attivo = false; };
   }, [sel.id, pDa, pA, fV, fT]);

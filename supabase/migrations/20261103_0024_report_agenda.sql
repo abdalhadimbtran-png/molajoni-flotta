@@ -1,0 +1,2 @@
+-- Report "Agenda lavori per tecnico": interventi + giorni di assenza, per periodo (max 3 mesi).
+-- Applicata come migrazione report_agenda_tecnici (vedi definizione nel DB: public.report_agenda).

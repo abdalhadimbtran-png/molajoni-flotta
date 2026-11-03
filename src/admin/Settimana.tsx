@@ -5,6 +5,7 @@ import { fascia, oggiISO } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { Banner, Caricamento, Errore, Modal, toast, useLoad } from '../ui';
 import { CATALOGO, type Riga } from './report/catalogo';
+import type { AttivitaPred } from './ElencoAttivita';
 
 /** Vista settimanale: inserimento rapido degli interventi lun–ven, pensata per chi usa poco il computer. */
 interface Int { id: number; data: string; tecnico_id: number; ora: string | null; ora_fine: string | null; luogo: string; attivita: string; note: string | null }
@@ -177,9 +178,7 @@ function ModaleIntervento({ b, titolo, luoghi, attivita, altri, onClose, onSalva
         <div className="field"><label htmlFor="wk-l">{t('Luogo')}</label>
           <input id="wk-l" list="wk-luoghi" autoFocus autoComplete="off" value={f.luogo} onChange={e => setF({ ...f, luogo: e.target.value })} placeholder={t('Es. Scuola Verdi, Roma')} />
           <datalist id="wk-luoghi">{luoghi.map(x => <option key={x} value={x} />)}</datalist></div>
-        <div className="field"><label htmlFor="wk-a">{t('Attività')}</label>
-          <input id="wk-a" list="wk-att" autoComplete="off" value={f.attivita} onChange={e => setF({ ...f, attivita: e.target.value })} placeholder={t('Es. Controllo estintori')} />
-          <datalist id="wk-att">{attivita.map(x => <option key={x} value={x} />)}</datalist></div>
+        <SceltaAttivita valore={f.attivita} precedenti={attivita} onChange={(nome, durata) => setF(conDurata({ ...f, attivita: nome }, durata))} />
         <CampiOrario dalle={f.ora} alle={f.ora_fine} onChange={(ora, ora_fine) => setF({ ...f, ora, ora_fine })} />
         <div className="field"><label htmlFor="wk-n">{t('Note (facoltative)')}</label>
           <input id="wk-n" type="text" value={f.note} onChange={e => setF({ ...f, note: e.target.value })} /></div>
@@ -287,6 +286,51 @@ export function CampiOrario({ dalle, alle, onChange, compatto = false }: { dalle
       <div className="wk-preset">{PRESET_ORARI.map(([a, b, l]) => (
         <button type="button" key={a + b} className={`wk-chip${dalle === a && alle === b ? ' on' : ''}`} onClick={() => onChange(a, b)}>{a}–{b}{l ? ` ${t(l)}` : ''}</button>
       ))}</div>
+    </div>
+  );
+}
+
+/** Se l'attività ha una durata, l'ora di fine si calcola dall'inizio (inizio 08:00 se manca). */
+export function conDurata<T extends { ora: string; ora_fine: string }>(f: T, durata?: number | null): T {
+  if (!durata) return f;
+  const dalle = f.ora || '08:00';
+  const [h, m] = dalle.split(':').map(Number); const tot = Math.min(h * 60 + m + durata, 23 * 60 + 59);
+  return { ...f, ora: dalle, ora_fine: `${String(Math.floor(tot / 60)).padStart(2, '0')}:${String(tot % 60).padStart(2, '0')}` };
+}
+
+let cacheAtt: AttivitaPred[] | null = null;
+/** Scelta dell'attività: elenco pronto raggruppato, con ricerca, più «Altro…» a testo libero. */
+export function SceltaAttivita({ valore, precedenti = [], onChange }: { valore: string; precedenti?: string[]; onChange: (nome: string, durata?: number | null) => void }) {
+  const { t } = useT();
+  const { data } = useLoad(async () => {
+    if (cacheAtt) return cacheAtt;
+    const r = await supabase.from('attivita_predefinite').select('id,nome,gruppo,durata_minuti,ordine,attiva').eq('attiva', true).order('ordine').order('nome');
+    cacheAtt = (r.data ?? []) as AttivitaPred[]; return cacheAtt;
+  }, []);
+  const lista = data ?? [];
+  const inElenco = lista.some(a => a.nome === valore);
+  const [libero, setLibero] = useState(!!valore && !inElenco && !!data);
+  const [cerca, setCerca] = useState('');
+  const q = cerca.trim().toLowerCase();
+  const filtrate = lista.filter(a => !q || a.nome.toLowerCase().includes(q) || (a.gruppo ?? '').toLowerCase().includes(q));
+  const gruppi = [...new Set(filtrate.map(a => a.gruppo ?? 'Altro'))];
+  const altro = libero || (!!valore && !!data && !inElenco);
+  return (
+    <div className="field">
+      <label>{t('Attività')}</label>
+      {lista.length > 6 && <input type="search" placeholder={t('Cerca attività…')} value={cerca} onChange={e => setCerca(e.target.value)} />}
+      <div className="att-scelta">
+        {gruppi.map(g => (
+          <div key={g}><div className="att-gruppo">{t(g)}</div>
+            <div className="wk-preset">{filtrate.filter(a => (a.gruppo ?? 'Altro') === g).map(a => (
+              <button type="button" key={a.id} className={`wk-chip${valore === a.nome ? ' on' : ''}`} onClick={() => { setLibero(false); onChange(a.nome, a.durata_minuti); }}>{a.nome}</button>
+            ))}</div></div>
+        ))}
+        <div className="wk-preset"><button type="button" className={`wk-chip${altro ? ' on' : ''}`} onClick={() => { setLibero(true); if (inElenco) onChange(''); }}>{t('Altro…')}</button></div>
+      </div>
+      {altro && <>
+        <input list="att-prec" autoFocus autoComplete="off" value={valore} onChange={e => onChange(e.target.value)} placeholder={t('Scrivi l\'attività')} />
+        <datalist id="att-prec">{precedenti.map(x => <option key={x} value={x} />)}</datalist></>}
     </div>
   );
 }

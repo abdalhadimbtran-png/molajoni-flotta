@@ -5,7 +5,7 @@ import { fascia, fmtGiorno, fmtOra, prossimoLavorativo, STATI_VEICOLO } from '..
 import { useT } from '../lib/i18n';
 import { SEL_VEICOLI, type Intervento, type Piano as TPiano, type RigaPiano, type Veicolo } from '../lib/tipi';
 import { Banner, Caricamento, Errore, Msgs, Pill, toast, useLoad } from '../ui';
-import Settimana, { CampiOrario, erroreOrario, sovrapposti } from './Settimana';
+import Settimana, { CampiOrario, SceltaAttivita, conDurata, erroreOrario, sovrapposti } from './Settimana';
 import PillPresenza, { presenzaDaNota, type Presenza } from './PillPresenza';
 
 /** Campi aggiunti a piano_giorno dal modulo ferie (migrazioni 0013-0014): mai il tipo di assenza. */
@@ -180,6 +180,7 @@ function NuovoIntervento({ giorno, tecnico, altri, onSalvato }: { giorno: string
   if (!aperto) return <button className="link" onClick={() => setAperto(true)}>{t('+ Aggiungi intervento')}</button>;
   async function salva(e: FormEvent) {
     e.preventDefault(); setErr(null);
+    if (!att.trim()) { setErr(t("Scegli o scrivi l'attività.")); return; }
     const eo = erroreOrario(ora, fine); if (eo) { setErr(t(eo)); return; }
     const sov = sovrapposti(ora, fine, altri);
     if (sov.length && !window.confirm(t('Attenzione: in questo orario il tecnico ha già «{l}». Salvare lo stesso?', { l: sov.map(x => `${fascia(x.ora, x.ora_fine)} ${x.luogo}`).join(', ') }))) return;
@@ -191,7 +192,7 @@ function NuovoIntervento({ giorno, tecnico, altri, onSalvato }: { giorno: string
     <form className="mini-form" onSubmit={salva}>
       <CampiOrario compatto dalle={ora} alle={fine} onChange={(a, b) => { setOra(a); setFine(b); }} />
       <input type="text" aria-label={t('Cliente / luogo')} placeholder={t('Cliente / luogo')} required value={luogo} onChange={e => setLuogo(e.target.value)} />
-      <input type="text" aria-label={t('Attività')} placeholder={t('Attività')} required value={att} onChange={e => setAtt(e.target.value)} />
+      <SceltaAttivita valore={att} onChange={(nome, durata) => { setAtt(nome); const x = conDurata({ ora, ora_fine: fine }, durata); setOra(x.ora); setFine(x.ora_fine); }} />
       <div className="row-flex"><button className="btn btn-sm">{t('Salva')}</button><button type="button" className="btn-ghost btn-sm" onClick={() => setAperto(false)}>{t('Annulla')}</button></div>
       {err && <div className="msg ko">{err}</div>}
     </form>

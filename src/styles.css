@@ -1226,3 +1226,17 @@ table.wk thead th { background:var(--surface-2); font-size:14px; }
 .wk-preset { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
 .wk-chip { border:1px solid var(--line-strong); background:var(--surface); border-radius:999px; padding:8px 12px; min-height:38px; font:inherit; font-size:13.5px; cursor:pointer; }
 .wk-chip.on { background:var(--ink); color:var(--surface); border-color:var(--ink); }
+.att-scelta { display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; padding:2px; }
+.att-gruppo { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-3); margin-top:2px; }
+.att-scelta .wk-preset { margin-top:4px; }
+.att-nuova { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; align-items:stretch; }
+.att-nuova input { flex:1 1 260px; min-height:48px; font-size:16px; }
+.att-nuova select, .att-lista select { min-height:44px; }
+.att-lista { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+.att-lista li { display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+.att-lista li.att-off { opacity:.6; }
+.att-frecce { display:flex; gap:4px; }
+.att-frecce button { min-width:44px; min-height:44px; justify-content:center; }
+.att-nome { flex:1 1 200px; font-size:15.5px; }
+.att-toggle { display:flex; align-items:center; gap:6px; min-height:44px; cursor:pointer; }
+.att-toggle input { width:22px; height:22px; }

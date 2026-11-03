@@ -1,0 +1,3 @@
+-- Il responsabile flotta crea/modifica i tecnici (solo dati di base). Applicata come migrazione flotta_gestisce_tecnici:
+-- ALTER POLICY dip_resp_tecnici with check (is_responsabile and categoria='TEC') + trigger dipendenti_guardia_flotta
+-- che blocca categoria, reparto, contratto, date, orario per chi non è HR/admin.

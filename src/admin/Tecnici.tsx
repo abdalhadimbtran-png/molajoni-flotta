@@ -13,9 +13,8 @@ interface RigaRichiesta { richiesta_id: number; dipendente_id: number; dal: stri
 const hhmm = (o: string | null) => (o ? o.slice(0, 5) : '');
 
 /**
- * Tecnici e conducenti. Dal 20/10/2026 i dati dei dipendenti (anche dei tecnici) li crea e modifica
- * solo l'ufficio personale o l'amministratore: il responsabile flotta li vede in sola lettura e
- * gestisce solo PIN e scheda dell'app. Le assenze arrivano dall'ufficio personale (sola lettura).
+ * Tecnici e conducenti. Dal 03/11/2026 il responsabile flotta crea e modifica i tecnici (dati di base,
+ * PIN, scheda app); contratto, date e orario restano all'ufficio personale (trigger dipendenti_guardia_flotta). Le assenze arrivano dall'ufficio personale (sola lettura).
  */
 export default function Tecnici() {
   const { t, tm } = useT();
@@ -26,12 +25,13 @@ export default function Tecnici() {
   const [mostraInattivi, setMostraInattivi] = useState(false);
   const { data, errore, reload } = useLoad(async () => {
     const oggi = oggiISO();
-    const [tc, a, rq, hr] = await Promise.all([
+    const [tc, a, rq, hr, fl] = await Promise.all([
       supabase.from('tecnici').select(SEL_TECNICI).order('cognome'),
       supabase.from('assenze').select('id,tecnico_id,dal,al').gte('al', oggi).order('dal'),
       supabase.from('assenze_da_richieste').select('richiesta_id,dipendente_id,dal,al,tipo_riga,etichetta,ora_inizio,ora_fine')
         .eq('attiva', true).in('tipo_riga', ['possibile', 'nota']).gte('al', oggi).order('dal'),
       supabase.rpc('is_hr'),
+      supabase.rpc('is_responsabile'),
     ]);
     if (tc.error) throw tc.error; if (a.error) throw a.error;
     const righe: RigaAssenza[] = [
@@ -48,7 +48,7 @@ export default function Tecnici() {
       try { rientri[al] = await rpc<string>('prossimo_lavorativo', { p_da: al }); } catch { rientri[al] = prossimoLavorativo(al); }
     }));
     righe.forEach(r => { if (!r.fascia) r.rientro = rientri[r.al] ?? null; });
-    return { tecnici: tc.data as Tecnico[], assenze: righe, modifica: !hr.error && hr.data === true };
+    return { tecnici: tc.data as Tecnico[], assenze: righe, modifica: (!hr.error && hr.data === true) || (!fl.error && fl.data === true) };
   });
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data) return <Caricamento />;

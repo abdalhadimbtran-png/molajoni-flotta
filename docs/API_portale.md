@@ -32,7 +32,10 @@ Errori: eccezione con messaggio in italiano pronto da mostrare.
 | `hr_calendario` | `p_da, p_a, p_categoria?, p_dipendente?` |
 | `hr_saldi` | `p_anno, p_categoria?, p_dipendente?, p_alla?` |
 | `hr_rettifica_saldo` | `p_dipendente, p_anno, p_tipo, p_quantita, p_motivo` |
-| `hr_report` | `p_tipo ('riepilogo'/'presenze'/'registro'), p_da, p_a, p_categoria?, p_dipendente?` |
+| `hr_report` | `p_tipo ('riepilogo'/'presenze'/'registro'/'ingiustificate'), p_da, p_a, p_categoria?, p_dipendente?` (riepilogo: anche `ing_gg`, `ing_ore`) |
+| `hr_registra_ingiustificata` | `p_dipendente, p_primo_giorno, p_rientro?, p_ora_inizio?, p_ora_fine?, p_mezza_giornata=false, p_meta?, p_note?` → tipo `ING`, già approvata, nessun saldo, nessuna email |
+| `hr_anteprima_conversione` | `p_id, p_tipo ('FERIE'/'ROL'/'EXF')` → come `hr_anteprima`; `ok=false` se il saldo non basta |
+| `hr_converti_ingiustificata` | `p_id, p_tipo, p_note?` → originale `annullata` con `convertita_in`, nuova approvata con `convertita_da` |
 | `hr_imposta_pin` / `hr_genera_pin` / `hr_sblocca_accesso` | `p_dipendente[, p_pin]` |
 | `hr_genera_festivita` | `p_anno` → integer |
 
@@ -50,3 +53,5 @@ Notifiche al responsabile flotta per assenze approvate/annullate: `link = /piano
 - `/push` (solo database, header segreto) · `/foto`, `/documento` (token tecnico).
 
 Nota: le RPC `hr_*` hanno EXECUTE anche per `anon` (grant di default), ma rifiutano chi non è HR.
+
+Assenza ingiustificata (`ING`): solo HR, mai richiedibile (vincolo), unità ore; la flotta vede solo "Assente". Annullo con `hr_annulla_richiesta` (motivo obbligatorio).

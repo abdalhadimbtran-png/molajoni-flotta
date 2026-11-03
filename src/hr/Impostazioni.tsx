@@ -145,7 +145,7 @@ function TipiAssenza() {
     const { error } = await supabase.from('tipi_assenza').update({ [campo]: v }).eq('codice', t.codice);
     if (error) toast(erroreHR(error)); else reload();
   }
-  const fissi = ['FERIE', 'ROL'];
+  const fissi = ['FERIE', 'ROL', 'ING'];
   return (
     <section className="panel">
       <div className="hr-panel-h"><h2>Tipi di assenza</h2></div>

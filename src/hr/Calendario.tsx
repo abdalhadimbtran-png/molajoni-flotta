@@ -24,6 +24,7 @@ export default function Calendario() {
   const [vista, setVista] = useState<'mese' | 'elenco'>(() => (window.innerWidth < 900 ? 'elenco' : 'mese'));
   const [aperta, setAperta] = useState<AssenzaCal | null>(null);
   const [inserisci, setInserisci] = useState(false);
+  const [ingiust, setIngiust] = useState(false);
   const da = `${mese}-01`, a = ultimoDelMese(mese);
   const { data, errore, reload } = useLoad(async () => {
     const [c, d] = await Promise.all([
@@ -50,7 +51,8 @@ export default function Calendario() {
     <>
       <div className="page-hero">
         <div><h1>Calendario assenze</h1><p className="sub">Chi manca e quando. Le richieste in valutazione hanno il bordo tratteggiato.</p></div>
-        <button className="btn" onClick={() => setInserisci(true)}>Inserisci un'assenza</button>
+        <div className="row-flex"><button className="btn" onClick={() => setInserisci(true)}>Inserisci un'assenza</button>
+          <button className="btn-ghost" onClick={() => setIngiust(true)}>Registra assenza ingiustificata</button></div>
       </div>
 
       <div className="hr-barra no-print">
@@ -119,6 +121,7 @@ export default function Calendario() {
         <div className="form"><dl className="riepilogo"><dt>Motivo</dt><dd>{aperta.etichetta}</dd><dt>Dal</dt><dd>{giornoLungo(aperta.dal)}</dd><dt>Al</dt><dd>{giornoLungo(aperta.al)}</dd></dl>
           <p className="hint">Inserita a mano dal responsabile flotta prima del modulo ferie. Per correggerla contatta il responsabile flotta.</p></div>
       </Modal>}
+      {ingiust && <ModaleInserisci ingiustificata preDipendente={evid ?? undefined} onClose={() => setIngiust(false)} onSalvato={() => { setIngiust(false); reload(); }} />}
       {inserisci && <ModaleInserisci preDipendente={evid ?? undefined} onClose={() => setInserisci(false)} onSalvato={() => { setInserisci(false); reload(); }} />}
     </>
   );
@@ -128,7 +131,7 @@ function Legenda() {
   return (
     <div className="cal-legenda" aria-label="Legenda">
       <span><i className="cal-x cal-f">F</i> Ferie</span><span><i className="cal-x cal-p">P</i> Permesso a ore o mezza giornata</span>
-      <span><i className="cal-x cal-f cal-m">M</i> Malattia</span><span><i className="cal-x cal-f">A</i> Altra assenza</span>
+      <span><i className="cal-x cal-f cal-m">M</i> Malattia</span><span><i className="cal-x cal-f">A</i> Altra assenza</span><span><i className="cal-x cal-f cal-m">I</i> Assenza ingiustificata</span>
       <span><i className="cal-x cal-f cal-v">F</i> In valutazione</span><span><i className="cal-x cal-off-i" /> Riposo o festività</span>
     </div>
   );

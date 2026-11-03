@@ -7,7 +7,7 @@ import { CATEGORIE, fmtQ, giornoLungo, nomeCategoria, type Unita } from './comun
 import { erroreHR } from './componenti';
 
 /** Report del personale: stessi file premium (Excel e PDF con logo) del centro report flotta. */
-type Id = 'riepilogo' | 'presenze' | 'registro' | 'consumi_veicoli' | 'spesa_mensile';
+type Id = 'riepilogo' | 'presenze' | 'registro' | 'ingiustificate' | 'consumi_veicoli' | 'spesa_mensile';
 const CARBURANTE: Id[] = ['consumi_veicoli', 'spesa_mensile'];
 const n = (v: unknown) => Number(v ?? 0) || 0;
 const somma = (r: Riga[], k: string) => r.reduce((s, x) => s + n(x[k]), 0);
@@ -22,10 +22,22 @@ const REPORT: (Report & { hrId: Id })[] = [
       { k: 'giorni_lavorativi_periodo', l: 'Giorni lavorativi', t: 'num', tot: true, w: 9 }, { k: 'giorni_presenza', l: 'Presenze (gg)', t: 'dec1', tot: true, w: 9 },
       { k: 'ferie', l: 'Ferie (gg)', t: 'dec1', tot: true, w: 8 }, { k: 'rol', l: 'ROL (ore)', t: 'dec1', tot: true, w: 8 }, { k: 'exf', l: 'Ex fest. (ore)', t: 'dec1', tot: true, w: 8 },
       { k: 'pnr', l: 'Non retrib. (ore)', t: 'dec1', tot: true, w: 9 }, { k: 'mal', l: 'Malattia (gg)', t: 'dec1', tot: true, w: 9 }, { k: 'altro', l: 'Altre assenze (gg)', t: 'dec1', tot: true, w: 9 },
+      { k: 'ing_testo', l: 'Ingiustificate (gg/ore)', t: 'testo', w: 11 },
       { k: 'giorni_assenza_manuali', l: 'Assenze flotta (gg)', t: 'num', tot: true, w: 9 }, { k: 'richieste_in_attesa', l: 'In valutazione', t: 'num', tot: true, w: 8 },
       { k: 'saldo_ferie', l: 'Saldo ferie (gg)', t: 'dec1', w: 9 }, { k: 'saldo_rol', l: 'Saldo ROL (ore)', t: 'dec1', w: 9 }, { k: 'saldo_exf', l: 'Saldo ex fest. (ore)', t: 'dec1', w: 9 },
     ],
-    riepilogo: r => [{ l: 'Dipendenti', v: String(r.length) }, { l: 'Giorni di ferie', v: fmtN(somma(r, 'ferie')) }, { l: 'Ore di permesso', v: fmtN(somma(r, 'rol') + somma(r, 'exf') + somma(r, 'pnr')) }, { l: 'Giorni di malattia', v: fmtN(somma(r, 'mal')) }],
+    riepilogo: r => [{ l: 'Dipendenti', v: String(r.length) }, { l: 'Giorni di ferie', v: fmtN(somma(r, 'ferie')) }, { l: 'Ore di permesso', v: fmtN(somma(r, 'rol') + somma(r, 'exf') + somma(r, 'pnr')) }, { l: 'Giorni di malattia', v: fmtN(somma(r, 'mal')) }, ...(somma(r, 'ing_ore') ? [{ l: 'Ingiustificate', v: `${fmtN(somma(r, 'ing_gg'))} gg / ${fmtN(somma(r, 'ing_ore'))} h` }] : [])],
+  },
+  {
+    hrId: 'ingiustificate', id: 'hr_ingiustificate', gruppo: 'Tecnici', titolo: 'Assenze ingiustificate', periodo: 'intervallo', filtri: {}, orizzontale: true,
+    descrizione: 'Assenze ingiustificate da trattenere in busta paga, giorno per giorno, con i totali per dipendente. Annullate e convertite restano per traccia ma non contano.',
+    colonne: [
+      { k: 'data', l: 'Data', t: 'data', w: 10 }, { k: 'dipendente', l: 'Dipendente', t: 'testo', w: 18 }, { k: 'codice', l: 'Codice', t: 'testo', w: 8 }, { k: 'cat', l: 'Categoria', t: 'testo', w: 9 },
+      { k: 'orario', l: 'Orario', t: 'testo', w: 9 }, { k: 'giorni', l: 'Giorni', t: 'dec1', tot: true, w: 7 }, { k: 'ore', l: 'Ore', t: 'dec1', tot: true, w: 7 },
+      { k: 'stato_testo', l: 'Stato', t: 'testo', w: 16 }, { k: 'nota', l: 'Nota', t: 'testo', w: 20 }, { k: 'registrata_da', l: 'Registrata da', t: 'testo', w: 12 }, { k: 'numero', l: 'Numero', t: 'testo', w: 11 },
+    ],
+    raggruppa: { k: 'dipendente', etichetta: r => `${r.dipendente} · ${r.codice ?? ''}` },
+    riepilogo: r => { const reg = r.filter(x => x.stato === 'Registrata'); return [{ l: 'Dipendenti', v: String(new Set(reg.map(x => x.codice)).size) }, { l: 'Giorni da trattenere', v: fmtN(somma(reg, 'giorni')) }, { l: 'Ore da trattenere', v: fmtN(somma(reg, 'ore')) }, { l: 'Annullate o convertite', v: String(r.length - reg.length) }]; },
   },
   {
     hrId: 'presenze', id: 'hr_presenze', gruppo: 'Tecnici', titolo: 'Presenze giorno per giorno', periodo: 'intervallo', filtri: {}, orizzontale: true,
@@ -62,6 +74,8 @@ function intervallo(p: Preset): [string, string] {
 const STATO_TESTO: Record<string, string> = { 'In attesa': 'In valutazione', 'Non approvata': 'Rifiutata' };
 function normalizza(id: Id, r: Riga): Riga {
   const x = { ...r, cat: nomeCategoria(String(r.categoria)) };
+  if (id === 'riepilogo') return { ...x, ing_testo: n(r.ing_ore) ? `${fmtN(n(r.ing_gg))} gg / ${fmtN(n(r.ing_ore))} h` : '' };
+  if (id === 'ingiustificate') return { ...x, stato_testo: r.esito ? `${r.stato} · ${r.esito}` : r.stato };
   if (id === 'registro') return { ...x, q: fmtQ(n(r.quantita), r.unita as Unita), motivo: r.motivo_decisione ?? r.motivo_annullamento ?? '', stato: STATO_TESTO[String(r.stato)] ?? r.stato };
   return x;
 }

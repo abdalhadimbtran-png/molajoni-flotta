@@ -266,7 +266,7 @@ function SchedaDipendente({ x, onClose, onModifica }: { x: Dipendente; onClose: 
             <thead><tr><th>Tipo</th><th>Periodo</th><th>Quantità</th><th>Stato</th></tr></thead>
             <tbody>{data.richieste.map(r => (
               <tr key={r.id} className="hr-click" onClick={() => setDet(r.id)}><td>{nomeTipo(r.tipo_descrizione)}<div className="sub">{r.numero} · {testoQuando(r.creato_il.slice(0, 10))}</div></td>
-                <td>{periodo(r)}</td><td>{fmtQ(r.quantita, r.unita)}</td><td><PillStato stato={r.stato} /></td></tr>))}</tbody>
+                <td>{periodo(r)}</td><td>{fmtQ(r.quantita, r.unita)}</td><td><PillStato stato={r.stato} tipo={r.tipo} motivo={r.motivo_annullamento} /></td></tr>))}</tbody>
           </table></div> : <p className="sub">Nessuna richiesta.</p>}
         </>}
         <div className="row-flex"><button className="btn-ghost" onClick={onModifica}>Modifica dati</button></div>

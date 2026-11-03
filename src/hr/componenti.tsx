@@ -3,11 +3,11 @@ import { supabase, rpc, testoErrore } from '../lib/supabase';
 import { oggiISO } from '../lib/format';
 import { Banner, Modal, Pill, toast } from '../ui';
 import {
-  SEL_DIP, STATI, categoriaReparto, fmtQ, giornoBreve, giornoLungo, nomeTipo, num, periodo, piuGiorni, prossimoLavorativo, testoQuando,
+  ING, SEL_DIP, TIPI_CONVERSIONE, categoriaReparto, statoTesto, fmtQ, giornoBreve, giornoLungo, nomeTipo, num, periodo, piuGiorni, prossimoLavorativo, testoQuando,
   type Anteprima, type Dipendente, type Impatto, type Richiesta, type Stato, type TipoAssenza,
 } from './comune';
 
-export const PillStato = ({ stato }: { stato: Stato }) => <Pill s={STATI[stato][0]}>{STATI[stato][1]}</Pill>;
+export const PillStato = ({ stato, tipo, motivo }: { stato: Stato; tipo?: string | null; motivo?: string | null }) => { const [l, t] = statoTesto(stato, tipo, motivo); return <Pill s={l}>{t}</Pill>; };
 
 /** Testo di errore leggibile per le funzioni hr_* (mai codici a schermo). */
 export function erroreHR(e: unknown): string {
@@ -108,7 +108,7 @@ export function RiepilogoRichiesta({ r }: { r: Richiesta }) {
       {!r.ora_inizio && !r.mezza_giornata && <><dt>Rientro</dt><dd>{giornoLungo(r.rientro)}</dd></>}
       <dt>Conteggio</dt><dd>{fmtQ(r.quantita, r.unita)}</dd>
       {r.note && <><dt>{r.tipo === 'MAL' ? 'Protocollo' : 'Nota'}</dt><dd><i>«{r.note}»</i></dd></>}
-      <dt>Stato</dt><dd><PillStato stato={r.stato} /></dd>
+      <dt>Stato</dt><dd><PillStato stato={r.stato} tipo={r.tipo} motivo={r.motivo_annullamento} /></dd>
     </dl>
   );
 }
@@ -137,11 +137,18 @@ export function ModaleDettaglio({ id, mio, onClose, onCambiato }: { id: number; 
   const [err, setErr] = useState<string | null>(null);
   const [rifiuta, setRifiuta] = useState(false);
   const [annulla, setAnnulla] = useState(false);
+  const [converti, setConverti] = useState(false);
+  const [legami, setLegami] = useState<{ in?: string; da?: string }>({});
   const [invio, setInvio] = useState(false);
   useEffect(() => {
-    supabase.from('richieste_assenza').select('stato,dipendente_id,primo_giorno,ultimo_giorno').eq('id', id).single()
+    supabase.from('richieste_assenza').select('stato,dipendente_id,primo_giorno,ultimo_giorno,convertita_in,convertita_da').eq('id', id).single()
       .then(async ({ data, error }) => {
         if (error || !data) { setErr(erroreHR(error)); return; }
+        const altri = [data.convertita_in, data.convertita_da].filter(Boolean) as number[];
+        if (altri.length) supabase.from('richieste_assenza').select('id,numero').in('id', altri).then(q => {
+          const m = new Map((q.data ?? []).map(y => [y.id as number, y.numero as string]));
+          setLegami({ in: data.convertita_in ? m.get(data.convertita_in) : undefined, da: data.convertita_da ? m.get(data.convertita_da) : undefined });
+        });
         const l = await rpc<Richiesta[]>('hr_richieste', { p_stato: data.stato, p_da: data.primo_giorno, p_a: data.ultimo_giorno, p_dipendente: data.dipendente_id });
         const x = l.find(y => y.id === id); if (x) setR(x); else setErr('Richiesta non trovata.');
       }).then(undefined, e => setErr(erroreHR(e)));
@@ -152,6 +159,8 @@ export function ModaleDettaglio({ id, mio, onClose, onCambiato }: { id: number; 
   }
   if (rifiuta && r) return <ModaleRifiuto nome={r.dipendente.nome} onClose={() => setRifiuta(false)} onConferma={async m => { await decidi(r, 'rifiuta', m); onCambiato(); }} />;
   if (annulla && r) return <ModaleAnnulla r={r} onClose={() => setAnnulla(false)} onFatto={onCambiato} />;
+  if (converti && r) return <ModaleConverti r={r} onClose={() => setConverti(false)} onFatto={onCambiato} />;
+  const ing = r?.tipo === ING;
   return (
     <Modal titolo={r ? `${nomeTipo(r.tipo_descrizione)} · ${r.dipendente.nome}` : 'Richiesta'} onClose={onClose}>
       {err && <Banner s="ko">{err}</Banner>}
@@ -160,11 +169,14 @@ export function ModaleDettaglio({ id, mio, onClose, onCambiato }: { id: number; 
         <RiepilogoRichiesta r={r} />
         {r.saldi?.map(s => <div key={s.anno} className={`msg ${s.saldo_dopo_approvazione < 0 ? 'warn' : 'info'}`}>Saldo {s.anno}: {num(s.saldo)} → {num(s.saldo_dopo_approvazione)} {r.unita === 'ore' ? 'ore' : 'giorni'}</div>)}
         <StoriaRichiesta r={r} />
+        {legami.in && <div className="msg info">Convertita nella richiesta approvata {legami.in}.</div>}
+        {legami.da && <div className="msg info">Nata dalla conversione dell'assenza ingiustificata {legami.da}.</div>}
         <AvvisoDecisore r={r} mio={mio} />
         {r.puo_decidere && <div className="row-flex">
           {r.stato === 'in_attesa' && <><button className="btn" onClick={approva} disabled={invio}>{invio ? 'Salvataggio…' : 'Approva'}</button>
             <button className="btn-ghost" onClick={() => setRifiuta(true)}>Rifiuta</button></>}
-          {(r.stato === 'approvata' || r.stato === 'in_attesa') && <button className="btn-ghost" onClick={() => setAnnulla(true)}>{r.stato === 'approvata' ? "Annulla l'assenza" : 'Annulla la richiesta'}</button>}
+          {ing && r.stato === 'approvata' && <button className="btn" onClick={() => setConverti(true)}>Converti in ferie/permesso</button>}
+          {(r.stato === 'approvata' || r.stato === 'in_attesa') && <button className="btn-ghost" onClick={() => setAnnulla(true)}>{ing ? 'Annulla' : r.stato === 'approvata' ? "Annulla l'assenza" : 'Annulla la richiesta'}</button>}
         </div>}
       </div>}
     </Modal>
@@ -187,7 +199,7 @@ export function ModaleAnnulla({ r, onClose, onFatto }: { r: Richiesta; onClose: 
   return (
     <Modal titolo={`Annullare l'assenza di ${nome}?`} onClose={onClose}>
       <div className="form">
-        <p>{nome} riceve una notifica{r.unita && r.tipo !== 'MAL' ? ' e i giorni tornano nel saldo' : ''}. {nomeTipo(r.tipo_descrizione)} · {periodo(r)}.</p>
+        <p>{nome} riceve una notifica{r.tipo === ING ? " e l'assenza non verrà più trattenuta (resta nello storico come annullata)" : r.unita && r.tipo !== 'MAL' ? ' e i giorni tornano nel saldo' : ''}. {nomeTipo(r.tipo_descrizione)} · {periodo(r)}.</p>
         <div className="field"><label htmlFor="ann-mot">Motivo (lo vede il dipendente)</label>
           <input id="ann-mot" value={motivo} maxLength={500} onChange={e => setMotivo(e.target.value)} placeholder="Es. inserita per errore" /></div>
         {err && <Banner s="ko">{err}</Banner>}
@@ -198,14 +210,52 @@ export function ModaleAnnulla({ r, onClose, onFatto }: { r: Richiesta; onClose: 
   );
 }
 
+/** Conversione di un'assenza ingiustificata in ferie o permesso: anteprima del saldo, consentita solo con saldo sufficiente. */
+export function ModaleConverti({ r, onClose, onFatto }: { r: Richiesta; onClose: () => void; onFatto: () => void }) {
+  const [tipo, setTipo] = useState(r.ora_inizio ? 'ROL' : 'FERIE');
+  const [ant, setAnt] = useState<Anteprima | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [invio, setInvio] = useState(false);
+  useEffect(() => {
+    let vivo = true; setAnt(null); setErr(null);
+    rpc<Anteprima>('hr_anteprima_conversione', { p_id: r.id, p_tipo: tipo }).then(a => { if (vivo) setAnt(a); }).catch(e => { if (vivo) setErr(erroreHR(e)); });
+    return () => { vivo = false; };
+  }, [r.id, tipo]);
+  async function conferma() {
+    setInvio(true); setErr(null);
+    try { const x = await rpc<{ messaggio: string }>('hr_converti_ingiustificata', { p_id: r.id, p_tipo: tipo }); toast(x.messaggio); onFatto(); }
+    catch (e) { setErr(erroreHR(e)); setInvio(false); }
+  }
+  return (
+    <Modal titolo={`Converti l'assenza di ${r.dipendente.nome}`} onClose={onClose}>
+      <div className="form">
+        <p>{r.numero} · {periodo(r)} · {fmtQ(r.quantita, r.unita)}. L'assenza ingiustificata resta nello storico come «convertita», collegata alla nuova richiesta approvata.</p>
+        <div className="field"><span className="lbl-sm">Converti in</span>
+          <div className="segmented" role="group" aria-label="Tipo">{TIPI_CONVERSIONE.map(([k, l]) => <button type="button" key={k} className={tipo === k ? 'on' : ''} aria-pressed={tipo === k} onClick={() => setTipo(k)}>{l}</button>)}</div></div>
+        <div className="hr-anteprima" aria-live="polite">
+          {!ant && !err && <span className="sub">Calcolo…</span>}
+          {ant && <>
+            {ant.ok && <div className="ph-msg info"><b>{fmtQ(ant.quantita, ant.unita)}</b> di {nomeTipo(ant.tipo_descrizione).toLowerCase()}</div>}
+            {ant.saldi.map(s => <div key={s.anno} className="mini-stat hr-mini"><span>Saldo {s.anno} oggi <b>{num(s.saldo)}</b></span><span>Dopo la conversione <b className={s.saldo_dopo < 0 ? 'hr-neg' : ''}>{num(s.saldo_dopo)}</b> {ant.unita === 'ore' ? 'ore' : 'giorni'}</span></div>)}
+            {ant.errori.map((x, i) => <div key={i} className="msg ko" role="alert">{x}</div>)}
+          </>}
+        </div>
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn" onClick={conferma} disabled={!ant?.ok || invio}>{invio ? 'Salvataggio…' : 'Converti'}</button>
+          <button className="btn-ghost" onClick={onClose}>Annulla</button></div>
+      </div>
+    </Modal>
+  );
+}
+
 // ---------- Inserisci un'assenza per conto di un dipendente ----------
 type Modo = 'giorni' | 'mezza' | 'ore';
-export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipendente?: number; onClose: () => void; onSalvato: () => void }) {
+export function ModaleInserisci({ preDipendente, ingiustificata, onClose, onSalvato }: { preDipendente?: number; ingiustificata?: boolean; onClose: () => void; onSalvato: () => void }) {
   const [dip, setDip] = useState<Dipendente[]>([]);
   const [tipi, setTipi] = useState<TipoAssenza[]>([]);
   const [fest, setFest] = useState<Set<string>>(new Set());
   const [cerca, setCerca] = useState('');
-  const [f, setF] = useState({ dip: preDipendente ? String(preDipendente) : '', tipo: 'FERIE', modo: 'giorni' as Modo, primo: '', rientro: '', rientroMano: false, dalle: '09:00', alle: '11:00', meta: 'mattina' as 'mattina' | 'pomeriggio', note: '', approva: true });
+  const [f, setF] = useState({ dip: preDipendente ? String(preDipendente) : '', tipo: ingiustificata ? ING : 'FERIE', modo: 'giorni' as Modo, primo: '', rientro: '', rientroMano: false, dalle: '09:00', alle: '11:00', meta: 'mattina' as 'mattina' | 'pomeriggio', note: '', approva: true });
   const [ant, setAnt] = useState<Anteprima | null>(null);
   const [calcolo, setCalcolo] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -216,13 +266,13 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
       supabase.from('tipi_assenza').select('*').eq('attivo', true).order('ordine'),
       supabase.from('festivita').select('data').eq('attiva', true).gte('data', piuGiorni(oggiISO(), -60)).lte('data', piuGiorni(oggiISO(), 500)),
     ]).then(([d, t, fe]) => {
-      setDip((d.data ?? []) as Dipendente[]); setTipi((t.data ?? []) as TipoAssenza[]);
+      setDip((d.data ?? []) as Dipendente[]); setTipi(((t.data ?? []) as TipoAssenza[]).filter(x => ingiustificata ? x.codice === ING : x.codice !== ING));
       setFest(new Set((fe.data ?? []).map((x: { data: string }) => x.data)));
     });
   }, []);
   const tipo = tipi.find(x => x.codice === f.tipo);
   const persona = dip.find(x => String(x.id) === f.dip);
-  const modi: [Modo, string][] = tipo?.unita === 'ore' ? [['ore', 'A ore'], ['giorni', 'Giorni interi']] : tipo?.mezza_giornata ? [['giorni', 'Giorni interi'], ['mezza', 'Mezza giornata']] : [['giorni', 'Giorni interi']];
+  const modi: [Modo, string][] = ingiustificata ? [['giorni', 'Giorni interi'], ['mezza', 'Mezza giornata'], ['ore', 'A ore']] : tipo?.unita === 'ore' ? [['ore', 'A ore'], ['giorni', 'Giorni interi']] : tipo?.mezza_giornata ? [['giorni', 'Giorni interi'], ['mezza', 'Mezza giornata']] : [['giorni', 'Giorni interi']];
   const modo: Modo = modi.some(m => m[0] === f.modo) ? f.modo : modi[0][0];
 
   function setPrimo(v: string) {
@@ -247,7 +297,10 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
     e.preventDefault(); if (!ant?.ok) return;
     setInvio(true); setErr(null);
     try {
-      const x = await rpc<{ messaggio: string }>('hr_inserisci_richiesta', { p_dipendente: Number(f.dip), p_tipo: f.tipo, p_primo_giorno: f.primo,
+      const comune = { p_dipendente: Number(f.dip), p_primo_giorno: f.primo,
+        p_rientro: modo === 'giorni' ? f.rientro : null, p_ora_inizio: modo === 'ore' ? f.dalle : null, p_ora_fine: modo === 'ore' ? f.alle : null,
+        p_mezza_giornata: modo === 'mezza', p_meta: modo === 'mezza' ? f.meta : null, p_note: f.note.trim() || null };
+      const x = ingiustificata ? await rpc<{ messaggio: string }>('hr_registra_ingiustificata', comune) : await rpc<{ messaggio: string }>('hr_inserisci_richiesta', { p_dipendente: Number(f.dip), p_tipo: f.tipo, p_primo_giorno: f.primo,
         p_rientro: modo === 'giorni' ? f.rientro : null, p_ora_inizio: modo === 'ore' ? f.dalle : null, p_ora_fine: modo === 'ore' ? f.alle : null,
         p_mezza_giornata: modo === 'mezza', p_meta: modo === 'mezza' ? f.meta : null, p_note: f.note.trim() || null, p_approva: f.approva });
       toast(x.messaggio); onSalvato();
@@ -256,16 +309,16 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
   const filtrati = dip.filter(x => !cerca || `${x.nome} ${x.cognome} ${x.codice}`.toLowerCase().includes(cerca.toLowerCase()));
   const mal = f.tipo === 'MAL';
   return (
-    <Modal titolo="Inserisci un'assenza" onClose={onClose}>
+    <Modal titolo={ingiustificata ? 'Registra assenza ingiustificata' : "Inserisci un'assenza"} onClose={onClose}>
       <form className="form" onSubmit={salva}>
         <div className="form grid2">
           <div className="field"><label htmlFor="ins-cerca">Cerca dipendente</label><input id="ins-cerca" value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Nome o codice" /></div>
           <div className="field"><label htmlFor="ins-dip">Dipendente</label>
             <select id="ins-dip" required value={f.dip} onChange={e => setF({ ...f, dip: e.target.value, primo: '', rientro: '', rientroMano: false })}>
               <option value="">Scegli…</option>{filtrati.map(x => <option key={x.id} value={x.id}>{x.cognome} {x.nome} · {x.codice}</option>)}</select></div>
-          <div className="field"><label htmlFor="ins-tipo">Tipo di assenza</label>
+          {ingiustificata ? <div className="field"><span className="lbl-sm">Tipo di assenza</span><b>Assenza ingiustificata</b></div> : <div className="field"><label htmlFor="ins-tipo">Tipo di assenza</label>
             <select id="ins-tipo" value={f.tipo} onChange={e => setF({ ...f, tipo: e.target.value })}>
-              {tipi.map(x => <option key={x.codice} value={x.codice}>{nomeTipo(x.descrizione)}</option>)}</select></div>
+              {tipi.map(x => <option key={x.codice} value={x.codice}>{nomeTipo(x.descrizione)}</option>)}</select></div>}
           <div className="field"><span className="lbl-sm">Durata</span>
             <div className="segmented" role="group" aria-label="Durata">{modi.map(([k, l]) => <button type="button" key={k} className={modo === k ? 'on' : ''} onClick={() => setF({ ...f, modo: k })}>{l}</button>)}</div></div>
           <div className="field"><label htmlFor="ins-primo">{modo === 'giorni' ? 'Primo giorno di assenza' : 'Giorno'}</label>
@@ -287,7 +340,7 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
               <div><b>{fmtQ(ant.quantita, ant.unita)}</b> di {nomeTipo(ant.tipo_descrizione).toLowerCase()}{ant.festivita_escluse.length ? ` · Non contano: ${ant.festivita_escluse.map(x => `${testoQuando(x.data).slice(0, 5)} (${x.nome})`).join(', ')}` : ''}</div>
             </div>}
             {ant.saldi.map(s => <div key={s.anno} className="mini-stat hr-mini"><span>Saldo {s.anno} oggi <b>{num(s.saldo)}</b></span><span>Dopo questa <b className={s.saldo_dopo < 0 ? 'hr-neg' : ''}>{num(s.saldo_dopo)}</b></span></div>)}
-            {tipo && !tipo.con_saldo && ant.ok && <p className="sub">Questa assenza non tocca il saldo di ferie e permessi.</p>}
+            {tipo && !tipo.con_saldo && ant.ok && <p className="sub">{ingiustificata ? 'Non tocca il saldo di ferie e permessi: viene trattenuta in busta paga.' : 'Questa assenza non tocca il saldo di ferie e permessi.'}</p>}
             {ant.errori.map((x, i) => <div key={i} className="msg ko" role="alert">{x}</div>)}
             {ant.avvisi.filter(x => !x.startsWith('Festività non conteggiate')).map((x, i) => <div key={i} className="msg warn">{x}</div>)}
           </>}
@@ -296,10 +349,10 @@ export function ModaleInserisci({ preDipendente, onClose, onSalvato }: { preDipe
         <div className="field"><label htmlFor="ins-note">{mal ? 'Numero di protocollo del certificato (se c\'è)' : 'Nota (facoltativa)'}</label>
           <input id="ins-note" value={f.note} maxLength={500} onChange={e => setF({ ...f, note: e.target.value })} placeholder={mal ? 'Es. 123456789' : 'Es. comunicata al telefono'} />
           {mal && <span className="hint" style={{ marginTop: 0 }}>Mai la diagnosi: basta il numero di protocollo.</span>}</div>
-        <label className="chk"><input type="checkbox" checked={f.approva} onChange={e => setF({ ...f, approva: e.target.checked })} /> Approvata subito</label>
-        <p className="hint" style={{ marginTop: 0 }}>Il dipendente riceve una notifica nell'app.</p>
+        {!ingiustificata && <label className="chk"><input type="checkbox" checked={f.approva} onChange={e => setF({ ...f, approva: e.target.checked })} /> Approvata subito</label>}
+        <p className="hint" style={{ marginTop: 0 }}>{ingiustificata ? 'Il dipendente la vede nel suo storico come «Assenza ingiustificata»; il responsabile flotta vede solo «Assente».' : "Il dipendente riceve una notifica nell'app."}</p>
         {err && <Banner s="ko">{err}</Banner>}
-        <div className="row-flex"><button className="btn" disabled={!ant?.ok || invio || calcolo}>{invio ? 'Salvataggio…' : 'Salva assenza'}</button>
+        <div className="row-flex"><button className="btn" disabled={!ant?.ok || invio || calcolo}>{invio ? 'Salvataggio…' : ingiustificata ? 'Registra' : 'Salva assenza'}</button>
           <button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
       </form>
     </Modal>

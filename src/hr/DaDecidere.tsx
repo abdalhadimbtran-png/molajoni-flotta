@@ -15,6 +15,7 @@ export default function DaDecidere() {
   const [cerca, setCerca] = useState('');
   const [rifiuta, setRifiuta] = useState<Richiesta | null>(null);
   const [inserisci, setInserisci] = useState(false);
+  const [ingiust, setIngiust] = useState(false);
   const [uscita, setUscita] = useState<Set<number>>(new Set());
   const [occupato, setOccupato] = useState<number | null>(null);
   const { data, errore, reload } = useLoad(async () => {
@@ -47,7 +48,8 @@ export default function DaDecidere() {
       <div className="page-hero">
         <div><h1>Da decidere</h1>
           <p className="sub">{tot === 0 ? 'Nessuna richiesta in attesa' : tot === 1 ? '1 richiesta aspetta una risposta' : `${tot} richieste aspettano una risposta`}</p></div>
-        <button className="btn-ghost" onClick={() => setInserisci(true)}>Inserisci un'assenza</button>
+        <div className="row-flex"><button className="btn-ghost" onClick={() => setInserisci(true)}>Inserisci un'assenza</button>
+          <button className="btn-ghost" onClick={() => setIngiust(true)}>Registra assenza ingiustificata</button></div>
       </div>
 
       {data.lista.length > 10 && <div className="field hr-cerca"><label htmlFor="dd-cerca">Cerca per nome</label><input id="dd-cerca" value={cerca} onChange={e => setCerca(e.target.value)} /></div>}
@@ -100,6 +102,7 @@ export default function DaDecidere() {
 
       {rifiuta && <ModaleRifiuto nome={rifiuta.dipendente.nome} onClose={() => setRifiuta(null)}
         onConferma={async m => { await decidi(rifiuta, 'rifiuta', m); const id = rifiuta.id; setRifiuta(null); togli(id); }} />}
+      {ingiust && <ModaleInserisci ingiustificata onClose={() => setIngiust(false)} onSalvato={() => setIngiust(false)} />}
       {inserisci && <ModaleInserisci onClose={() => setInserisci(false)} onSalvato={() => { setInserisci(false); reload(); aggiornaContatore(); }} />}
     </>
   );

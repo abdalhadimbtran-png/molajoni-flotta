@@ -74,11 +74,22 @@ export const STATI: Record<Stato, [Livello, string]> = {
   in_attesa: ['warn', 'In valutazione'], approvata: ['ok', 'Approvata'], rifiutata: ['ko', 'Rifiutata'], annullata: ['na', 'Annullata'],
 };
 
+/** Assenza ingiustificata: la registra solo l'ufficio personale (trattenuta in busta paga). */
+export const ING = 'ING';
+/** Tipi in cui si può convertire un'ingiustificata. */
+export const TIPI_CONVERSIONE: [string, string][] = [['FERIE', 'Ferie'], ['ROL', 'Permesso ROL'], ['EXF', 'Permesso ex festività']];
+/** Stato leggibile, con i casi dell'ingiustificata (registrata / convertita). */
+export function statoTesto(stato: Stato, tipo?: string | null, motivoAnnullamento?: string | null): [Livello, string] {
+  if (tipo === ING && stato === 'approvata') return ['ko', 'Registrata'];
+  if (tipo === ING && stato === 'annullata' && (motivoAnnullamento ?? '').startsWith('Convertita')) return ['info', 'Convertita'];
+  return STATI[stato];
+}
+
 /** Nome breve del tipo: «Permesso ROL (riduzione …)» → «Permesso ROL». */
 export const nomeTipo = (d: string | null | undefined) => (d ?? '').replace(/\s*\(.*\)\s*$/, '');
 /** Lettera del calendario (con la legenda: mai solo colore). */
 export const letteraTipo = (tipo: string | null) =>
-  tipo === 'FERIE' ? 'F' : tipo === 'MAL' ? 'M' : tipo === 'ROL' || tipo === 'EXF' || tipo === 'PNR' ? 'P' : 'A';
+  tipo === 'FERIE' ? 'F' : tipo === 'MAL' ? 'M' : tipo === 'ING' ? 'I' : tipo === 'ROL' || tipo === 'EXF' || tipo === 'PNR' ? 'P' : 'A';
 
 // ---------- numeri e date (stringhe AAAA-MM-GG, mai new Date('AAAA-MM-GG')) ----------
 export const num = (n: number | null | undefined, dec = 2) =>

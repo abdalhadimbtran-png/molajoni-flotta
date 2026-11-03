@@ -628,6 +628,8 @@ const AR: Record<string, string> = {
   'Priorità': 'الأولوية',
   'Avviso urgente inviato al tecnico.': 'تم إرسال تنبيه عاجل إلى الفني.',
   'Intervento salvato, ma avviso non inviato: {e}': 'تم حفظ المهمة، لكن لم يُرسل التنبيه: {e}',
+  'Allega il PDF appena scaricato (lo trovi in Download).': 'أرفق ملف PDF الذي تم تنزيله للتو (تجده في مجلد التنزيلات).',
+  'Si apre il tuo programma di posta con il messaggio già scritto, senza PIN: allega il PDF, controlla e premi Invia. Il PIN è visibile solo adesso: se chiudi la pagina, per rivederlo devi generarne uno nuovo.': 'يُفتح برنامج البريد مع رسالة جاهزة بدون رمز PIN: أرفق ملف PDF، راجع ثم اضغط إرسال. رمز PIN ظاهر الآن فقط: إذا أغلقت الصفحة يجب إنشاء رمز جديد لرؤيته.',
 };
 
 /** Traduzione dei messaggi generati dal database (regole, errori). */

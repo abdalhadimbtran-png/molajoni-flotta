@@ -29,30 +29,38 @@ export default function Volantino() {
   }, []);
 
   const emailValida = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
-  const mailto = dati ? `mailto:${encodeURIComponent(email.trim())}?subject=${encodeURIComponent('Molajoni · App Flotta: il tuo accesso')}&body=${encodeURIComponent(
+  const firma = mittente || 'Il responsabile flotta';
+  // niente PIN nell'email: resta solo nel PDF allegato
+  const mailto = dati ? `mailto:${encodeURIComponent(email.trim())}?subject=${encodeURIComponent("Molajoni – Accesso all'app aziendale")}&body=${encodeURIComponent(
 `Ciao ${dati.tecnico.nome},
 
-da oggi per prendere e riconsegnare i veicoli, registrare i km e segnalare problemi usi l'app Flotta di Molajoni.
+in allegato trovi la tua scheda per accedere all'app Molajoni: dentro ci sono il QR code, il tuo codice e il PIN personale.
 
-1. Apri questo link dal telefono: ${url}
-2. Android: tocca "Installa l'app".
-   iPhone: apri il link con Safari, tocca Condividi e poi "Aggiungi alla schermata Home".
-3. Apri l'app dall'icona Flotta e accedi con:
-   Codice: ${dati.tecnico.codice}
-   PIN: ${dati.pin}
-4. Tocca "Attiva le notifiche": così ricevi il piano del giorno dopo e gli avvisi urgenti.
+Per installarla bastano due minuti: inquadra il QR con il telefono e segui i passaggi indicati nella scheda.
 
-Il PIN è personale: non darlo a nessuno. Se lo dimentichi, chiedi un PIN nuovo al responsabile flotta.
+Il PIN è personale, ti chiedo di non condividerlo. Se hai bisogno di una mano, scrivimi pure.
 
 Buon lavoro,
-${mittente || 'Il responsabile flotta'}
-Molajoni Antincendi`)}` : '';
+${firma}`)}` : '';
+  const [scaricato, setScaricato] = useState(false);
+  const [pdfInCorso, setPdfInCorso] = useState(false);
+  async function pdf() {
+    if (!qr) return;
+    setPdfInCorso(true);
+    try {
+      const m = await import('./report/schedaPdf');
+      await m.schedaPdf(dati ? { nome: dati.tecnico.nome, cognome: dati.tecnico.cognome, codice: dati.tecnico.codice, pin: dati.pin } : null, url, qr);
+      setScaricato(true);
+    } finally { setPdfInCorso(false); }
+  }
+  async function emailConPdf() { await pdf(); window.location.href = mailto; }
 
   return (
     <>
       <div className="row-flex no-print" style={{ marginBottom: 18 }}>
         <Link className="btn-ghost btn-sm" to={`${base}/tecnici`}>← {t('Tecnici')}</Link>
-        <button className="btn btn-sm" onClick={() => window.print()}>{t('Stampa')}</button>
+        <button className="btn btn-sm" onClick={pdf} disabled={!qr || pdfInCorso}>{t('Scarica PDF')}</button>
+        <button className="btn-ghost btn-sm" onClick={() => window.print()}>{t('Stampa')}</button>
         {!dati && <span className="sub">{t('Scheda vuota: per una scheda con codice e PIN usa "Scheda app + PIN" accanto al tecnico.')}</span>}
       </div>
       {dati && (
@@ -61,9 +69,10 @@ Molajoni Antincendi`)}` : '';
           <div className="row-flex wrap-end">
             <div className="field" style={{ flex: 1, minWidth: 240 }}><label htmlFor="v-mail">{t('Email di {n}', { n: `${dati.tecnico.nome} ${dati.tecnico.cognome}` })}</label>
               <input id="v-mail" type="email" dir="ltr" value={email} onChange={e => setEmail(e.target.value)} placeholder="nome@esempio.it" /></div>
-            <a className={`btn ${emailValida ? '' : 'disabled'}`} aria-disabled={!emailValida} href={emailValida ? mailto : undefined}>{t('Apri email pronta')}</a>
+            <button className="btn" onClick={pdf} disabled={!qr || pdfInCorso}>{t('Scarica PDF')}</button>
+            <button className="btn-ghost" disabled={!emailValida || !qr || pdfInCorso} onClick={emailConPdf}>{t('Apri email pronta')}</button>
           </div>
-          <p className="hint">{t("Si apre il tuo programma di posta con il messaggio già scritto: controlla e premi Invia. Il PIN è visibile solo adesso: se chiudi la pagina, per rivederlo devi generarne uno nuovo.")}</p>
+          <p className="hint">{scaricato && <b>{t('Allega il PDF appena scaricato (lo trovi in Download).')} </b>}{t("Si apre il tuo programma di posta con il messaggio già scritto, senza PIN: allega il PDF, controlla e premi Invia. Il PIN è visibile solo adesso: se chiudi la pagina, per rivederlo devi generarne uno nuovo.")}</p>
         </div>
       )}
       <div className="volantino" lang="it" dir="ltr">

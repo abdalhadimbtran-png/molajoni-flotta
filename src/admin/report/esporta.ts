@@ -5,13 +5,13 @@ export interface Contesto { periodo: string; filtri: string; autore: string; gen
 const nomeFile = (r: Report, c: Contesto, est: string) =>
   `Molajoni_${r.titolo.replace(/[^A-Za-z0-9]+/g, '_')}_${c.periodo.replace(/[^0-9]+/g, '-').replace(/^-|-$/g, '')}.${est}`;
 
-function scarica(blob: Blob, nome: string) {
+export function scarica(blob: Blob, nome: string) {
   const u = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = u; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(u), 2000);
 }
 
-async function logo(): Promise<{ dataUrl: string; w: number; h: number }> {
+export async function logo(): Promise<{ dataUrl: string; w: number; h: number }> {
   const b = await (await fetch('/logo-molajoni.png')).blob();
   const dataUrl = await new Promise<string>(ok => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result)); fr.readAsDataURL(b); });
   const img = await new Promise<HTMLImageElement>(ok => { const i = new Image(); i.onload = () => ok(i); i.src = dataUrl; });

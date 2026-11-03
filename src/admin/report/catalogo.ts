@@ -92,8 +92,8 @@ export const CATALOGO: Report[] = [
     id: 'agenda', gruppo: 'Tecnici', titolo: 'Agenda lavori per tecnico', periodo: 'intervallo', filtri: { tecnico: true },
     descrizione: 'Elenco stampabile dei lavori di ogni tecnico (giorno, settimana o mese): ora, luogo, attività, veicolo e giorni di assenza, con colonna da spuntare.',
     colonne: [
-      { k: 'data', l: 'Data', t: 'data', w: 11 }, { k: 'ora', l: 'Ora', t: 'testo', w: 6 }, { k: 'luogo', l: 'Luogo', t: 'testo', w: 34 },
-      { k: 'attivita', l: 'Attività', t: 'testo', w: 40 }, { k: 'veicolo', l: 'Veicolo', t: 'targa', w: 11 }, { k: 'note', l: 'Note', t: 'testo', w: 22 },
+      { k: 'data', l: 'Data', t: 'data', w: 11 }, { k: 'ora', l: 'Orario', t: 'testo', w: 11 }, { k: 'durata', l: 'Durata', t: 'testo', w: 6 }, { k: 'luogo', l: 'Luogo', t: 'testo', w: 30 },
+      { k: 'attivita', l: 'Attività', t: 'testo', w: 34 }, { k: 'veicolo', l: 'Veicolo', t: 'targa', w: 11 }, { k: 'note', l: 'Note', t: 'testo', w: 22 },
       { k: 'fatto', l: 'Fatto ☐', t: 'testo', w: 8 },
     ],
     raggruppa: { k: 'tecnico', etichetta: r => String(r.tecnico) }, orizzontale: true, nuovaPaginaPerGruppo: true,

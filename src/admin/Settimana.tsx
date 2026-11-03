@@ -1,15 +1,15 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, rpc, testoErrore } from '../lib/supabase';
-import { oggiISO } from '../lib/format';
+import { fascia, oggiISO } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { Banner, Caricamento, Errore, Modal, toast, useLoad } from '../ui';
 import { CATALOGO, type Riga } from './report/catalogo';
 
 /** Vista settimanale: inserimento rapido degli interventi lun–ven, pensata per chi usa poco il computer. */
-interface Int { id: number; data: string; tecnico_id: number; ora: string | null; luogo: string; attivita: string; note: string | null }
+interface Int { id: number; data: string; tecnico_id: number; ora: string | null; ora_fine: string | null; luogo: string; attivita: string; note: string | null }
 interface Tec { id: number; nome: string; cognome: string }
-type Bozza = { id?: number; data: string; tecnico_id: number; ora: string; luogo: string; attivita: string; note: string };
+type Bozza = { id?: number; data: string; tecnico_id: number; ora: string; ora_fine: string; luogo: string; attivita: string; note: string };
 
 const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
 const pd = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
@@ -17,8 +17,8 @@ const fd = (d: Date) => d.toISOString().slice(0, 10);
 const add = (s: string, n: number) => { const d = pd(s); d.setUTCDate(d.getUTCDate() + n); return fd(d); };
 const lunedi = (s: string) => add(s, -((pd(s).getUTCDay() + 6) % 7));
 const hhmm = (o: string | null) => (o ? o.slice(0, 5) : '');
-const chiave = (x: { data: string; tecnico_id: number; ora: string | null; luogo: string; attivita: string }) =>
-  [x.data, x.tecnico_id, hhmm(x.ora), x.luogo.trim().toLowerCase(), x.attivita.trim().toLowerCase()].join('|');
+const chiave = (x: { data: string; tecnico_id: number; ora: string | null; ora_fine?: string | null; luogo: string; attivita: string }) =>
+  [x.data, x.tecnico_id, hhmm(x.ora), hhmm(x.ora_fine ?? null), x.luogo.trim().toLowerCase(), x.attivita.trim().toLowerCase()].join('|');
 
 export default function Settimana() {
   const { t, tm, locale } = useT();
@@ -32,7 +32,7 @@ export default function Settimana() {
     const ven = add(lun, 4);
     const [tc, it, as, st] = await Promise.all([
       supabase.from('tecnici').select('id,nome,cognome').eq('attivo', true).order('cognome'),
-      supabase.from('interventi').select('id,data,tecnico_id,ora,luogo,attivita,note').gte('data', lun).lte('data', ven).order('ora', { nullsFirst: false }),
+      supabase.from('interventi').select('id,data,tecnico_id,ora,ora_fine,luogo,attivita,note').gte('data', lun).lte('data', ven).order('ora', { nullsFirst: false }),
       supabase.from('assenze').select('tecnico_id,dal,al').lte('dal', ven).gte('al', lun),
       supabase.from('interventi').select('luogo,attivita').order('id', { ascending: false }).limit(1500),
     ]);
@@ -58,7 +58,7 @@ export default function Settimana() {
   function apriNuovo(tec: number, g: string) {
     if (data?.fest.has(g)) { window.alert(t('{g} è un giorno festivo: non si possono aggiungere interventi.', { g: fmtG(g) })); return; }
     if (assente(tec, g)) { window.alert(t('{n} è assente il {g}: non si possono aggiungere interventi.', { n: nomeT(tec), g: fmtG(g) })); return; }
-    setBozza({ data: g, tecnico_id: tec, ora: '', luogo: '', attivita: '', note: '' });
+    setBozza({ data: g, tecnico_id: tec, ora: '', ora_fine: '', luogo: '', attivita: '', note: '' });
   }
 
   /** Inserisce copie saltando giorni bloccati e duplicati già presenti. */
@@ -78,12 +78,12 @@ export default function Settimana() {
     esegui(async () => { const { error } = await supabase.from('interventi').delete().eq('id', i.id); if (error) throw error; toast(t('Intervento eliminato.')); });
   };
 
-  const ripeti = (i: Int) => esegui(() => inserisciCopie(giorni.filter(g => g !== i.data).map(g => ({ data: g, tecnico_id: i.tecnico_id, ora: i.ora, luogo: i.luogo, attivita: i.attivita, note: i.note }))));
+  const ripeti = (i: Int) => esegui(() => inserisciCopie(giorni.filter(g => g !== i.data).map(g => ({ data: g, tecnico_id: i.tecnico_id, ora: i.ora, ora_fine: i.ora_fine, luogo: i.luogo, attivita: i.attivita, note: i.note }))));
 
   const copiaPrecedente = (tec: Tec) => {
     if (!window.confirm(t('Copiare gli interventi della settimana precedente di {n} in questa settimana? I giorni di assenza e gli interventi già presenti vengono saltati.', { n: `${tec.nome} ${tec.cognome}` }))) return;
     esegui(async () => {
-      const { data: prec, error } = await supabase.from('interventi').select('data,tecnico_id,ora,luogo,attivita,note').eq('tecnico_id', tec.id).gte('data', add(lun, -7)).lte('data', add(lun, -3));
+      const { data: prec, error } = await supabase.from('interventi').select('data,tecnico_id,ora,ora_fine,luogo,attivita,note').eq('tecnico_id', tec.id).gte('data', add(lun, -7)).lte('data', add(lun, -3));
       if (error) throw error;
       if (!prec?.length) { toast(t('La settimana precedente non ha interventi per {n}.', { n: tec.nome })); return; }
       await inserisciCopie(prec.map(p => ({ ...p, data: add(p.data, 7) })));
@@ -125,10 +125,10 @@ export default function Settimana() {
                     {(ass || fes) && <div className="wk-stato">{fes ? t('Festivo') : t('Assente')}</div>}
                     {lista.map(i => (
                       <div key={i.id} className="wk-card">
-                        <div><b>{hhmm(i.ora) || '—'}</b> · {i.luogo}</div>
+                        <div><b>{fascia(i.ora, i.ora_fine)}</b> · {i.luogo}</div>
                         <div className="sub">{i.attivita}{i.note ? ` — ${i.note}` : ''}</div>
                         <div className="wk-azioni">
-                          <button className="btn-ghost btn-sm" onClick={() => setBozza({ id: i.id, data: i.data, tecnico_id: i.tecnico_id, ora: hhmm(i.ora), luogo: i.luogo, attivita: i.attivita, note: i.note ?? '' })}>{t('Modifica')}</button>
+                          <button className="btn-ghost btn-sm" onClick={() => setBozza({ id: i.id, data: i.data, tecnico_id: i.tecnico_id, ora: hhmm(i.ora), ora_fine: hhmm(i.ora_fine), luogo: i.luogo, attivita: i.attivita, note: i.note ?? '' })}>{t('Modifica')}</button>
                           <button className="btn-ghost btn-sm" onClick={() => setCopia(i)}>{t('Copia su…')}</button>
                           <button className="btn-ghost btn-sm" onClick={() => ripeti(i)}>{t('Ripeti tutta la settimana')}</button>
                           <button className="btn-ghost btn-sm wk-del" onClick={() => elimina(i)}>{t('Elimina')}</button>
@@ -144,15 +144,15 @@ export default function Settimana() {
           ))}</tbody>
         </table></div>
       )}
-      {bozza && data && <ModaleIntervento b={bozza} titolo={`${nomeT(bozza.tecnico_id)} · ${fmtG(bozza.data)}`} luoghi={data.luoghi} attivita={data.attivita}
+      {bozza && data && <ModaleIntervento b={bozza} titolo={`${nomeT(bozza.tecnico_id)} · ${fmtG(bozza.data)}`} luoghi={data.luoghi} attivita={data.attivita} altri={data.interventi.filter(x => x.tecnico_id === bozza.tecnico_id && x.data === bozza.data && x.id !== bozza.id)}
         onClose={() => setBozza(null)} onSalvato={() => { setBozza(null); reload(); }} />}
       {copia && data && <ModaleCopia i={copia} giorni={giorni} tecnici={data.tecnici} fmtG={fmtG} bloccato={bloccato}
-        onClose={() => setCopia(null)} onCopia={dest => { setCopia(null); esegui(() => inserisciCopie(dest.map(d => ({ data: d.g, tecnico_id: d.tec, ora: copia.ora, luogo: copia.luogo, attivita: copia.attivita, note: copia.note })))); }} />}
+        onClose={() => setCopia(null)} onCopia={dest => { setCopia(null); esegui(() => inserisciCopie(dest.map(d => ({ data: d.g, tecnico_id: d.tec, ora: copia.ora, ora_fine: copia.ora_fine, luogo: copia.luogo, attivita: copia.attivita, note: copia.note })))); }} />}
     </>
   );
 }
 
-function ModaleIntervento({ b, titolo, luoghi, attivita, onClose, onSalvato }: { b: Bozza; titolo: string; luoghi: string[]; attivita: string[]; onClose: () => void; onSalvato: () => void }) {
+function ModaleIntervento({ b, titolo, luoghi, attivita, altri, onClose, onSalvato }: { b: Bozza; titolo: string; luoghi: string[]; attivita: string[]; altri: Int[]; onClose: () => void; onSalvato: () => void }) {
   const { t, tm } = useT();
   const [f, setF] = useState(b);
   const [err, setErr] = useState<string | null>(null);
@@ -160,8 +160,11 @@ function ModaleIntervento({ b, titolo, luoghi, attivita, onClose, onSalvato }: {
   async function salva(e: FormEvent) {
     e.preventDefault(); setErr(null);
     if (!f.luogo.trim() || !f.attivita.trim()) { setErr(t('Scrivi il luogo e l\'attività.')); return; }
+    const eo = erroreOrario(f.ora, f.ora_fine); if (eo) { setErr(t(eo)); return; }
+    const sov = sovrapposti(f.ora, f.ora_fine, altri);
+    if (sov.length && !window.confirm(t('Attenzione: in questo orario il tecnico ha già «{l}». Salvare lo stesso?', { l: sov.map(x => `${fascia(x.ora, x.ora_fine)} ${x.luogo}`).join(', ') }))) return;
     setInv(true);
-    const rec = { data: f.data, tecnico_id: f.tecnico_id, ora: f.ora || null, luogo: f.luogo.trim(), attivita: f.attivita.trim(), note: f.note.trim() || null };
+    const rec = { data: f.data, tecnico_id: f.tecnico_id, ora: f.ora || null, ora_fine: f.ora_fine || null, luogo: f.luogo.trim(), attivita: f.attivita.trim(), note: f.note.trim() || null };
     const { error } = f.id ? await supabase.from('interventi').update(rec).eq('id', f.id) : await supabase.from('interventi').insert(rec);
     setInv(false);
     if (error) { setErr(tm(testoErrore(error))); return; }
@@ -177,8 +180,7 @@ function ModaleIntervento({ b, titolo, luoghi, attivita, onClose, onSalvato }: {
         <div className="field"><label htmlFor="wk-a">{t('Attività')}</label>
           <input id="wk-a" list="wk-att" autoComplete="off" value={f.attivita} onChange={e => setF({ ...f, attivita: e.target.value })} placeholder={t('Es. Controllo estintori')} />
           <datalist id="wk-att">{attivita.map(x => <option key={x} value={x} />)}</datalist></div>
-        <div className="field"><label htmlFor="wk-o">{t('Ora (facoltativa)')}</label>
-          <input id="wk-o" type="time" value={f.ora} onChange={e => setF({ ...f, ora: e.target.value })} /></div>
+        <CampiOrario dalle={f.ora} alle={f.ora_fine} onChange={(ora, ora_fine) => setF({ ...f, ora, ora_fine })} />
         <div className="field"><label htmlFor="wk-n">{t('Note (facoltative)')}</label>
           <input id="wk-n" type="text" value={f.note} onChange={e => setF({ ...f, note: e.target.value })} /></div>
         {err && <div className="msg ko">{err}</div>}
@@ -259,5 +261,32 @@ function Stampa({ lun, tecnici, singolo = false, etichetta }: { lun: string; tec
         </div>
       )}
     </span>
+  );
+}
+
+export const PRESET_ORARI: [string, string, string][] = [['08:00', '12:00', ''], ['13:00', '17:00', ''], ['08:00', '17:00', 'Giornata intera']];
+/** Messaggio d'errore (chiave italiana) o null se l'orario è valido. Inizio e fine obbligatori. */
+export function erroreOrario(dalle: string, alle: string): string | null {
+  if (!dalle || !alle) return "Indica l'orario: dalle … alle ….";
+  if (alle <= dalle) return "L'ora di fine deve essere dopo l'ora di inizio.";
+  return null;
+}
+/** Interventi dello stesso tecnico e giorno che si sovrappongono all'orario indicato. */
+export function sovrapposti<T extends { ora: string | null; ora_fine?: string | null }>(dalle: string, alle: string, altri: T[]): T[] {
+  return altri.filter(x => x.ora && (x.ora.slice(0, 5) < alle) && ((x.ora_fine ?? x.ora).slice(0, 5) > dalle || (!x.ora_fine && x.ora.slice(0, 5) >= dalle)));
+}
+export function CampiOrario({ dalle, alle, onChange, compatto = false }: { dalle: string; alle: string; onChange: (dalle: string, alle: string) => void; compatto?: boolean }) {
+  const { t } = useT();
+  return (
+    <div className="field">
+      {!compatto && <label>{t('Orario')}</label>}
+      <div className="wk-orario">
+        <label>{t('Dalle')} <input type="time" required value={dalle} onChange={e => onChange(e.target.value, alle)} /></label>
+        <label>{t('Alle')} <input type="time" required value={alle} onChange={e => onChange(dalle, e.target.value)} /></label>
+      </div>
+      <div className="wk-preset">{PRESET_ORARI.map(([a, b, l]) => (
+        <button type="button" key={a + b} className={`wk-chip${dalle === a && alle === b ? ' on' : ''}`} onClick={() => onChange(a, b)}>{a}–{b}{l ? ` ${t(l)}` : ''}</button>
+      ))}</div>
+    </div>
   );
 }

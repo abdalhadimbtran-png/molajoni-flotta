@@ -77,3 +77,6 @@ export const STATI_MULTA: Record<string, [Livello, string]> = {
   pagata: ['ok', 'Pagata'], contestata: ['na', 'Contestata'], chiusa: ['na', 'Chiusa'],
 };
 export const fmtEuro = (n: number | null | undefined) => (n == null ? '—' : Number(n).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }));
+
+/** «08:30–12:00» oppure solo l'inizio se manca la fine. */
+export const fascia = (ora: string | null | undefined, fine?: string | null) => (ora ? `${ora.slice(0, 5)}${fine ? `–${fine.slice(0, 5)}` : ''}` : '—');

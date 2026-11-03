@@ -1220,3 +1220,9 @@ table.wk thead th { background:var(--surface-2); font-size:14px; }
   .wk-cell { height:auto; min-height:64px; }
   .wk-cell::before { content:attr(data-giorno); display:block; font-weight:600; font-size:13px; color:var(--ink-2); margin-bottom:4px; }
 }
+.wk-orario { display:flex; gap:10px; flex-wrap:wrap; }
+.wk-orario label { display:flex; align-items:center; gap:6px; font-weight:500; }
+.wk-orario input { min-height:44px; font-size:16px; }
+.wk-preset { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.wk-chip { border:1px solid var(--line-strong); background:var(--surface); border-radius:999px; padding:8px 12px; min-height:38px; font:inherit; font-size:13.5px; cursor:pointer; }
+.wk-chip.on { background:var(--ink); color:var(--surface); border-color:var(--ink); }

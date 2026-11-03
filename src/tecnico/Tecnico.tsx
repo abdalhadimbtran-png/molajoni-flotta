@@ -2,7 +2,7 @@ import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState
 import { Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
 import { rpc, testoErrore } from '../lib/supabase';
-import { CARBURANTE, CATEGORIE, GRAVITA, STATI_SEGN, TIPI_DOC, fmtGiorno, fmtKm, fmtOra, lblCarb, type Messaggio } from '../lib/format';
+import { CARBURANTE, CATEGORIE, GRAVITA, STATI_SEGN, TIPI_DOC, fascia, fmtGiorno, fmtKm, fmtOra, lblCarb, type Messaggio } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { Logo, Pill, Targa } from '../ui';
 import { InstallaApp } from '../Installa';
@@ -94,7 +94,7 @@ function SoloTecnici({ veicolo }: { veicolo: boolean }) {
   );
 }
 
-interface Giorno { data: string; confermato: boolean; assenza: string | null; veicolo: { targa: string; modello: string; qr: string } | null; interventi: { ora: string | null; luogo: string; attivita: string }[] }
+interface Giorno { data: string; confermato: boolean; assenza: string | null; veicolo: { targa: string; modello: string; qr: string } | null; interventi: { ora: string | null; ora_fine?: string | null; luogo: string; attivita: string }[] }
 interface HomeDati { nome: string; codice: string; avvisi: Messaggio[];
   in_carico: { targa: string; modello: string; km: number; dal: string; qr: string }[];
   giorni: Giorno[];
@@ -142,7 +142,7 @@ function Home({ token, onScaduta }: { token: string; onScaduta: () => void }) {
           <div className="lbl-sm">{k === 0 ? t('Oggi') : t('Prossimo giorno lavorativo')} · {fmtGiorno(g.data, locale)}</div>
           {g.assenza ? <p>{t(g.assenza)}</p> : <>
             <div className="row-flex"><span>{t('Veicolo:')}</span> {g.veicolo ? <><Targa t={g.veicolo.targa} /> <span className="sub">{g.veicolo.modello}</span></> : <span className="sub">{t('non assegnato')}</span>}</div>
-            {g.interventi.length ? g.interventi.map((i, n) => <div key={n} className="int"><span className="h">{i.ora ?? '—'}</span><span>{i.luogo}<div className="sub">{i.attivita}</div></span></div>)
+            {g.interventi.length ? g.interventi.map((i, n) => <div key={n} className="int"><span className="h">{fascia(i.ora, i.ora_fine)}</span><span>{i.luogo}<div className="sub">{i.attivita}</div></span></div>)
               : <p className="sub">{t('Nessun intervento pianificato')}</p>}
             {!g.confermato && (g.interventi.length > 0 || g.veicolo) && <span className="sub">{t('piano non ancora confermato')}</span>}
           </>}

@@ -590,6 +590,13 @@ const AR: Record<string, string> = {
   '{n} interventi copiati, {s} saltati (assenza, festivo o già presenti).': 'تم نسخ {n} مهمة، وتخطي {s} (غياب أو عطلة أو موجودة مسبقًا).',
   '{n} interventi copiati.': 'تم نسخ {n} مهمة.',
   '{n} è assente il {g}: non si possono aggiungere interventi.': '{n} غائب يوم {g}: لا يمكن إضافة مهمات.',
+  'Orario': 'التوقيت',
+  'Dalle': 'من',
+  'Alle': 'إلى',
+  'Giornata intera': 'يوم كامل',
+  "Indica l'orario: dalle … alle ….": 'حدّد التوقيت: من … إلى ….',
+  "L'ora di fine deve essere dopo l'ora di inizio.": 'يجب أن يكون وقت الانتهاء بعد وقت البدء.',
+  'Attenzione: in questo orario il tecnico ha già «{l}». Salvare lo stesso?': 'تنبيه: لدى الفني في هذا التوقيت «{l}». هل تريد الحفظ على أي حال؟',
 };
 
 /** Traduzione dei messaggi generati dal database (regole, errori). */

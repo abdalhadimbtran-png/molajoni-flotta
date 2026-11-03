@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { rpc } from '../lib/supabase';
-import { fmtGiorno, fmtOra } from '../lib/format';
+import { fascia, fmtGiorno, fmtOra } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { attivaPush, statoPush, type StatoPush } from '../lib/push';
 import { Targa } from '../ui';
@@ -12,7 +12,7 @@ import { giornoBreve, giornoLungo, intervallo } from './periodo';
 const Ico = ({ d }: { d: ReactNode }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
 const IcoTel = () => <Ico d={<path d="M5 3.5h3.5l2 5-2.5 1.5a11 11 0 0 0 6 6l1.5-2.5 5 2V19a1.5 1.5 0 0 1-1.5 1.5A16.5 16.5 0 0 1 3.5 5 1.5 1.5 0 0 1 5 3.5Z" />} />;
 
-interface DatiPiano { data: string; veicolo?: { targa: string; modello: string } | null; veicolo_prima?: { targa: string } | null; interventi?: { ora: string | null; luogo: string; attivita: string }[]; aggiornato?: boolean; annullato?: boolean }
+interface DatiPiano { data: string; veicolo?: { targa: string; modello: string } | null; veicolo_prima?: { targa: string } | null; interventi?: { ora: string | null; ora_fine?: string | null; luogo: string; attivita: string }[]; aggiornato?: boolean; annullato?: boolean }
 interface DatiAvviso { livello: 'urgente' | 'importante' | 'info'; titolo: string; testo?: string; ora?: string; luogo?: string; contatto?: string; telefono?: string; targa?: string; da?: string; categoria?: string; evento?: string; richiesta_id?: number }
 
 /** Notifiche non lette in cima alla home (piano, avvisi, esiti delle richieste). Funzioni dipendente_notifiche / dipendente_notifica_letta. */
@@ -65,7 +65,7 @@ export function Notifiche() {
           {p.annullato ? <p>{t('Non hai più attività o veicolo per questo giorno.')}</p> : <>
             <div className="row-flex"><span>{t('Veicolo:')}</span>{p.veicolo ? <><Targa t={p.veicolo.targa} big /><span className="sub">{p.veicolo.modello}</span></> : <b>{t('non assegnato')}</b>}</div>
             {p.veicolo_prima && <div className="ph-msg warn">{t('Prima era {t}: usa il nuovo veicolo.', { t: p.veicolo_prima.targa })}</div>}
-            {(p.interventi ?? []).map((i, k) => <div key={k} className="int"><span className="h">{i.ora ?? '—'}</span><span>{i.luogo}<div className="sub">{i.attivita}</div></span></div>)}
+            {(p.interventi ?? []).map((i, k) => <div key={k} className="int"><span className="h">{fascia(i.ora, i.ora_fine)}</span><span>{i.luogo}<div className="sub">{i.attivita}</div></span></div>)}
           </>}
           <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ho visto')}</button>
         </section>

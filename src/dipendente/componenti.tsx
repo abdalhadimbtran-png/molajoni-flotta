@@ -4,6 +4,7 @@ import { Pill } from '../ui';
 import { oggiISO } from '../lib/format';
 import type { Livello } from '../lib/format';
 import { nomeTipo, type Richiesta, type Saldo, type SaldoAnteprima, type StatoRichiesta } from './api';
+import { useDaFareCorsi } from './Corsi';
 import { dataDaTs, dataLunga, diffGiorni, fineMese, fmtPeriodo, fmtQuantita, fmtSaldo, giornoLungo, intervallo, nomeMese, saldoSemplice, type Unita } from './periodo';
 
 /* ---------- Icone (tratto 2, come quelle dell'app tecnico) ---------- */
@@ -11,6 +12,7 @@ const Ico = ({ d }: { d: ReactNode }) => <svg viewBox="0 0 24 24" fill="none" st
 export const IcoCasa = () => <Ico d={<><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>} />;
 export const IcoFerie = () => <Ico d={<><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /><path d="m9 15 2 2 4-4" /></>} />;
 export const IcoProfilo = () => <Ico d={<><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>} />;
+export const IcoCorsi = () => <Ico d={<><path d="M3 8.5 12 4l9 4.5-9 4.5L3 8.5Z" /><path d="M7 10.5V16c1.5 1.3 3.2 2 5 2s3.5-.7 5-2v-5.5M21 8.5V14" /></>} />;
 export const IcoPiu = () => <Ico d={<path d="M12 5v14M5 12h14" />} />;
 export const IcoSpunta = () => <Ico d={<><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></>} />;
 export const IcoFreccia = () => <Ico d={<path d="m9 6 6 6-6 6" />} />;
@@ -148,13 +150,17 @@ export function RiepilogoRichiesta({ d, saldi, conSaldo, modificabile }: {
 const VOCI = [
   { to: '/t', label: 'Home', ico: <IcoCasa />, end: true },
   { to: '/t/ferie', label: 'Ferie', ico: <IcoFerie />, end: false },
+  { to: '/t/corsi', label: 'Corsi', ico: <IcoCorsi />, end: false },
   { to: '/t/profilo', label: 'Profilo', ico: <IcoProfilo />, end: false },
 ];
 /** Barra in basso (telefono). Su computer le stesse voci stanno nella barra in alto. */
 export function BarraDipendente() {
+  const n = useDaFareCorsi();
+  const badge = n ? n.caricare + n.scadenza : 0;
   return (
     <nav className="tec-nav" aria-label="Menu">
-      {VOCI.map(v => <NavLink key={v.to} to={v.to} end={v.end} className={({ isActive }) => (isActive ? 'on' : '')}>{v.ico}<span>{v.label}</span></NavLink>)}
+      {VOCI.map(v => <NavLink key={v.to} to={v.to} end={v.end} className={({ isActive }) => (isActive ? 'on' : '')}>
+        <span style={{ position: 'relative', display: 'inline-flex' }}>{v.ico}{v.to === '/t/corsi' && badge > 0 && <span className="tec-badge" aria-label={`${badge} da fare`}>{badge}</span>}</span><span>{v.label}</span></NavLink>)}
     </nav>
   );
 }

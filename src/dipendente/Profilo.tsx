@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { InstallaApp } from '../Installa';
 import { rpc } from '../lib/supabase';
-import { URL_FUNZIONI } from '../lib/push';
-import { comprimi } from '../formazione/comune';
+import { Link } from 'react-router-dom';
 import { nomeTipo, useSessione, type Saldo } from './api';
 import { Attesa } from './componenti';
 import { AttivaNotifiche } from './Notifiche';
@@ -45,91 +44,6 @@ function LaTuaCarta({ token }: { token: string }) {
   );
 }
 
-const STATO_MIO: Record<string, [string, string]> = { valido: ['ok', 'Valido'], in_scadenza: ['warn', 'In scadenza'], scaduto: ['ko', 'Scaduto'], mancante: ['ko', 'Da fare'] };
-interface MioCorso { corso: string; data_conseguimento: string | null; data_scadenza: string | null; stato: string; attestati: { id: number; nome: string }[] }
-interface RichiestaMia { id: number; corso: string; stato: string; motivo: string | null }
-
-async function apriMioAttestato(token: string, id: number) {
-  const w = window.open('', '_blank');
-  const r = await fetch(`${URL_FUNZIONI}/attestato`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, id }) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.url) { w?.close(); alert(j.errore === 'SESSIONE_NON_VALIDA' ? 'Accedi di nuovo.' : 'Attestato non disponibile.'); return; }
-  if (w) w.location.href = j.url; else window.location.href = j.url;
-}
-
-/** Attestati richiesti dal responsabile formazione: il dipendente carica solo il file. */
-function AttestatiDaCaricare({ token, onCaricato }: { token: string; onCaricato: () => void }) {
-  const [l, setL] = useState<RichiestaMia[] | null>(null);
-  const [invio, setInvio] = useState<number | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const carica = () => rpc<RichiestaMia[]>('dipendente_attestati_richiesti', { p_token: token }).then(setL).catch(() => setL([]));
-  useEffect(() => { carica(); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
-  async function invia(id: number, f: File | undefined) {
-    if (!f) return;
-    setInvio(id); setMsg(null);
-    try {
-      const g = await comprimi(f);
-      if (g.size > 10 * 1024 * 1024) throw new Error('Il file è troppo grande (massimo 10 MB).');
-      const fd = new FormData(); fd.append('token', token); fd.append('richiesta_id', String(id)); fd.append('file', g, g.name);
-      const r = await fetch(`${URL_FUNZIONI}/carica-attestato`, { method: 'POST', body: fd });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.errore === 'SESSIONE_NON_VALIDA' ? 'Accedi di nuovo.' : j.errore || 'Caricamento non riuscito.');
-      setMsg('Attestato inviato. Il responsabile lo controllerà.'); carica(); onCaricato();
-    } catch (e) { setMsg((e as Error).message); } finally { setInvio(null); }
-  }
-  const aperte = (l ?? []).filter(r => r.stato !== 'approvato');
-  const fatte = (l ?? []).filter(r => r.stato === 'approvato');
-  if (!l || (!aperte.length && !fatte.length)) return null;
-  return (
-    <section className="tec-card">
-      <div className="lbl-sm">Attestati da caricare</div>
-      {aperte.map(r => (
-        <div key={r.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-          <b>{r.corso}</b>
-          {r.stato === 'da_verificare' && <div><span className="pill warn">In verifica</span></div>}
-          {r.stato === 'rifiutato' && <div className="sub" style={{ color: 'var(--ko)' }}>Rifiutato: {r.motivo}. Caricalo di nuovo.</div>}
-          {(r.stato === 'richiesto' || r.stato === 'rifiutato') && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-              <label className="big-btn primary" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>{invio === r.id ? 'Invio…' : '📷 Foto'}
-                <input type="file" accept="image/*" capture="environment" hidden disabled={invio != null} onChange={e => { invia(r.id, e.target.files?.[0]); e.target.value = ''; }} /></label>
-              <label className="big-btn light" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>📄 PDF / file
-                <input type="file" accept="application/pdf,image/*" hidden disabled={invio != null} onChange={e => { invia(r.id, e.target.files?.[0]); e.target.value = ''; }} /></label>
-            </div>)}
-        </div>))}
-      {fatte.map(r => <div key={r.id} className="sub" style={{ paddingTop: 6 }}>{r.corso}: <span className="pill ok">Approvato</span></div>)}
-      {msg && <p className="sub" style={{ marginTop: 8 }}>{msg}</p>}
-    </section>
-  );
-}
-
-/** I miei corsi: stato e scadenza, sola lettura; apertura dei propri attestati. */
-function IMieiCorsi({ token }: { token: string }) {
-  const [corsi, setCorsi] = useState<MioCorso[] | null>(null);
-  const [k, setK] = useState(0);
-  useEffect(() => { rpc<MioCorso[]>('dipendente_corsi', { p_token: token }).then(setCorsi).catch(() => setCorsi([])); }, [token, k]);
-  return (
-    <>
-      <AttestatiDaCaricare token={token} onCaricato={() => setK(k + 1)} />
-      {!!corsi?.length && (
-        <section className="tec-card">
-          <div className="lbl-sm">I miei corsi</div>
-          {corsi.map((c, i) => {
-            const [l, t] = STATO_MIO[c.stato] ?? ['na', c.stato];
-            return (
-              <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-                  <div><b>{c.corso}</b><div className="sub">{c.data_conseguimento ? (c.data_scadenza ? `Scade il ${dataLunga(c.data_scadenza)}` : 'Non scade') : 'Corso obbligatorio non ancora fatto'}</div></div>
-                  <span className={`pill ${l}`}>{t}</span>
-                </div>
-                {c.attestati?.map((a, j) => <button key={a.id} className="big-btn light" style={{ marginTop: 6, padding: '8px 12px', fontSize: 15 }} onClick={() => apriMioAttestato(token, a.id)}>Vedi attestato{c.attestati.length > 1 ? ` ${j + 1}` : ''}</button>)}
-              </div>);
-          })}
-          <span className="sub">Un corso manca o è sbagliato? Avvisa il responsabile della formazione.</span>
-        </section>)}
-    </>
-  );
-}
-
 /** Profilo in sola lettura (UX § 2.6). «Esci» sta qui, così non si tocca per sbaglio. */
 export default function Profilo() {
   const { home, errore, esci, token } = useSessione();
@@ -159,7 +73,7 @@ export default function Profilo() {
         </dl>
         <span className="sub">Vedi un dato sbagliato? Avvisa l'ufficio personale.</span>
       </section>
-      <IMieiCorsi token={token} />
+      <Link className="big-btn light" to="/t/corsi">I miei corsi e attestati</Link>
       <LaTuaCarta token={token} />
       <AttivaNotifiche sempre />
       <InstallaApp />

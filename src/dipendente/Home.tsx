@@ -1,3 +1,4 @@
+import { CardCorsiHome } from './Corsi';
 import { Link } from 'react-router-dom';
 import { oggiISO } from '../lib/format';
 import { InstallaApp } from '../Installa';
@@ -19,6 +20,7 @@ export default function HomeDipendente() {
   return (
     <>
       <Notifiche />
+      <CardCorsiHome />
       {oggi && <div className="ph-msg info">{oggi.ora_inizio ? `Oggi hai un permesso dalle ${oggi.ora_inizio} alle ${oggi.ora_fine}.`
         : oggi.mezza_giornata ? 'Oggi sei assente per mezza giornata.'
         : `Oggi sei ${oggi.tipo === 'FERIE' ? 'in ferie' : 'assente'}. Torni al lavoro ${giornoLungo(oggi.rientro)}.`}</div>}

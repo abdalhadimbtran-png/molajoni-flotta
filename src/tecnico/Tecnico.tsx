@@ -1,3 +1,4 @@
+import { CardCorsiHome } from '../dipendente/Corsi';
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
@@ -12,6 +13,7 @@ import Accesso from '../dipendente/Accesso';
 import HomeDipendente, { RiquadroFerieTec } from '../dipendente/Home';
 import NuovaRichiesta from '../dipendente/NuovaRichiesta';
 import Profilo from '../dipendente/Profilo';
+import Corsi from '../dipendente/Corsi';
 import { DettaglioRichiesta, MieRichieste } from '../dipendente/Richieste';
 import { Attesa, BarraDipendente, VociAlto } from '../dipendente/componenti';
 import { AttivaNotifiche, Notifiche } from '../dipendente/Notifiche';
@@ -50,7 +52,7 @@ export default function Tecnico() {
   const idRichiesta = matchPath('/t/ferie/:id', path)?.params.id;
   const pagina = path.startsWith('/t/scansiona') ? 'scan' : path.startsWith('/t/elenco') ? 'elenco' : qr ? 'veicolo'
     : path === '/t/ferie/nuova' ? 'nuova' : idRichiesta && /^\d+$/.test(idRichiesta) ? 'dettaglio' : path === '/t/ferie' ? 'ferie'
-    : path === '/t/profilo' ? 'profilo' : 'home';
+    : path === '/t/profilo' ? 'profilo' : path === '/t/corsi' ? 'corsi' : 'home';
   const tec = home ? home.tec : tecLogin;
   const soloTec = pagina === 'veicolo' || pagina === 'scan' || pagina === 'elenco';
   const conNav = !!token && pagina !== 'nuova' && pagina !== 'scan';
@@ -67,6 +69,7 @@ export default function Tecnico() {
   else if (pagina === 'dettaglio') corpo = <DettaglioRichiesta key={idRichiesta} id={Number(idRichiesta)} />;
   else if (pagina === 'ferie') corpo = <MieRichieste />;
   else if (pagina === 'profilo') corpo = <Profilo />;
+  else if (pagina === 'corsi') corpo = <Corsi />;
   else if (tec === null && !errHome) corpo = <Attesa />;
   else corpo = tec !== false ? <Home token={token} onScaduta={esci} /> : <HomeDipendente />;
 
@@ -114,6 +117,7 @@ function Home({ token, onScaduta }: { token: string; onScaduta: () => void }) {
   return (
     <>
       <Notifiche />
+      <CardCorsiHome />
       <h1 className="tec-h1">{t('Ciao {n}', { n: h.nome.split(' ')[0] })}</h1>
       {h.avvisi.map((a, i) => <div key={i} className={`ph-msg ${a.l}`}>{tm(a.m)}</div>)}
       <InstallaApp />

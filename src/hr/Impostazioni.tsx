@@ -56,7 +56,7 @@ function Festivita() {
   }
   const attive = (data ?? []).filter(x => x.attiva);
   const patrono = attive.some(x => x.origine === 'patrono');
-  const naz = attive.filter(x => x.origine === 'nazionale').length;
+  const naz = (data ?? []).filter(x => x.origine === 'nazionale').length;
   return (
     <section className="panel">
       <div className="hr-panel-h"><h2>Festività {anno}</h2>
@@ -64,13 +64,16 @@ function Festivita() {
         <span className="spacer" />{naz < 12 && <button className="btn-ghost btn-sm" onClick={genera}>Aggiungi le festività nazionali</button>}</div>
       {errore && <Errore testo={errore} onRetry={reload} />}
       {!patrono && data && <Banner s="warn">Aggiungi il santo patrono della sede, se è un giorno di festa.</Banner>}
-      {annulla && <Banner s="ok"><div className="row-flex">Festività tolta: {annulla.nome}. <button className="btn-ghost btn-sm" onClick={() => attiva(annulla, true)}>Annulla</button></div></Banner>}
+      {annulla && <Banner s="ok"><div className="row-flex">{annulla.nome} ora è un giorno lavorativo. <button className="btn-ghost btn-sm" onClick={() => attiva(annulla, true)}>Annulla</button></div></Banner>}
       {!data ? <Caricamento /> : <ul className="hr-feste">
-        {data.filter(x => x.attiva).map(x => (
-          <li key={x.data}><span className="hr-feste-d">{giornoLungo(x.data)}</span><span>{x.nome}</span>
+        {data.map(x => (
+          <li key={x.data} className={x.attiva ? '' : 'hr-festa-off'}><span className="hr-feste-d">{giornoLungo(x.data)}</span><span>{x.nome}</span>
             {x.origine === 'nazionale' ? <Pill s="na">Nazionale</Pill> : <Pill s="info">{x.origine === 'patrono' ? 'Santo patrono' : 'Aziendale / locale'}</Pill>}
-            <span className="spacer" />{x.origine !== 'nazionale' && <button className="btn-ghost btn-sm" onClick={() => attiva(x, false)}>Togli</button>}</li>))}
-        {!attive.length && <li className="sub">Nessuna festività per il {anno}. Usa «Aggiungi le festività nazionali».</li>}
+            <span className="spacer" />
+            <span className={x.attiva ? 'hr-festa-stato on' : 'hr-festa-stato'}>{x.attiva ? 'Festivo: non conta come ferie' : 'Lavorativo: conta come ferie'}</span>
+            <button type="button" role="switch" aria-checked={x.attiva} aria-label={`${x.nome}: ${x.attiva ? 'festivo' : 'lavorativo'}`}
+              className={`hr-switch ${x.attiva ? 'on' : ''}`} onClick={() => attiva(x, !x.attiva)}><span /></button></li>))}
+        {!data.length && <li className="sub">Nessuna festività per il {anno}. Usa «Aggiungi le festività nazionali».</li>}
       </ul>}
       <form className="row-flex wrap-end hr-add" onSubmit={aggiungi}>
         <div className="field"><label htmlFor="fe-d">Data</label><input id="fe-d" type="date" required min={`${anno}-01-01`} max={`${anno}-12-31`} value={f.data} onChange={e => setF({ ...f, data: e.target.value })} /></div>

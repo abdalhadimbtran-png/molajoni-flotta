@@ -1248,3 +1248,15 @@ table.wk thead th { background:var(--surface-2); font-size:14px; }
 .wk-prio button { flex:1; min-height:52px; font:inherit; font-size:16px; font-weight:600; border:2px solid var(--line-strong); border-radius:10px; background:var(--surface); cursor:pointer; color:var(--ink-2); }
 .wk-prio button.on { border-color:var(--ink); background:var(--ink); color:var(--surface); }
 .wk-prio button.urg.on { border-color:var(--brand); background:var(--brand); color:#fff; }
+
+/* festività: interruttore attiva / disattivata */
+.hr-feste li.hr-festa-off { opacity: .6; }
+.hr-feste li.hr-festa-off .hr-feste-d, .hr-feste li.hr-festa-off > span:nth-child(2) { text-decoration: line-through; }
+.hr-festa-stato { font-size: .8rem; color: var(--muted, #6b7280); margin-right: .6rem; }
+.hr-festa-stato.on { color: #15803d; }
+.hr-switch { position: relative; width: 46px; height: 26px; border-radius: 13px; border: 0; background: #cbd5e1; cursor: pointer; padding: 0; flex: none; transition: background .15s; }
+.hr-switch span { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+.hr-switch.on { background: #16a34a; }
+.hr-switch.on span { left: 23px; }
+.hr-switch:focus-visible { outline: 2px solid #b71c1c; outline-offset: 2px; }
+@media (max-width: 600px) { .hr-festa-stato { display: none; } }

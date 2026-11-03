@@ -50,3 +50,53 @@ export async function apriAttestato(path: string) {
   if (error || !data) { w?.close(); throw new Error('Attestato non disponibile'); }
   if (w) w.location.href = data.signedUrl; else window.location.href = data.signedUrl;
 }
+
+export interface Registrazione {
+  id: number; dipendente_id: number; nome: string; categoria: string; attivo: boolean; corso_id: number; corso: string;
+  data_conseguimento: string; data_scadenza: string | null; ente: string | null; ore: number | null; n_attestati: number; attuale: boolean;
+}
+export interface Attestato { id: number; corso_dipendente_id: number; path: string; nome_file: string | null; mime: string | null; created_at: string; caricato_da_dipendente: boolean }
+export interface Richiesta { id: number; corso_dipendente_id: number; stato: 'richiesto' | 'da_verificare' | 'approvato' | 'rifiutato'; path: string | null; nome_file: string | null; mime: string | null; motivo: string | null; richiesto_il: string; ultimo_promemoria: string | null; caricato_il: string | null }
+export interface Tutto { oggi: string; righe: RigaStato[]; registrazioni: Registrazione[]; corsi: Corso[]; dip: DipBase[]; attestati: Attestato[]; richieste: Richiesta[] }
+
+/** Tutti i dati dell'area in una volta (pochi dipendenti: calcoli nel browser). */
+export async function caricaTutto(): Promise<Tutto> {
+  const [d, c, p, a, pr] = await Promise.all([
+    supabase.rpc('formazione_dati'),
+    supabase.from('corsi').select('*').order('ordine').order('nome'),
+    supabase.from('dipendenti').select('id,codice,nome,cognome,categoria,reparto,attivo').eq('attivo', true).order('cognome').order('nome'),
+    supabase.from('corsi_attestati').select('*').order('created_at', { ascending: false }),
+    supabase.from('richieste_attestato').select('*').order('richiesto_il', { ascending: false }),
+  ]);
+  const e = d.error || c.error || p.error || a.error || pr.error; if (e) throw e;
+  const x = d.data as { oggi: string; righe: RigaStato[]; registrazioni: Registrazione[] };
+  return { ...x, corsi: (c.data ?? []) as Corso[], dip: (p.data ?? []) as DipBase[], attestati: (a.data ?? []) as Attestato[], richieste: (pr.data ?? []) as Richiesta[] };
+}
+
+/** Riduce le foto grandi prima del caricamento (JPEG, lato lungo 2000 px). PDF e foto piccole restano uguali. */
+export async function comprimi(f: File): Promise<File> {
+  if (!/^image\/(jpeg|png|webp)$/.test(f.type) || f.size < 1.5 * 1024 * 1024) return f;
+  try {
+    const img = await createImageBitmap(f);
+    const k = Math.min(1, 2000 / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+    cv.getContext('2d')!.drawImage(img, 0, 0, cv.width, cv.height);
+    const b = await new Promise<Blob | null>(r => cv.toBlob(r, 'image/jpeg', 0.82));
+    return b && b.size < f.size ? new File([b], f.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : f;
+  } catch { return f; }
+}
+
+export async function caricaFile(f: File): Promise<{ path: string; nome: string; mime: string }> {
+  const g = await comprimi(f);
+  return { path: await caricaAttestato(g), nome: g.name.slice(0, 120), mime: g.type };
+}
+
+export const iniziali = (n: string, c: string) => `${(c[0] ?? '').toUpperCase()}${(n[0] ?? '').toUpperCase()}`;
+export const COLORE: Record<StatoCorso, string> = { valido: 'var(--ok)', in_scadenza: 'var(--warn)', scaduto: 'var(--ko)', mancante: 'var(--ko)' };
+
+export const richiestaAperta = (t: Tutto, cd: number) => t.richieste.find(r => r.corso_dipendente_id === cd && r.stato !== 'approvato') ?? null;
+export async function chiediAttestato(ids: number[]) {
+  const { data, error } = await supabase.rpc('formazione_chiedi_attestato', { p_registrazioni: ids });
+  if (error) throw error;
+  return (data as { richieste: number }).richieste;
+}

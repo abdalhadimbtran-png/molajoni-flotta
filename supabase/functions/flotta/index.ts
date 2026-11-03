@@ -2,6 +2,8 @@
 // /push      (chiamata dal database) invia la notifica push ai telefoni iscritti
 // /foto      (app tecnico) carica una foto su una segnalazione propria
 // /documento (app tecnico) restituisce un link temporaneo a un documento del veicolo
+// /attestato (app dipendente) link temporaneo a un proprio attestato
+// /carica-attestato (app dipendente) carica l'attestato richiesto dal responsabile (da verificare)
 // /account   (amministratore) elenco, creazione, password e stato degli account responsabile
 // Le chiavi stanno nella tabella privata config_privata, letta con la chiave di servizio.
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -126,6 +128,43 @@ async function documento(req: Request) {
   return json({ url: s.data.signedUrl });
 }
 
+
+async function attestato(req: Request) {
+  const { token, id } = await req.json().catch(() => ({}));
+  if (typeof token !== "string" || !Number.isInteger(id)) return json({ errore: "Richiesta non valida" }, 400);
+  const { data: path, error } = await db.rpc("dipendente_percorso_attestato", { p_token: token, p_id: id });
+  if (error) return json({ errore: error.message.includes("SESSIONE_NON_VALIDA") ? "SESSIONE_NON_VALIDA" : "Attestato non disponibile" }, 401);
+  if (!path) return json({ errore: "Attestato non trovato" }, 404);
+  const s = await db.storage.from("attestati").createSignedUrl(path, 120);
+  if (s.error) return json({ errore: "Attestato non disponibile" }, 500);
+  return json({ url: s.data.signedUrl });
+}
+
+async function caricaAttestato(req: Request) {
+  const form = await req.formData();
+  const token = String(form.get("token") ?? "");
+  const id = Number(form.get("richiesta_id"));
+  const file = form.get("file");
+  if (!(file instanceof File)) return json({ errore: "File mancante" }, 400);
+  if (file.size > 10 * 1024 * 1024) return json({ errore: "File troppo grande (massimo 10 MB)." }, 400);
+  if (!Number.isInteger(id) || id <= 0) return json({ errore: "Richiesta non valida" }, 400);
+  const t = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const asc = String.fromCharCode(...t);
+  const tipo = t[0] === 0xff && t[1] === 0xd8 ? "image/jpeg" : t[0] === 0x89 && t[1] === 0x50 ? "image/png"
+    : asc.startsWith("%PDF") ? "application/pdf" : asc.slice(4, 8) === "ftyp" && /heic|heix|mif1|heif/.test(asc.slice(8, 12)) ? "image/heic" : null;
+  if (!tipo) return json({ errore: "Formato non supportato: usa foto JPG, PNG, HEIC o PDF." }, 400);
+  const { data: did, error: e1 } = await db.rpc("dipendente_id_token", { p_token: token });
+  if (e1 || !did) return json({ errore: "SESSIONE_NON_VALIDA" }, 401);
+  const est = { "image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf", "image/heic": "heic" }[tipo];
+  const path = `dip/${did}/${crypto.randomUUID()}.${est}`;
+  const up = await db.storage.from("attestati").upload(path, file, { contentType: tipo, upsert: false });
+  if (up.error) return json({ errore: "Caricamento non riuscito" }, 500);
+  const { error } = await db.rpc("dipendente_carica_attestato", { p_token: token, p_id: id, p_path: path,
+    p_nome: (file.name || "attestato").slice(0, 120), p_mime: tipo });
+  if (error) { await db.storage.from("attestati").remove([path]); return json({ errore: error.message }, 400); }
+  return json({ ok: true });
+}
+
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 async function account(req: Request) {
   const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -191,6 +230,8 @@ Deno.serve(async (req) => {
     if (p.endsWith("/push")) return await push(req);
     if (p.endsWith("/foto")) return await foto(req);
     if (p.endsWith("/documento")) return await documento(req);
+    if (p.endsWith("/carica-attestato")) return await caricaAttestato(req);
+    if (p.endsWith("/attestato")) return await attestato(req);
     if (p.endsWith("/account")) return await account(req);
     return json({ errore: "percorso sconosciuto" }, 404);
   } catch (e) {

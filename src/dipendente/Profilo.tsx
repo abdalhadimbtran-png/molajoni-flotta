@@ -43,6 +43,28 @@ function LaTuaCarta({ token }: { token: string }) {
   );
 }
 
+const STATO_MIO: Record<string, [string, string]> = { valido: ['ok', 'Valido'], in_scadenza: ['warn', 'In scadenza'], scaduto: ['ko', 'Scaduto'], mancante: ['ko', 'Da fare'] };
+/** I miei corsi: stato e scadenza, sola lettura. */
+function IMieiCorsi({ token }: { token: string }) {
+  const [corsi, setCorsi] = useState<{ corso: string; data_conseguimento: string | null; data_scadenza: string | null; stato: string }[] | null>(null);
+  useEffect(() => { rpc<NonNullable<typeof corsi>>('dipendente_corsi', { p_token: token }).then(setCorsi).catch(() => setCorsi([])); }, [token]);
+  if (!corsi?.length) return null;
+  return (
+    <section className="tec-card">
+      <div className="lbl-sm">I miei corsi</div>
+      {corsi.map((c, i) => {
+        const [l, t] = STATO_MIO[c.stato] ?? ['na', c.stato];
+        return (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', padding: '6px 0' }}>
+            <div><b>{c.corso}</b><div className="sub">{c.data_conseguimento ? (c.data_scadenza ? `Scade il ${dataLunga(c.data_scadenza)}` : 'Non scade') : 'Corso obbligatorio non ancora fatto'}</div></div>
+            <span className={`pill ${l}`}>{t}</span>
+          </div>);
+      })}
+      <span className="sub">Un corso manca o è sbagliato? Avvisa il responsabile della formazione.</span>
+    </section>
+  );
+}
+
 /** Profilo in sola lettura (UX § 2.6). «Esci» sta qui, così non si tocca per sbaglio. */
 export default function Profilo() {
   const { home, errore, esci, token } = useSessione();
@@ -72,6 +94,7 @@ export default function Profilo() {
         </dl>
         <span className="sub">Vedi un dato sbagliato? Avvisa l'ufficio personale.</span>
       </section>
+      <IMieiCorsi token={token} />
       <LaTuaCarta token={token} />
       <AttivaNotifiche sempre />
       <InstallaApp />

@@ -40,6 +40,12 @@ import Saldi from './hr/Saldi';
 import Impostazioni from './hr/Impostazioni';
 import ReportHR from './hr/ReportHR';
 import SchedaAccesso from './hr/SchedaAccesso';
+import ShellFormazione from './formazione/ShellFormazione';
+import CruscottoFormazione from './formazione/Cruscotto';
+import CorsiFormazione from './formazione/Corsi';
+import DipendentiFormazione from './formazione/Dipendenti';
+import RegistraFormazione from './formazione/Registra';
+import ReportFormazione from './formazione/Report';
 
 function App() {
   if (!configurato) return <div className="wrap"><div className="banner ko">Configurazione mancante: VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.</div></div>;
@@ -71,6 +77,14 @@ function App() {
           <Route path="/hr/carburante" element={<Carburante gestione />} />
           <Route path="/hr/installa" element={<SchedaAccesso />} />
           <Route path="/hr/*" element={<Navigate to="/hr" replace />} />
+        </Route>
+        <Route element={<ShellFormazione />}>
+          <Route path="/formazione" element={<CruscottoFormazione />} />
+          <Route path="/formazione/dipendenti" element={<DipendentiFormazione />} />
+          <Route path="/formazione/registra" element={<RegistraFormazione />} />
+          <Route path="/formazione/corsi" element={<CorsiFormazione />} />
+          <Route path="/formazione/report" element={<ReportFormazione />} />
+          <Route path="/formazione/*" element={<Navigate to="/formazione" replace />} />
         </Route>
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />

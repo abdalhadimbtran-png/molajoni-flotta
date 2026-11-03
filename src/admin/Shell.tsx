@@ -10,8 +10,8 @@ import { InstallaApp } from '../Installa';
 
 type Stato = 'caricamento' | 'anonimo' | 'non_abilitato' | 'ok';
 /** Area dell'account: null per l'amministratore (entra ovunque) o per un account non abilitato. */
-export type Area = 'flotta' | 'hr' | null;
-export interface Ruoli { admin: boolean; flotta: boolean; hr: boolean }
+export type Area = 'flotta' | 'hr' | 'formazione' | null;
+export interface Ruoli { admin: boolean; flotta: boolean; hr: boolean; formazione: boolean }
 
 /**
  * Sessione dell'ufficio. `stato` resta come prima (ok = può aprire il pannello flotta).
@@ -21,16 +21,16 @@ export interface Ruoli { admin: boolean; flotta: boolean; hr: boolean }
 export function useSessione() {
   const [sessione, setSessione] = useState<Session | null>(null);
   const [stato, setStato] = useState<Stato>('caricamento');
-  const [ruoli, setRuoli] = useState<Ruoli>({ admin: false, flotta: false, hr: false });
+  const [ruoli, setRuoli] = useState<Ruoli>({ admin: false, flotta: false, hr: false, formazione: false });
   useEffect(() => {
     let attivo = true;
     async function verifica(s: Session | null) {
       if (!attivo) return;
       setSessione(s);
-      if (!s) { setRuoli({ admin: false, flotta: false, hr: false }); setStato('anonimo'); return; }
-      const [r, a, h] = await Promise.all([supabase.rpc('is_responsabile'), supabase.rpc('is_admin'), supabase.rpc('is_hr')]);
+      if (!s) { setRuoli({ admin: false, flotta: false, hr: false, formazione: false }); setStato('anonimo'); return; }
+      const [r, a, h, f] = await Promise.all([supabase.rpc('is_responsabile'), supabase.rpc('is_admin'), supabase.rpc('is_hr'), supabase.rpc('is_formazione')]);
       if (!attivo) return;
-      const nuovi = { admin: !a.error && a.data === true, flotta: !r.error && r.data === true, hr: !h.error && h.data === true };
+      const nuovi = { admin: !a.error && a.data === true, flotta: !r.error && r.data === true, hr: !h.error && h.data === true, formazione: !f.error && f.data === true };
       setRuoli(nuovi);
       setStato(nuovi.flotta ? 'ok' : 'non_abilitato');
     }
@@ -38,7 +38,7 @@ export function useSessione() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { verifica(s); });
     return () => { attivo = false; sub.subscription.unsubscribe(); };
   }, []);
-  const area: Area = ruoli.admin ? null : ruoli.flotta ? 'flotta' : ruoli.hr ? 'hr' : null;
+  const area: Area = ruoli.admin ? null : ruoli.flotta ? 'flotta' : ruoli.hr ? 'hr' : ruoli.formazione ? 'formazione' : null;
   return { sessione, stato, ...ruoli, area };
 }
 
@@ -47,6 +47,7 @@ export function homeDi(r: Ruoli): string | null {
   if (r.admin) return '/admin';
   if (r.flotta) return '/cruscotto';
   if (r.hr) return '/hr';
+  if (r.formazione) return '/formazione';
   return null;
 }
 
@@ -56,6 +57,7 @@ export function puoAprire(percorso: string, r: Ruoli): boolean {
   if (percorso === '/t' || percorso.startsWith('/t/')) return true;
   if (percorso.startsWith('/admin')) return false;
   if (percorso.startsWith('/hr')) return r.hr;
+  if (percorso.startsWith('/formazione')) return r.formazione;
   return r.flotta;
 }
 
@@ -95,13 +97,14 @@ const GRUPPI: Gruppo[] = [
 ];
 
 export default function Shell() {
-  const { sessione, stato, admin, hr } = useSessione();
+  const { sessione, stato, admin, hr, formazione } = useSessione();
   const { t } = useT();
   const loc = useLocation();
   if (stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
   if (stato === 'anonimo') return <Navigate to="/accesso" replace state={{ da: loc.pathname + loc.search }} />;
   // account dell'ufficio personale che apre il pannello flotta: va alla sua area, senza errore
   if (stato === 'non_abilitato' && hr) return <Navigate to="/hr" replace />;
+  if (stato === 'non_abilitato' && formazione) return <Navigate to="/formazione" replace />;
   if (stato === 'non_abilitato') return (
     <div className="wrap narrow">
       <h1>{t('Account non abilitato')}</h1>

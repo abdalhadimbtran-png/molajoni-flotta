@@ -32,6 +32,7 @@ function Contenuto({ email }: { email: string }) {
       menuUtente={<>
         <NavLink to="/cruscotto"><Icona n="cruscotto" />{t('Pannello flotta')}</NavLink>
         <NavLink to="/hr"><Icona n="tecnici" />{t('Ufficio personale')}</NavLink>
+        <NavLink to="/formazione"><Icona n="report" />{t('Formazione')}</NavLink>
         <button onClick={() => supabase.auth.signOut()}><Icona n="ritorno" />{t('Esci')}</button>
       </>}>
       <Outlet />

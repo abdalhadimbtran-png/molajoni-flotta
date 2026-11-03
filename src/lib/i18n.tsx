@@ -528,6 +528,7 @@ const AR: Record<string, string> = {
   'amministratori, responsabili flotta e ufficio personale': 'المديرون ومسؤولو الأسطول وشؤون الموظفين',
   'Tutto il sistema: account, analisi, sicurezza, flotta e personale.': 'النظام كاملًا: الحسابات والتحليلات والأمان والأسطول والموظفون.',
   'Ferie e permessi, dipendenti, saldi, festività, report del personale.': 'الإجازات والأذونات، الموظفون، الأرصدة، العطل، تقارير الموظفين.',
+  'Responsabile formazione': 'مسؤول التدريب', 'Corsi e attestati dei dipendenti, scadenze, report della formazione.': 'دورات الموظفين وشهاداتهم، تواريخ الانتهاء، تقارير التدريب.',
   'App con codice e PIN: ferie e permessi; i tecnici anche veicolo e km.': 'تطبيق بالرمز وPIN: الإجازات والأذونات؛ وللفنيين أيضًا السيارة والكيلومترات.',
   'Cambia ruolo': 'تغيير الدور', 'Collega dipendente': 'ربط بموظف', 'Salva ruolo': 'حفظ الدور', 'Il tuo account': 'حسابك',
   'Ruolo di {n}': 'دور {n}', 'È anche il dipendente {n}': 'وهو أيضًا الموظف {n}',

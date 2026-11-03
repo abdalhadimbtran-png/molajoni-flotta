@@ -55,3 +55,15 @@ Notifiche al responsabile flotta per assenze approvate/annullate: `link = /piano
 Nota: le RPC `hr_*` hanno EXECUTE anche per `anon` (grant di default), ma rifiutano chi non è HR.
 
 Assenza ingiustificata (`ING`): solo HR, mai richiedibile (vincolo), unità ore; la flotta vede solo "Assente". Annullo con `hr_annulla_richiesta` (motivo obbligatorio).
+
+## Formazione — `authenticated` + `is_formazione()` (responsabile con `responsabili.formazione=true`, o admin)
+Ruolo: `admin_imposta_responsabile(p_user, 'formazione', p_attivo)` (area resta `flotta` per il CHECK esistente, `is_responsabile()` esclude questi account).
+| RPC | Parametri | Note |
+|---|---|---|
+| `formazione_cruscotto` | — | `{validi, in_scadenza, scaduti, mancanti, lista}`; anche HR |
+| `formazione_scadenze` | `p_giorni=60` | anche HR |
+| `formazione_report` | `p_tipo ('per_dipendente'/'scadenze'), p_categoria?, p_dipendente?, p_giorni=60` | anche HR |
+| `formazione_registra` | `p_corso, p_dipendenti bigint[], p_data, p_scadenza?, p_ente?, p_ore?, p_note?, p_attestato?` | rinnovo = nuova riga |
+| `formazione_stato_tecnici` | — | flotta: solo `valido`/`scaduto` per tecnico |
+| `dipendente_corsi` | `p_token` | app dipendente, sola lettura |
+Tabelle `corsi`, `corsi_dipendente` (scadenza automatica da trigger), vista `corsi_attuali`; bucket privato `attestati`.

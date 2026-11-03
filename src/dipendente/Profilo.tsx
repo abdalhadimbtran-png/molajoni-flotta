@@ -4,13 +4,14 @@ import { rpc } from '../lib/supabase';
 import { nomeTipo, useSessione, type Saldo } from './api';
 import { Attesa } from './componenti';
 import { AttivaNotifiche } from './Notifiche';
-import { dataLunga, fmtSaldo, num } from './periodo';
+import { dataLunga, fmtSaldo, num, saldoSemplice } from './periodo';
 
 const CATEGORIE: Record<string, string> = { TEC: 'Tecnico', UFFICIO: 'Ufficio', MAGAZZINO: 'Magazzino', ALTRO: 'Altro' };
 
 function BloccoSaldo({ s }: { s: Saldo }) {
   const u = s.unita;
-  const v = (n: number) => <b className={n < 0 ? 'neg' : undefined}>{num(Number(n))}</b>;
+  const v = (n: number) => <b className={n < 0 ? 'neg' : undefined}>{num(Math.round(Number(n) * 10) / 10)}</b>;
+  const resto = saldoSemplice(Number(s.saldo), u);
   return (
     <div className="saldo-dett">
       <div className="saldo-dett-t"><b>{nomeTipo(s.tipo, s.descrizione)}</b><span className="sub">{u === 'ore' ? 'in ore' : 'in giorni'}</span></div>
@@ -20,9 +21,9 @@ function BloccoSaldo({ s }: { s: Saldo }) {
         <span>Usate o già approvate{v(s.goduto)}</span>
         {Number(s.rettifiche) !== 0 && <span>Correzioni dell'ufficio{v(s.rettifiche)}</span>}
         {Number(s.in_attesa) > 0 && <span>In valutazione{v(s.in_attesa)}</span>}
-        <span className="totale">Ti restano{v(s.saldo)}</span>
+        <span className="totale">Ti restano<b className={resto.anticipo ? 'neg' : undefined}>{resto.testo}</b></span>
       </div>
-      {Number(s.quota_mensile) > 0 && <span className="sub">Maturi {fmtSaldo(Number(s.quota_mensile), u)} ogni mese. A fine anno avrai {fmtSaldo(Number(s.saldo_fine_anno), u)} (senza nuove richieste).</span>}
+      {Number(s.quota_mensile) > 0 && <span className="sub">Maturi circa {fmtSaldo(Math.round(Number(s.quota_mensile) * 10) / 10, u)} ogni mese. A fine anno avrai {saldoSemplice(Number(s.saldo_fine_anno), u).testo} (senza nuove richieste).</span>}
     </div>
   );
 }

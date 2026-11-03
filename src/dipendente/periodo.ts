@@ -50,6 +50,20 @@ export function fmtQuantita(q: number, unita: Unita): string {
   return `${num(q)} ${Math.abs(q) === 1 ? 'giorno' : 'giorni'}`;
 }
 
+/**
+ * Saldo come lo legge il dipendente: giorni arrotondati per difetto alla mezza giornata, ore all'ora intera
+ * (la maturazione mensile, es. 20/12 = 1,67, produce decimali che confondono). Se negativo: «0 giorni (in anticipo: 0,5)».
+ */
+export function saldoSemplice(q: number, unita: Unita): { testo: string; anticipo: boolean } {
+  const passo = unita === 'ore' ? 1 : 0.5;
+  const giu = (x: number) => Math.floor(x / passo + 1e-6) * passo;
+  if (q < 0) {
+    const a = Math.max(passo, Math.ceil(-q / passo - 1e-6) * passo);
+    return { testo: `0 ${unita === 'ore' ? 'ore' : 'giorni'} (in anticipo: ${num(a)})`, anticipo: true };
+  }
+  return { testo: fmtSaldo(giu(q), unita), anticipo: false };
+}
+
 /** Saldo: «12,5 giorni», «−0,5 giorni», «16 ore», «63,5 ore». */
 export const fmtSaldo = (q: number, unita: Unita) => `${num(q)} ${unita === 'ore' ? (Math.abs(q) === 1 ? 'ora' : 'ore') : (Math.abs(q) === 1 ? 'giorno' : 'giorni')}`;
 

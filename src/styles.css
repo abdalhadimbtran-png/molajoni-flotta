@@ -1260,3 +1260,19 @@ table.wk thead th { background:var(--surface-2); font-size:14px; }
 .hr-switch.on span { left: 23px; }
 .hr-switch:focus-visible { outline: 2px solid #b71c1c; outline-offset: 2px; }
 @media (max-width: 600px) { .hr-festa-stato { display: none; } }
+
+/* App dipendente: icone nei bottoni sempre piccole (un <svg> senza misura diventa 300×150 e copre la pagina) */
+.tec-main .btn > svg, .tec-main .btn-ghost > svg, .modal .btn > svg { width:22px; height:22px; flex:none; }
+.tec-main .btn { min-width:0; } .tec-main .btn.big { white-space:normal; text-align:center; }
+.tec-main, .tec-main > * { min-width:0; } .tec-main { overflow-wrap:anywhere; }
+.mini-stat b { overflow-wrap:normal; }
+/* Riepilogo della richiesta (app dipendente): 3 colonne etichetta · valore · «Cambia» (la regola generica più sopra lo riduce a 2) */
+.tec-main .riepilogo:not(.dati) { grid-template-columns:auto minmax(0,1fr) auto; column-gap:14px; }
+.tec-main .riepilogo dt, .tec-main .riepilogo dd { border-bottom:none; border-top:1px solid var(--line); padding:11px 0; }
+.tec-main .riepilogo > :nth-child(-n+3) { border-top:none; }
+.tec-main .riepilogo dd.az:empty { padding:0; }
+/* Numeri del saldo su telefono: una riga per voce, etichetta a sinistra e numero a destra */
+.tec-main .mini-stat { grid-template-columns:1fr; }
+.tec-main .mini-stat span { align-items:baseline; }
+.tec-main .mini-stat b { text-align:end; font-size:17px; }
+@media (min-width:600px) { .tec-main .mini-stat { grid-template-columns:repeat(2, 1fr); } }

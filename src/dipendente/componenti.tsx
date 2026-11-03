@@ -4,7 +4,7 @@ import { Pill } from '../ui';
 import { oggiISO } from '../lib/format';
 import type { Livello } from '../lib/format';
 import { nomeTipo, type Richiesta, type Saldo, type SaldoAnteprima, type StatoRichiesta } from './api';
-import { dataDaTs, dataLunga, diffGiorni, fineMese, fmtPeriodo, fmtQuantita, fmtSaldo, giornoLungo, intervallo, nomeMese, num, type Unita } from './periodo';
+import { dataDaTs, dataLunga, diffGiorni, fineMese, fmtPeriodo, fmtQuantita, fmtSaldo, giornoLungo, intervallo, nomeMese, saldoSemplice, type Unita } from './periodo';
 
 /* ---------- Icone (tratto 2, come quelle dell'app tecnico) ---------- */
 const Ico = ({ d }: { d: ReactNode }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
@@ -39,7 +39,7 @@ export function sintesiSaldi(saldi: Saldo[] | undefined): SintesiSaldo {
   const oreTipi = l.filter(s => s.unita === 'ore');
   return { ferie, oreTipi, oreTot: oreTipi.length ? Math.round(oreTipi.reduce((a, s) => a + Number(s.saldo), 0) * 100) / 100 : null };
 }
-const Neg = ({ n, children }: { n: number; children: ReactNode }) => <b className={n < 0 ? 'neg' : undefined}>{children}</b>;
+const Saldo1 = ({ n, u }: { n: number; u: Unita }) => { const x = saldoSemplice(Number(n), u); return <b className={x.anticipo ? 'neg' : undefined}>{x.testo}</b>; };
 
 export function RiquadroSaldo({ saldi, variante, inAttesa = 0 }: { saldi: Saldo[] | undefined; variante: 'grande' | 'compatto'; inAttesa?: number }) {
   const { ferie, oreTot } = sintesiSaldi(saldi);
@@ -50,18 +50,18 @@ export function RiquadroSaldo({ saldi, variante, inAttesa = 0 }: { saldi: Saldo[
   const prossima = ferie && ferie.mesi_maturati < 12 && Number(ferie.quota_mensile) > 0 ? fineMese(oggi) : null;
   if (variante === 'compatto') return (
     <p className="saldo-riga">
-      Ti restano {ferie && <><Neg n={ferie.saldo}>{fmtSaldo(Number(ferie.saldo), 'giorni')}</Neg> di ferie</>}
+      Ti restano {ferie && <><Saldo1 n={ferie.saldo} u="giorni" /> di ferie</>}
       {ferie && oreTot != null && ' e '}
-      {oreTot != null && <><Neg n={oreTot}>{fmtSaldo(oreTot, 'ore')}</Neg> di permesso</>}
+      {oreTot != null && <><Saldo1 n={oreTot} u="ore" /> di permesso</>}
     </p>
   );
   return (
     <section className="tec-card saldo grande" aria-label="Il tuo saldo">
       <span className="lbl-sm">Ti restano</span>
-      {ferie && <div className={`saldo-num${ferie.saldo < 0 ? ' neg' : ''}`}>{fmtSaldo(Number(ferie.saldo), 'giorni')} <span>di ferie</span></div>}
-      {oreTot != null && <div className="saldo-ore">{ferie ? 'e ' : ''}<b className={oreTot < 0 ? 'neg' : undefined}>{fmtSaldo(oreTot, 'ore')}</b> di permesso</div>}
+      {ferie && <div className={`saldo-num${ferie.saldo < 0 ? ' neg' : ''}`}>{saldoSemplice(Number(ferie.saldo), 'giorni').testo} <span>di ferie</span></div>}
+      {oreTot != null && <div className="saldo-ore">{ferie ? 'e ' : ''}<Saldo1 n={oreTot} u="ore" /> di permesso</div>}
       {inAttesa > 0 && <div className="sub">{inAttesa === 1 ? '1 richiesta in valutazione non è ancora tolta dal saldo.' : `${inAttesa} richieste in valutazione non sono ancora tolte dal saldo.`}</div>}
-      {prossima && ferie && <div className="sub">A fine {nomeMese(prossima)} maturi altri {fmtSaldo(Number(ferie.quota_mensile), 'giorni')} di ferie.</div>}
+      {prossima && ferie && <div className="sub">A fine {nomeMese(prossima)} maturi altri {fmtSaldo(Math.round(Number(ferie.quota_mensile) * 2) / 2, 'giorni')} circa di ferie.</div>}
     </section>
   );
 }
@@ -131,11 +131,11 @@ export function RiepilogoRichiesta({ d, saldi, conSaldo, modificabile }: {
           <div key={s.anno} className="saldo-dopo">
             <div className="lbl-sm">{d.unita === 'ore' ? 'Ore di permesso' : 'Ferie'} che ti restano a fine {nomeMese(s.alla_data)}{s.alla_data.slice(0, 4) !== oggiISO().slice(0, 4) ? ` ${s.anno}` : ''}</div>
             <div className="mini-stat">
-              <span>senza questa<b className={prima < 0 ? 'neg' : undefined}>{num(prima)}</b></span>
-              <span>dopo questa<b className={s.saldo_dopo < 0 ? 'neg' : undefined}>{num(Number(s.saldo_dopo))}</b></span>
+              <span>senza questa<Saldo1 n={prima} u={d.unita} /></span>
+              <span>dopo questa<Saldo1 n={Number(s.saldo_dopo)} u={d.unita} /></span>
             </div>
             {Number(s.in_attesa) > 0 && <span className="sub">Sono già tolte le altre richieste in valutazione ({fmtSaldo(Number(s.in_attesa), d.unita)}).</span>}
-            {s.insufficiente && <div className="ph-msg warn">Dopo questa richiesta ti mancano {fmtSaldo(-Number(s.saldo_dopo), d.unita)} di {d.unita === 'ore' ? 'permesso' : 'ferie'}. Puoi inviarla lo stesso: decide l'ufficio personale.</div>}
+            {s.insufficiente && <div className="ph-msg warn">Dopo questa richiesta ti mancano circa {saldoSemplice(-Number(s.saldo_dopo) + (d.unita === 'ore' ? 0.999 : 0.499), d.unita).testo} di {d.unita === 'ore' ? 'permesso' : 'ferie'}. Puoi inviarla lo stesso: decide l'ufficio personale.</div>}
             {s.spettanza_mancante && <span className="sub">L'ufficio personale non ha ancora impostato le ferie di quest'anno: il numero può cambiare.</span>}
           </div>
         );

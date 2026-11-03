@@ -24,6 +24,7 @@ import Multe from './admin/Multe';
 import Carburante from './admin/Carburante';
 import CarteCarburante from './admin/CarteCarburante';
 import Report from './admin/Report';
+import ElencoAttivita from './admin/ElencoAttivita';
 import Volantino from './admin/Volantino';
 import Avvisi from './admin/Avvisi';
 import Tecnico from './tecnico/Tecnico';
@@ -74,6 +75,7 @@ function App() {
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />
           <Route path="/piano" element={<Piano />} />
+          <Route path="/attivita" element={<ElencoAttivita />} />
           <Route path="/flotta" element={<Flotta />} />
           <Route path="/stampa-qr" element={<StampaQr />} />
           <Route path="/tecnici" element={<Tecnici />} />

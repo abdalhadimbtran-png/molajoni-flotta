@@ -1350,3 +1350,4 @@ i.int-pin { display:inline-block; width:22px; height:22px; vertical-align:middle
 .int-voce.on { border-color:var(--brand); box-shadow:inset 3px 0 0 var(--brand); }
 .int-pop { font-size:13px; line-height:1.45; } .int-pop-h { font-weight:700; margin-bottom:4px; }
 @media (max-width:820px) { .int-verifica { grid-template-columns:1fr; } .int-mappa.alta { height:460px; } }
+.int-geo { display:flex; flex-wrap:wrap; gap:10px 20px; align-items:center; margin-bottom:16px; } .int-geo .spacer { flex:1; }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { noteIndirizzo, pulisciIndirizzo, senzaIniziali } from './indirizzo';
-import { capTesto, dataIso, inLazio, leggiMatrice } from './importa';
-import { puntoMedioVia, valida, distanzaKm, type RisultatoNominatim } from '../../../supabase/functions/geocodifica/valida';
+import { capTesto, coordinateTesto, dataIso, inLazio, leggiMatrice } from './importa';
+import { catena, daNominatim, daPhoton, ErroreServizio, geocodificaRiga, puntoMedioVia, valida, distanzaKm, type Fornitore, type Geo } from '../../../supabase/functions/geocodifica/valida';
 import { suggerisci } from './suggerimenti';
 
 // Indirizzi di prova inventati (stessi schemi dell'export Taylor, nessun dato reale)
@@ -80,7 +80,7 @@ describe('importazione', () => {
 
 describe('validazione geocodifica', () => {
   const centro = { lat: 41.9, lon: 12.5 };
-  const r = (lat: number, lon: number, address: Record<string, string>): RisultatoNominatim => ({ lat: String(lat), lon: String(lon), address });
+  const r = (lat: number, lon: number, address: Record<string, string>): Geo => daNominatim({ lat: String(lat), lon: String(lon), address });
   it('CAP uguale → ok', () => { expect(valida(r(41.901, 12.501, { postcode: '00100', city: 'Roma' }), { cap: '00100', comune: 'ROMA' }, centro).ok).toBe(true); });
   it('comune diverso → no', () => { expect(valida(r(45.4, 9.1, { postcode: '20100', city: 'Milano' }), { cap: '00100', comune: 'ROMA' }, centro).ok).toBe(false); });
   it('stesso comune ma lontano dal CAP → no', () => { expect(valida(r(41.8, 12.6, { postcode: '00199', city: 'Roma' }), { cap: '00100', comune: 'ROMA' }, centro).ok).toBe(false); });
@@ -90,9 +90,9 @@ describe('validazione geocodifica', () => {
   it('punto medio della via limitato al CAP', () => {
     // via lunga 20 km in linea retta verso est; il CAP è vicino all'inizio
     const linea: [number, number][] = Array.from({ length: 21 }, (_, i) => [12.5 + i * 0.012, 41.9]);
-    const p = puntoMedioVia([{ lat: '41.9', lon: '12.62', geojson: { type: 'LineString', coordinates: linea } }], { lat: 41.9, lon: 12.5 })!;
+    const p = puntoMedioVia([daNominatim({ lat: '41.9', lon: '12.62', class: 'highway', geojson: { type: 'LineString', coordinates: linea } })], { lat: 41.9, lon: 12.5 })!;
     expect(distanzaKm(p, { lat: 41.9, lon: 12.5 })).toBeLessThan(3);
-    const q = puntoMedioVia([{ lat: '41.9', lon: '12.62', geojson: { type: 'LineString', coordinates: linea } }], null)!;
+    const q = puntoMedioVia([daNominatim({ lat: '41.9', lon: '12.62', class: 'highway', geojson: { type: 'LineString', coordinates: linea } })], null)!;
     expect(q.lon).toBeCloseTo(12.62, 2);
   });
 });
@@ -106,4 +106,49 @@ describe('suggerimento tecnico', () => {
     expect(s?.sigla).toBe('TECE'); expect(s?.motivo).toMatch(/più vicino: TECE, \d+,\d km/);
   });
   it('nessun dato', () => { expect(suggerisci({ cap: null, lat: null, lon: null }, zone, [], new Set())).toBeNull(); });
+});
+
+describe('fornitori e errori di servizio', () => {
+  const casa: Geo = daPhoton({ geometry: { coordinates: [12.5, 41.9] }, properties: { housenumber: '1', street: 'Via Finta', postcode: '00100', city: 'Roma', osm_key: 'building' } });
+  it('Photon normalizzato', () => { expect(casa).toMatchObject({ lat: 41.9, lon: 12.5, postcode: '00100', tipo: 'casa', housenumber: '1' }); });
+  const giu: Fornitore = { nome: 'Giu', cerca: async () => { throw new ErroreServizio('Giu HTTP 403', 403); } };
+  const vuoto: Fornitore = { nome: 'Vuoto', cerca: async () => [] };
+  const buono: Fornitore = { nome: 'Buono', cerca: async q => q.tipo === 'indirizzo' ? [casa] : [{ ...casa, tipo: 'altro' }] };
+  const cache = { leggi: async () => undefined, scrivi: async () => undefined };
+  const riga = { via: 'Via Finta', civico_geo: '1', cap: '00100', comune: 'ROMA', prov: 'RM' };
+  it('tutti giù → ErroreServizio (riga non segnata)', async () => { await expect(geocodificaRiga(riga, catena([giu, giu]), cache)).rejects.toBeInstanceOf(ErroreServizio); });
+  it('uno giù, l\'altro risponde → esatto', async () => { expect((await geocodificaRiga(riga, catena([giu, buono]), cache))?.geo_qualita).toBe('esatto'); });
+  it('risposte vuote → non trovato (null), non errore', async () => { expect(await geocodificaRiga(riga, catena([giu, vuoto]), cache)).toBeNull(); });
+});
+
+describe('coordinate nel file', () => {
+  it('colonne Lat/Lon o Coordinate', () => {
+    const m = [['ID intervento', 'Num/serie', 'Ubicazione', 'CAP', 'Loc. imp.', 'Latitudine', 'Longitudine', 'Coordinate'],
+      [1, '1/', 'VIA FINTA 1', '00100', 'ROMA', '41,9', '12,5', null],
+      [2, '2/', 'VIA FINTA 2', '00100', 'ROMA', null, null, '41.91, 12.51'],
+      [3, '3/', 'VIA FINTA 3', '00100', 'ROMA', 99, 99, null]];
+    const L = leggiMatrice(m);
+    expect([L.righe[0].lat, L.righe[0].lon]).toEqual([41.9, 12.5]);
+    expect([L.righe[1].lat, L.righe[1].lon]).toEqual([41.91, 12.51]);
+    expect(L.righe[2].lat).toBeNull();
+    expect(coordinateTesto('12.5,41.9')).toEqual([41.9, 12.5]);
+  });
+});
+
+describe('controllo qualità ed esportazioni', async () => {
+  const { fuoriZona } = await import('./controllo');
+  const { gpx, kml, csv } = await import('./esporta');
+  it('punto fuori dal suo CAP', () => {
+    const p = [1, 2, 3, 4].map(id => ({ id, cap: '00100', lat: 41.9 + id * 0.001, lon: 12.5 }));
+    p.push({ id: 9, cap: '00100', lat: 42.2, lon: 12.5 });
+    const f = fuoriZona(p);
+    expect([...f.keys()]).toEqual([9]);
+  });
+  const punto = { numero: '1', cliente: 'Cliente & Prova', cod_cliente: 'C1', impianto: '1/IMP', via: 'Via Finta', civico: '1', cap: '00100', comune: 'ROMA', prov: 'RM', tipo: 'CONTROLLO', famiglie: ['ESTINTORE'], note: null, tecnico_sigla: 'TECA', componenti: 2, lat: 41.9, lon: 12.5, geo_qualita: 'esatto' };
+  it('GPX/KML/CSV', () => {
+    expect(gpx([punto], 'Prova')).toContain('<wpt lat="41.900000" lon="12.500000">');
+    expect(gpx([punto], 'Prova')).toContain('Cliente &amp; Prova');
+    expect(kml([punto], 'Prova')).toContain('<coordinates>12.500000,41.900000,0</coordinates>');
+    expect(csv([punto]).split('\r\n')[1]).toContain('41.900000;12.500000');
+  });
 });

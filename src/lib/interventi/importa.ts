@@ -21,6 +21,7 @@ export interface RigaImport {
   impianto: string | null; cod_cliente: string | null; cliente: string | null; comune: string | null; cap: string | null; prov: string | null;
   indirizzo_originale: string | null; via: string | null; civico: string | null; civico_geo: string | null; note: string | null;
   componenti: number | null; tipo: string | null; famiglie: string[]; fuori_lazio: boolean;
+  lat: number | null; lon: number | null; // solo se il file ha colonne di coordinate
 }
 export interface Scartata { riga: number; motivo: string }
 export interface Lettura { righe: RigaImport[]; scartate: Scartata[]; mancanti: string[]; mese: string | null }
@@ -52,14 +53,41 @@ export function inLazio(prov: string | null, cap: string | null): boolean {
   return cap != null && CAP_LAZIO.test(cap);
 }
 
+const ALIAS_LAT = ['lat', 'latitudine', 'latitude', 'lat.'];
+const ALIAS_LON = ['lon', 'lng', 'long', 'longitudine', 'longitude', 'lon.'];
+const ALIAS_COORD = ['coordinate', 'coordinates', 'coord', 'coordinate gps', 'gps', 'posizione'];
+
+/** Numero con virgola o punto decimale ("41,9" / "41.9"). */
+const numero = (v: unknown): number | null => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const s = String(v ?? '').trim().replace(',', '.'); if (!s) return null;
+  const n = Number(s); return Number.isFinite(n) ? n : null;
+};
+/** "41.9,12.5" / "41,9; 12,5" / "41.9 12.5" → [lat, lon] in Italia, altrimenti null. */
+export function coordinateTesto(v: unknown): [number, number] | null {
+  const m = String(v ?? '').trim().match(/^(-?\d{1,2}(?:[.,]\d+)?)\s*[;,\s]\s*(-?\d{1,3}(?:[.,]\d+)?)$/);
+  if (!m) return null;
+  const a = Number(m[1].replace(',', '.')), b = Number(m[2].replace(',', '.'));
+  return coordinateValide(a, b);
+}
+/** Coordinate plausibili per l'Italia; se invertite (lon, lat) le raddrizza. */
+export function coordinateValide(lat: number | null, lon: number | null): [number, number] | null {
+  if (lat == null || lon == null) return null;
+  const ok = (a: number, b: number) => a >= 35 && a <= 48 && b >= 6 && b <= 19;
+  if (ok(lat, lon)) return [lat, lon];
+  if (ok(lon, lat)) return [lon, lat];
+  return null;
+}
+
 /** Trova la riga d'intestazione (quella con "ID intervento") e l'indice di ogni colonna. */
-export function trovaIntestazione(m: unknown[][]): { riga: number; indici: Partial<Record<Chiave, number>> } | null {
+export function trovaIntestazione(m: unknown[][]): { riga: number; indici: Partial<Record<Chiave, number>>; lat?: number; lon?: number; coord?: number } | null {
   for (let r = 0; r < Math.min(m.length, 15); r++) {
     const celle = (m[r] ?? []).map(norm);
     if (!celle.includes(norm(COLONNE.id))) continue;
     const indici: Partial<Record<Chiave, number>> = {};
     for (const k of Object.keys(COLONNE) as Chiave[]) { const i = celle.indexOf(norm(COLONNE[k])); if (i >= 0) indici[k] = i; }
-    return { riga: r, indici };
+    const trova = (al: string[]) => { const i = celle.findIndex(c => al.includes(c)); return i >= 0 ? i : undefined; };
+    return { riga: r, indici, lat: trova(ALIAS_LAT), lon: trova(ALIAS_LON), coord: trova(ALIAS_COORD) };
   }
   return null;
 }
@@ -107,6 +135,10 @@ export function leggiMatrice(m: unknown[][]): Lettura {
       tipo: testo(cella(r, 'tipo')),
       famiglie: (testo(cella(r, 'famiglie')) ?? '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean),
       fuori_lazio: !inLazio(prov, cap),
+      ...(() => {
+        const c = (h.lat != null && h.lon != null ? coordinateValide(numero(r[h.lat]), numero(r[h.lon])) : null) ?? (h.coord != null ? coordinateTesto(r[h.coord]) : null);
+        return { lat: c?.[0] ?? null, lon: c?.[1] ?? null };
+      })(),
     });
   }
   const mese = [...mesi.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;

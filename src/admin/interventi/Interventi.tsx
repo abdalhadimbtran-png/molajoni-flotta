@@ -7,11 +7,36 @@ import { leggiFile, type Lettura } from '../../lib/interventi/importa';
 import { baricentri, suggerisci, type Suggerimento } from '../../lib/interventi/suggerimenti';
 import { geocodificaPrimo } from '../../lib/percorsi/routing';
 import MappaInterventi from './MappaInterventi';
-import { CAMPI, QUALITA, STATI, coloreTecnico, daVerificare, type Intervento } from './tipi';
+import { geocodificaTutto, type Avanzamento } from '../../lib/interventi/geocodificaBrowser';
+import { CAMPI, QUALITA, STATI, coloreTecnico, daVerificare, etichettaSede, indirizzoBreve, linkGoogle, type Intervento } from './tipi';
+import { esportaPunti } from '../../lib/interventi/esporta';
+import { fuoriZona } from '../../lib/interventi/controllo';
+
+/** Legge tutte le righe a blocchi da 1000 (limite del server). */
+async function tutteLeRighe<T>(fn: (da: number, a: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let da = 0; da < 50000; da += 1000) {
+    const { data, error } = await fn(da, da + 999);
+    if (error) throw error;
+    out.push(...((data ?? []) as T[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+function BottoniEsporta({ righe, nome }: { righe: Intervento[]; nome: string }) {
+  const { t } = useT();
+  const n = righe.filter(i => i.lat != null).length;
+  return (<span className="row-flex" style={{ gap: 6 }}>
+    <button className="btn-ghost btn-sm" disabled={!n} onClick={() => esportaPunti('gpx', righe, nome)} title={t('{n} punti con coordinate', { n })}>{t('Esporta per OsmAnd/Google (GPX)')}</button>
+    <button className="btn-ghost btn-sm" disabled={!n} onClick={() => esportaPunti('kml', righe, nome)}>KML</button>
+    <button className="btn-ghost btn-sm" disabled={!righe.length} onClick={() => esportaPunti('csv', righe, nome)}>{t('CSV con coordinate')}</button>
+  </span>);
+}
 
 interface Sigla { sigla: string; dipendente_id: number | null; attiva: boolean }
 interface Tec { id: number; nome: string; cognome: string; codice: string | null }
-type Vista = 'mappa' | 'tabella' | 'senza' | 'verifica' | 'sigle' | 'importa';
+type Vista = 'mappa' | 'tabella' | 'clienti' | 'senza' | 'verifica' | 'qualita' | 'sigle' | 'importa';
 
 const fineMese = (m: string) => { const [a, b] = m.split('-').map(Number); return new Date(Date.UTC(a, b, 0)).toISOString().slice(0, 10); };
 const nomeMese = (m: string) => new Date(`${m}-15T12:00`).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
@@ -23,9 +48,9 @@ export function RiepilogoInterventi() {
     const im = await supabase.from('importazioni').select('mese').not('mese', 'is', null).order('mese', { ascending: false }).limit(1);
     const mese = (im.data?.[0]?.mese as string | undefined)?.slice(0, 7);
     if (!mese) return null;
-    const r = await supabase.from('interventi_importati').select('tecnico_sigla,geo_qualita,geo_dubbio,lat,fuori_lazio').eq('fuori_lazio', false)
-      .gte('data_riferimento', `${mese}-01`).lte('data_riferimento', fineMese(mese)).range(0, 4999);
-    const l = (r.data ?? []) as Pick<Intervento, 'tecnico_sigla' | 'geo_qualita' | 'geo_dubbio' | 'lat' | 'fuori_lazio'>[];
+    const l = await tutteLeRighe<Pick<Intervento, 'tecnico_sigla' | 'geo_qualita' | 'geo_dubbio' | 'lat' | 'fuori_lazio'>>((da, a) => supabase.from('interventi_importati')
+      .select('tecnico_sigla,geo_qualita,geo_dubbio,lat,fuori_lazio').eq('fuori_lazio', false)
+      .gte('data_riferimento', `${mese}-01`).lte('data_riferimento', fineMese(mese)).order('id').range(da, a));
     return { mese, tot: l.length, senza: l.filter(x => !x.tecnico_sigla).length, verifica: l.filter(x => daVerificare(x as Intervento)).length };
   }, []);
   if (caricamento && data === null) return null;
@@ -45,7 +70,7 @@ export default function Interventi() {
   const setVista = (v: Vista) => { const n = new URLSearchParams(sp); n.set('vista', v); setSp(n, { replace: true }); };
   const [meseScelto, setMese] = useState<string | null>(null);
   const [fuoriLazio, setFuoriLazio] = useState(false);
-  const [f, setF] = useState({ tecnico: '', tipo: '', famiglia: '', stato: '', qualita: '', testo: '' });
+  const [f, setF] = useState({ tecnico: '', tipo: '', famiglia: '', stato: '', qualita: '', testo: '', cliente: '' });
 
   const base = useLoad(async () => {
     const [im, sg, tc, cz] = await Promise.all([
@@ -61,11 +86,23 @@ export default function Interventi() {
   const mese = meseScelto ?? base.data?.mesi[0] ?? null;
   const dati = useLoad(async () => {
     if (!mese) return [] as Intervento[];
-    const r = await supabase.from('interventi_importati').select(CAMPI).gte('data_riferimento', `${mese}-01`).lte('data_riferimento', fineMese(mese)).order('numero').range(0, 4999);
-    if (r.error) throw r.error;
-    return r.data as unknown as Intervento[];
+    return tutteLeRighe<Intervento>((da, a) => supabase.from('interventi_importati').select(CAMPI)
+      .gte('data_riferimento', `${mese}-01`).lte('data_riferimento', fineMese(mese)).order('id').range(da, a));
   }, [mese]);
   const ricarica = () => { base.reload(); dati.reload(); };
+  const [geo, setGeo] = useState<Avanzamento | null>(null);
+  const [geoAttiva, setGeoAttiva] = useState(false);
+  const [geoErr, setGeoErr] = useState<string | null>(null);
+  async function avviaGeo() {
+    if (geoAttiva) return;
+    setGeoAttiva(true); setGeoErr(null);
+    try {
+      const r = await geocodificaTutto(a => setGeo(a));
+      setGeo(r);
+      if (r.errore) setGeoErr(r.errore); else toast(t('Geocodifica completata'));
+    } catch (e) { setGeoErr(testoErrore(e)); }
+    finally { setGeoAttiva(false); dati.reload(); }
+  }
 
   const tutti = dati.data ?? [];
   const visibili = useMemo(() => tutti.filter(i => fuoriLazio || !i.fuori_lazio), [tutti, fuoriLazio]);
@@ -74,6 +111,7 @@ export default function Interventi() {
     return visibili.filter(i => (!f.tecnico || (f.tecnico === '-' ? !i.tecnico_sigla : i.tecnico_sigla === f.tecnico))
       && (!f.tipo || i.tipo === f.tipo) && (!f.famiglia || i.famiglie.includes(f.famiglia)) && (!f.stato || i.stato === f.stato)
       && (!f.qualita || (f.qualita === 'verifica' ? daVerificare(i) : i.geo_qualita === f.qualita))
+      && (!f.cliente || i.cod_cliente === f.cliente)
       && (!q || [i.numero, i.cliente, i.cod_cliente, i.impianto, i.via, i.comune, i.cap, i.note].some(x => String(x ?? '').toLowerCase().includes(q))));
   }, [visibili, f]);
 
@@ -99,7 +137,7 @@ export default function Interventi() {
     for (const [s, ids] of gruppi) await assegna(ids, s);
   }
   async function sposta(id: number, lat: number, lon: number, indirizzo?: string) {
-    const r = await supabase.from('interventi_importati').update({ lat, lon, geo_qualita: 'manuale', geo_dubbio: false, ...(indirizzo ? { geo_indirizzo: indirizzo } : {}) }).eq('id', id);
+    const r = await supabase.from('interventi_importati').update({ lat, lon, geo_qualita: 'manuale', geo_fonte: 'manuale', geo_dubbio: false, indirizzo_cambiato: false, ...(indirizzo ? { geo_indirizzo: indirizzo } : {}) }).eq('id', id);
     if (r.error) toast(testoErrore(r.error)); else { toast(t('Posizione salvata')); dati.reload(); }
   }
   async function esporta() {
@@ -140,12 +178,24 @@ export default function Interventi() {
       </div>}
 
       <div className="segmented" role="tablist" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-        {([['mappa', 'Mappa'], ['tabella', 'Tabella'], ['senza', `Senza tecnico (${senza.length})`], ['verifica', `Da verificare (${verifica.length})`], ['sigle', 'Sigle tecnici'], ['importa', 'Importa']] as [Vista, string][])
+        {([['mappa', 'Mappa'], ['tabella', 'Tabella'], ['clienti', 'Sedi del cliente'], ['senza', `Senza tecnico (${senza.length})`], ['verifica', `Da verificare (${verifica.length})`], ['qualita', 'Controllo qualità'], ['sigle', 'Sigle tecnici'], ['importa', 'Importa']] as [Vista, string][])
           .map(([v, l]) => <button key={v} className={vista === v ? 'on' : ''} onClick={() => setVista(v)}>{t(l)}</button>)}
       </div>
 
+      {!nessuno && <div className="card int-geo">
+        <span><strong>{lazio.filter(i => i.lat != null).length}</strong> {t('posizionati')}</span>
+        <span><strong>{lazio.filter(i => i.lat == null).length}</strong> {t('da posizionare')}</span>
+        <span><strong>{verifica.length}</strong> {t('da verificare')}</span>
+        <span className="spacer" />
+        <button className="btn btn-sm" disabled={geoAttiva} onClick={avviaGeo}>{geoAttiva ? t('Geocodifica in corso…') : t('Riprova geocodifica')}</button>
+        {geo && geo.tot > 0 && <div style={{ width: '100%' }}>
+          <div className="sub">{geo.modo === 'browser' ? t('Dal browser (il server non raggiunge il servizio indirizzi), 1 indirizzo al secondo') : t('Dal server')} · {geo.fatti}/{geo.tot}</div>
+          <progress max={geo.tot} value={geo.fatti} style={{ width: '100%' }} />
+        </div>}
+        {geoErr && <div style={{ width: '100%' }}><Banner s="ko">{geoErr}</Banner></div>}
+      </div>}
       {dati.errore && <Errore testo={dati.errore} onRetry={dati.reload} />}
-      {vista === 'importa' && <Importa onFatto={ricarica} storico={base.data.importazioni} />}
+      {vista === 'importa' && <Importa onFatto={ricarica} onGeo={avviaGeo} storico={base.data.importazioni} />}
       {vista === 'sigle' && <Sigle sigle={base.data.sigle} tecnici={base.data.tecnici} onSalvato={ricarica} />}
       {nessuno && vista !== 'importa' && vista !== 'sigle' && <Banner s="warn">{t('Nessun file importato. Usa «Importa file Excel» con il Listato interventi esportato da Taylor.')}</Banner>}
       {!nessuno && (vista === 'mappa' || vista === 'tabella') && <>
@@ -157,16 +207,21 @@ export default function Interventi() {
           <select value={f.stato} onChange={e => setF({ ...f, stato: e.target.value })}><option value="">{t('Tutti gli stati')}</option>{Object.entries(STATI).map(([k, v]) => <option key={k} value={k}>{t(v)}</option>)}</select>
           <select value={f.qualita} onChange={e => setF({ ...f, qualita: e.target.value })}><option value="">{t('Ogni posizione')}</option><option value="verifica">{t('Da verificare')}</option>{Object.entries(QUALITA).map(([k, v]) => <option key={k} value={k}>{t(v)}</option>)}</select>
           <span className="sub">{t('{n} interventi', { n: filtrati.length })}</span>
+          <SceltaCliente righe={visibili} valore={f.cliente} onScegli={c => setF({ ...f, cliente: c })} />
           {vista === 'tabella' && <button className="btn-ghost btn-sm" onClick={esporta}>{t('Esporta Excel')}</button>}
+          <BottoniEsporta righe={filtrati} nome={`interventi_${mese}${f.tecnico ? `_${f.tecnico}` : ''}${f.cliente ? `_cliente_${f.cliente}` : ''}`} />
         </div>
         {vista === 'mappa' ? <>
           <MappaInterventi interventi={filtrati} alta />
           <Legenda sigle={[...perTec.keys()].sort()} />
         </> : <Tabella righe={filtrati} />}
       </>}
+      {!nessuno && vista === 'clienti' && <SediCliente righe={visibili} mese={mese ?? ''} onSposta={sposta} />}
+      {!nessuno && vista === 'qualita' && <Qualita righe={lazio} />}
       {!nessuno && vista === 'senza' && <SenzaTecnico righe={senza} sugg={sugg} sigle={[...attive]} onAssegna={assegna} onAccettaTutti={accettaTutti} />}
       {!nessuno && vista === 'verifica' && <DaVerificare righe={verifica} tutti={lazio} onSposta={sposta} onRiprova={async ids => {
-        const r = await supabase.functions.invoke('geocodifica', { body: { ids } }); if (r.error) toast(testoErrore(r.error)); else dati.reload();
+        const r = await supabase.from('interventi_importati').update({ geo_tentato_at: null }).in('id', ids).is('lat', null);
+        if (r.error) toast(testoErrore(r.error)); else await avviaGeo();
       }} />}
     </div>
   );
@@ -188,16 +243,17 @@ function Legenda({ sigle }: { sigle: string[] }) {
 
 function Tabella({ righe }: { righe: Intervento[] }) {
   const { t } = useT();
-  const [n, setN] = useState(200);
+  const [pag, setPag] = useState(0);
+  const PAG = 100; const pagine = Math.max(1, Math.ceil(righe.length / PAG)); const p = Math.min(pag, pagine - 1);
   return (<>
     <div className="table-wrap"><table>
       <thead><tr><th>{t('N.')}</th><th>{t('Tecnico')}</th><th>{t('Cliente')}</th><th>{t('Impianto')}</th><th>{t('Indirizzo')}</th><th>{t('Comp.')}</th><th>{t('Famiglie')}</th><th>{t('Tipo')}</th><th>{t('Stato')}</th><th>{t('Posizione')}</th><th>{t('Durata')}</th></tr></thead>
-      <tbody>{righe.slice(0, n).map(i => (
+      <tbody>{righe.slice(p * PAG, p * PAG + PAG).map(i => (
         <tr key={i.id}>
           <td className="mono">{i.numero}</td>
           <td>{i.tecnico_sigla ? <span><i className="int-dot" style={{ background: coloreTecnico(i.tecnico_sigla) }} />{i.tecnico_sigla}</span> : <Pill s="ko">{t('Senza')}</Pill>}</td>
           <td>{i.cliente}<div className="sub mono">{i.cod_cliente}</div></td>
-          <td className="mono">{i.impianto}</td>
+          <td className="mono">{i.impianto}{i.indirizzo_cambiato && <div><Pill s="warn">{t('Indirizzo cambiato')}</Pill></div>}</td>
           <td>{[i.via, i.civico].filter(Boolean).join(' ')}<div className="sub">{i.cap} {i.comune}{i.prov ? ` (${i.prov})` : ''}</div>{i.note && <div className="sub">{i.note}</div>}</td>
           <td className="mono">{i.componenti ?? '—'}</td>
           <td style={{ fontSize: 12.5 }}>{i.famiglie.join(', ')}</td>
@@ -208,7 +264,7 @@ function Tabella({ righe }: { righe: Intervento[] }) {
         </tr>))}
         {!righe.length && <tr><td colSpan={11} className="sub">{t('Nessun intervento con questi filtri')}</td></tr>}</tbody>
     </table></div>
-    {righe.length > n && <button className="btn-ghost" onClick={() => setN(n + 300)}>{t('Mostra altri ({n})', { n: righe.length - n })}</button>}
+    <Paginazione p={p} pagine={pagine} tot={righe.length} onPag={setPag} />
   </>);
 }
 
@@ -225,7 +281,7 @@ function SenzaTecnico({ righe, sugg, sigle, onAssegna, onAccettaTutti }: { righe
       <thead><tr><th>{t('N.')}</th><th>{t('Cliente')}</th><th>{t('Indirizzo')}</th><th>{t('Suggerito')}</th><th /></tr></thead>
       <tbody>{righe.map(i => { const s = sugg.get(i.id); return (
         <tr key={i.id}>
-          <td className="mono">{i.numero}</td><td>{i.cliente}</td>
+          <td className="mono">{i.numero}</td><td>{etichettaSede(i)}</td>
           <td>{[i.via, i.civico].filter(Boolean).join(' ')}<div className="sub">{i.cap} {i.comune}</div></td>
           <td>{s ? <><strong style={{ color: coloreTecnico(s.sigla) }}>{s.sigla}</strong><div className="sub">{s.motivo}</div></> : <span className="sub">{t('Nessun suggerimento (posizione mancante)')}</span>}</td>
           <td className="row-flex" style={{ gap: 6, flexWrap: 'nowrap' }}>
@@ -257,7 +313,7 @@ function DaVerificare({ righe, tutti, onSposta, onRiprova }: { righe: Intervento
     <div className="int-verifica">
       <div className="int-lista">
         <div className="section-title">{t('Da verificare')} <span className="meta">{righe.length}</span><span className="spacer" />
-          <button className="btn-ghost btn-sm" disabled={occ} onClick={async () => { setOcc(true); await onRiprova(righe.filter(x => x.lat == null).map(x => x.id).slice(0, 30)); setOcc(false); }}>{t('Riprova geocodifica')}</button></div>
+          <button className="btn-ghost btn-sm" disabled={occ} onClick={async () => { setOcc(true); await onRiprova(righe.filter(x => x.lat == null).map(x => x.id).slice(0, 300)); setOcc(false); }}>{t('Riprova geocodifica')}</button></div>
         {righe.map(x => (
           <button key={x.id} className={`int-voce${x.id === sel ? ' on' : ''}`} onClick={() => { setSel(x.id); setTesto([x.via, x.civico].filter(Boolean).join(' ')); }}>
             <strong>N. {x.numero}</strong> · {[x.via, x.civico].filter(Boolean).join(' ') || x.indirizzo_originale}
@@ -266,7 +322,7 @@ function DaVerificare({ righe, tutti, onSposta, onRiprova }: { righe: Intervento
       </div>
       <div>
         {i && <div className="card" style={{ marginBottom: 12 }}>
-          <div><strong>N. {i.numero}</strong> · {i.cliente}</div>
+          <div><strong>N. {i.numero}</strong> · {etichettaSede(i)}</div>{i.indirizzo_cambiato && <Pill s="warn">{t('Indirizzo cambiato rispetto alla posizione salvata')}</Pill>}
           <div className="sub">{t('Originale')}: {i.indirizzo_originale} · {i.cap} {i.comune}</div>
           {i.note && <div className="sub">{i.note}</div>}
           <div className="row-flex" style={{ marginTop: 8 }}>
@@ -305,12 +361,11 @@ function Sigle({ sigle, tecnici, onSalvato }: { sigle: Sigla[]; tecnici: Tec[]; 
 
 interface Anteprima { file: File; l: Lettura; nuovi: number; aggiornati: number; fuori: number; senzaTec: number; verifica: number }
 
-function Importa({ onFatto, storico }: { onFatto: () => void; storico: { id: number; file_nome: string; mese: string | null; righe: number; nuovi: number; aggiornati: number; scartati: number; fuori_lazio: number; created_at: string }[] }) {
+function Importa({ onFatto, onGeo, storico }: { onFatto: () => void; onGeo: () => void; storico: { id: number; file_nome: string; mese: string | null; righe: number; nuovi: number; aggiornati: number; scartati: number; fuori_lazio: number; created_at: string }[] }) {
   const { t } = useT();
   const [ant, setAnt] = useState<Anteprima | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
-  const [fase, setFase] = useState<'' | 'lettura' | 'salvataggio' | 'geo'>('');
-  const [prog, setProg] = useState<{ fatti: number; tot: number } | null>(null);
+  const [fase, setFase] = useState<'' | 'lettura' | 'salvataggio'>('');
   const [esito, setEsito] = useState<string | null>(null);
   const [sopra, setSopra] = useState(false);
 
@@ -340,32 +395,15 @@ function Importa({ onFatto, storico }: { onFatto: () => void; storico: { id: num
       const { data, error } = await supabase.rpc('importa_interventi', { p_file: ant.file.name, p_mese: ant.l.mese ? `${ant.l.mese}-01` : null, p_scartati: ant.l.scartate.length, p_righe: ant.l.righe });
       if (error) throw error;
       const d = data as { nuovi: number; aggiornati: number; scartati: number; fuori_lazio: number };
-      setEsito(t('Salvati: {n} nuovi, {a} aggiornati, {s} scartati, {f} fuori Lazio.', { n: d.nuovi, a: d.aggiornati, s: d.scartati, f: d.fuori_lazio }));
+      setEsito(t('Salvati: {n} nuovi, {a} aggiornati, {s} scartati, {f} fuori Lazio.', { n: d.nuovi, a: d.aggiornati, s: d.scartati, f: d.fuori_lazio }) + ' ' + t('Posizioni riusate dagli impianti: {r}.', { r: (d as { posizioni_riusate?: number }).posizioni_riusate ?? 0 }));
       setAnt(null); onFatto();
-      await geocodificaTutto();
+      onGeo();
     } catch (e) { setErrore(testoErrore(e)); } finally { setFase(''); }
-  }
-
-  async function geocodificaTutto() {
-    setFase('geo');
-    let tot = 0, fatti = 0;
-    try {
-      for (let giro = 0; giro < 200; giro++) {
-        const { data, error } = await supabase.functions.invoke('geocodifica', { body: {} });
-        if (error) throw error;
-        const d = data as { fatti: number; rimanenti: number };
-        fatti += d.fatti; if (!tot) tot = d.fatti + d.rimanenti;
-        setProg({ fatti, tot });
-        if (!d.rimanenti || !d.fatti) break;
-      }
-      toast(t('Geocodifica completata'));
-    } catch (e) { setErrore(t('Geocodifica interrotta: {e}. Puoi riprendere con «Continua geocodifica».', { e: testoErrore(e) })); }
-    finally { setFase(''); onFatto(); }
   }
 
   return (<>
     <div className="section-title">{t('Importa file Excel')} <span className="meta">{t('Listato interventi mensile esportato da Taylor')}</span><span className="spacer" />
-      <button className="btn-ghost btn-sm" disabled={!!fase} onClick={geocodificaTutto}>{t('Continua geocodifica')}</button></div>
+      <button className="btn-ghost btn-sm" onClick={onGeo}>{t('Riprova geocodifica')}</button></div>
     <label className={`int-drop${sopra ? ' sopra' : ''}`} onDragOver={e => { e.preventDefault(); setSopra(true); }} onDragLeave={() => setSopra(false)}
       onDrop={e => { e.preventDefault(); setSopra(false); scegli(e.dataTransfer.files[0]); }}>
       <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={e => { scegli(e.target.files?.[0]); e.target.value = ''; }} />
@@ -389,14 +427,124 @@ function Importa({ onFatto, storico }: { onFatto: () => void; storico: { id: num
       <div className="row-flex"><button className="btn brand" disabled={!!fase} onClick={conferma}>{fase === 'salvataggio' ? t('Salvataggio…') : t('Conferma e salva')}</button>
         <button className="btn-ghost" onClick={() => setAnt(null)}>{t('Annulla')}</button></div>
     </div>}
-    {prog && <div className="card" style={{ margin: '16px 0' }}>
-      <div>{fase === 'geo' ? t('Geocodifica in corso (1 indirizzo al secondo)…') : t('Geocodifica')} {prog.fatti}/{prog.tot}</div>
-      <progress max={prog.tot || 1} value={prog.fatti} style={{ width: '100%' }} />
-    </div>}
     {storico.length > 0 && <>
       <div className="section-title" style={{ marginTop: 24 }}>{t('Importazioni precedenti')}</div>
       <div className="table-wrap"><table><thead><tr><th>{t('Data')}</th><th>{t('File')}</th><th>{t('Mese')}</th><th>{t('Righe')}</th><th>{t('Nuovi')}</th><th>{t('Aggiornati')}</th><th>{t('Scartati')}</th><th>{t('Fuori Lazio')}</th></tr></thead>
         <tbody>{storico.map(s => <tr key={s.id}><td className="mono">{new Date(s.created_at).toLocaleString('it-IT')}</td><td>{s.file_nome}</td><td>{s.mese ? nomeMese(s.mese.slice(0, 7)) : '—'}</td><td>{s.righe}</td><td>{s.nuovi}</td><td>{s.aggiornati}</td><td>{s.scartati}</td><td>{s.fuori_lazio}</td></tr>)}</tbody></table></div>
     </>}
+  </>);
+}
+
+function Paginazione({ p, pagine, tot, onPag }: { p: number; pagine: number; tot: number; onPag: (n: number) => void }) {
+  const { t } = useT();
+  if (pagine <= 1) return null;
+  return (<div className="row-flex" style={{ gap: 8, marginTop: 8 }}>
+    <button className="btn-ghost btn-sm" disabled={p === 0} onClick={() => onPag(p - 1)}>‹</button>
+    <span className="sub">{t('Pagina {a} di {b} · {n} righe', { a: p + 1, b: pagine, n: tot })}</span>
+    <button className="btn-ghost btn-sm" disabled={p >= pagine - 1} onClick={() => onPag(p + 1)}>›</button>
+  </div>);
+}
+
+interface Cliente { cod: string; nome: string; sedi: number; interventi: number }
+function clientiDi(righe: Intervento[]): Cliente[] {
+  const m = new Map<string, { nome: string; sedi: Set<string>; n: number }>();
+  for (const i of righe) {
+    if (!i.cod_cliente) continue;
+    const x = m.get(i.cod_cliente) ?? { nome: i.cliente ?? '', sedi: new Set(), n: 0 };
+    x.sedi.add(i.impianto ?? `#${i.id}`); x.n++; m.set(i.cod_cliente, x);
+  }
+  return [...m].map(([cod, x]) => ({ cod, nome: x.nome, sedi: x.sedi.size, interventi: x.n })).sort((a, b) => b.sedi - a.sedi || a.nome.localeCompare(b.nome));
+}
+
+/** Filtro cliente con suggerimenti (nome o codice). */
+function SceltaCliente({ righe, valore, onScegli }: { righe: Intervento[]; valore: string; onScegli: (cod: string) => void }) {
+  const { t } = useT();
+  const clienti = useMemo(() => clientiDi(righe), [righe]);
+  const [testo, setTesto] = useState('');
+  const scelto = clienti.find(c => c.cod === valore);
+  if (scelto) return <span className="pill info" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>{scelto.nome} ({scelto.cod}) · {t('{n} sedi', { n: scelto.sedi })}<button className="btn-ghost btn-sm" onClick={() => onScegli('')} aria-label={t('Togli filtro cliente')}>×</button></span>;
+  return (<>
+    <input list="int-clienti" placeholder={t('Cliente (nome o codice)…')} value={testo} style={{ minWidth: 200 }}
+      onChange={e => { setTesto(e.target.value); const c = clienti.find(c => `${c.nome} (${c.cod})` === e.target.value || c.cod === e.target.value.trim()); if (c) { onScegli(c.cod); setTesto(''); } }} />
+    <datalist id="int-clienti">{clienti.slice(0, 500).map(c => <option key={c.cod} value={`${c.nome} (${c.cod})`}>{t('{n} sedi', { n: c.sedi })}</option>)}</datalist>
+  </>);
+}
+
+/** Tutte le sedi (impianti) di un cliente: elenco paginato + mappa del solo cliente + esportazioni. */
+function SediCliente({ righe, mese, onSposta }: { righe: Intervento[]; mese: string; onSposta: (id: number, lat: number, lon: number) => Promise<void> }) {
+  const { t } = useT();
+  const clienti = useMemo(() => clientiDi(righe), [righe]);
+  const [cod, setCod] = useState('');
+  const [cerca, setCerca] = useState('');
+  const [pag, setPag] = useState(0);
+  const [sel, setSel] = useState<number | null>(null);
+  const PAG = 50;
+  if (!cod) {
+    const q = cerca.trim().toLowerCase();
+    const l = clienti.filter(c => !q || c.nome.toLowerCase().includes(q) || c.cod.toLowerCase().includes(q));
+    const pagine = Math.max(1, Math.ceil(l.length / PAG)); const p = Math.min(pag, pagine - 1);
+    return (<>
+      <div className="int-filtri"><input type="search" placeholder={t('Cerca cliente per nome o codice…')} value={cerca} onChange={e => { setCerca(e.target.value); setPag(0); }} />
+        <span className="sub">{t('{n} clienti', { n: l.length })}</span></div>
+      <div className="table-wrap"><table><thead><tr><th>{t('Cliente')}</th><th>{t('Cod. cli.')}</th><th>{t('Sedi')}</th><th>{t('Interventi')}</th><th /></tr></thead>
+        <tbody>{l.slice(p * PAG, p * PAG + PAG).map(c => <tr key={c.cod}><td>{c.nome}</td><td className="mono">{c.cod}</td><td className="mono">{c.sedi}</td><td className="mono">{c.interventi}</td>
+          <td><button className="btn-ghost btn-sm" onClick={() => { setCod(c.cod); setPag(0); }}>{t('Apri sedi')}</button></td></tr>)}</tbody></table></div>
+      <Paginazione p={p} pagine={pagine} tot={l.length} onPag={setPag} />
+    </>);
+  }
+  const c = clienti.find(x => x.cod === cod);
+  const mie = righe.filter(i => i.cod_cliente === cod);
+  const q = cerca.trim().toLowerCase();
+  const filtrate = mie.filter(i => !q || [i.impianto, i.via, i.comune, i.cap, i.numero].some(x => String(x ?? '').toLowerCase().includes(q)));
+  const pagine = Math.max(1, Math.ceil(filtrate.length / PAG)); const p = Math.min(pag, pagine - 1);
+  return (<>
+    <div className="section-title"><button className="btn-ghost btn-sm" onClick={() => { setCod(''); setCerca(''); }}>‹ {t('Tutti i clienti')}</button>
+      {c?.nome} <span className="meta mono">{cod}</span><span className="spacer" />
+      <BottoniEsporta righe={mie} nome={`sedi_${cod}_${mese}`} /></div>
+    <div className="int-geo card">
+      <span><strong>{c?.sedi ?? 0}</strong> {t('sedi')}</span>
+      <span><strong>{mie.length}</strong> {t('interventi')}</span>
+      <span><strong>{mie.filter(i => i.lat != null).length}</strong> {t('posizionati')}</span>
+      <span><strong>{mie.filter(daVerificare).length}</strong> {t('da verificare')}</span>
+      <span><strong>{mie.filter(i => i.indirizzo_cambiato).length}</strong> {t('indirizzo cambiato')}</span>
+    </div>
+    <MappaInterventi interventi={mie} trascinabile={sel} onScegli={setSel} onSposta={(id, la, lo) => onSposta(id, la, lo)} />
+    <div className="int-filtri"><input type="search" placeholder={t('Cerca sede: impianto, via, CAP…')} value={cerca} onChange={e => { setCerca(e.target.value); setPag(0); }} /></div>
+    <div className="table-wrap"><table><thead><tr><th>{t('Sede/impianto')}</th><th>{t('Indirizzo')}</th><th>{t('N.')}</th><th>{t('Tecnico')}</th><th>{t('Posizione')}</th><th /></tr></thead>
+      <tbody>{filtrate.slice(p * PAG, p * PAG + PAG).map(i => <tr key={i.id} className={sel === i.id ? 'on' : ''}>
+        <td className="mono">{i.impianto}{i.indirizzo_cambiato && <div><Pill s="warn">{t('Indirizzo cambiato')}</Pill></div>}</td>
+        <td>{indirizzoBreve(i)}{i.note && <div className="sub">{i.note}</div>}</td>
+        <td className="mono">{i.numero}</td><td>{i.tecnico_sigla ?? '—'}</td>
+        <td>{i.geo_qualita ? <Pill s={daVerificare(i) ? 'warn' : 'ok'}>{t(QUALITA[i.geo_qualita])}</Pill> : <Pill s="na">{t('In attesa')}</Pill>}</td>
+        <td className="row-flex" style={{ gap: 6, flexWrap: 'nowrap' }}>{i.lat != null && <><button className="btn-ghost btn-sm" onClick={() => setSel(i.id)}>{t('Sposta')}</button><a className="btn-ghost btn-sm" href={linkGoogle(i.lat, i.lon!)} target="_blank" rel="noopener">Google Maps</a></>}</td>
+      </tr>)}</tbody></table></div>
+    <Paginazione p={p} pagine={pagine} tot={filtrate.length} onPag={setPag} />
+    <p className="hint">{t('Seleziona «Sposta» e trascina il segnaposto: la posizione si salva per quell\'impianto ed è riusata nei mesi successivi.')}</p>
+  </>);
+}
+
+/** Controllo qualità: conteggi per qualità/fonte e punti sospetti (fuori dalla zona del CAP, dubbi, indirizzo cambiato). */
+function Qualita({ righe }: { righe: Intervento[] }) {
+  const { t } = useT();
+  const fz = useMemo(() => fuoriZona(righe), [righe]);
+  const [pag, setPag] = useState(0);
+  const conta = (k: (i: Intervento) => string) => { const m = new Map<string, number>(); righe.forEach(i => m.set(k(i), (m.get(k(i)) ?? 0) + 1)); return [...m].sort((a, b) => b[1] - a[1]); };
+  const sospetti = righe.filter(i => fz.has(i.id) || (i.geo_dubbio && i.geo_qualita !== 'manuale') || i.indirizzo_cambiato)
+    .sort((a, b) => (fz.get(b.id) ?? 0) - (fz.get(a.id) ?? 0));
+  const PAG = 50; const pagine = Math.max(1, Math.ceil(sospetti.length / PAG)); const p = Math.min(pag, pagine - 1);
+  return (<>
+    <div className="kpis">
+      {conta(i => i.geo_qualita ?? (i.lat == null ? 'non posizionato' : '—')).map(([k, n]) => <div key={k} className={`kpi ${k === 'esatto' || k === 'manuale' ? 'ok' : k === 'via' ? 'info' : 'warn'}`}><div className="lbl">{t(QUALITA[k] ?? k)}</div><div className="num">{n}</div></div>)}
+    </div>
+    <p className="sub">{t('Fonte')}: {conta(i => i.geo_fonte ?? '—').map(([k, n]) => `${k} ${n}`).join(' · ')}</p>
+    <div className="section-title">{t('Punti sospetti')} <span className="meta">{t('{n} da controllare', { n: sospetti.length })}</span></div>
+    <div className="table-wrap"><table><thead><tr><th>{t('N.')}</th><th>{t('Sede')}</th><th>{t('Indirizzo')}</th><th>{t('Motivo')}</th><th /></tr></thead>
+      <tbody>{sospetti.slice(p * PAG, p * PAG + PAG).map(i => <tr key={i.id}>
+        <td className="mono">{i.numero}</td><td>{etichettaSede(i)}</td><td>{indirizzoBreve(i)}</td>
+        <td>{[fz.has(i.id) ? t('a {k} km dal centro del CAP {c}', { k: fz.get(i.id)!.toFixed(1).replace('.', ','), c: i.cap ?? '' }) : '', i.geo_dubbio ? t('posizione approssimata') : '', i.indirizzo_cambiato ? t('indirizzo cambiato') : ''].filter(Boolean).join(' · ')}</td>
+        <td>{i.lat != null && <a className="btn-ghost btn-sm" href={linkGoogle(i.lat, i.lon!)} target="_blank" rel="noopener">{t('Apri in Google Maps')}</a>}</td>
+      </tr>)}</tbody></table></div>
+    <Paginazione p={p} pagine={pagine} tot={sospetti.length} onPag={setPag} />
+    <p className="hint">{t('Il centro del CAP è la mediana dei punti del mese con quel CAP (servono almeno 3 punti). Correggi da «Da verificare» o «Sedi del cliente».')}</p>
   </>);
 }

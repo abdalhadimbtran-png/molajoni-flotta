@@ -6,8 +6,9 @@ export interface Intervento {
   lat: number | null; lon: number | null; geo_qualita: 'esatto' | 'via' | 'centro_cap' | 'centro_comune' | 'manuale' | null;
   geo_indirizzo: string | null; geo_dubbio: boolean; geo_tentato_at: string | null;
   stato: 'da_pianificare' | 'pianificato' | 'eseguito' | 'annullato'; durata_minuti: number | null;
+  geo_fonte: string | null; indirizzo_cambiato: boolean;
 }
-export const CAMPI = 'id,id_intervento,numero,data_riferimento,tecnico_sigla,tecnico_id,impianto,cod_cliente,cliente,comune,cap,prov,indirizzo_originale,via,civico,note,componenti,tipo,famiglie,fuori_lazio,lat,lon,geo_qualita,geo_indirizzo,geo_dubbio,geo_tentato_at,stato,durata_minuti';
+export const CAMPI = 'id,id_intervento,numero,data_riferimento,tecnico_sigla,tecnico_id,impianto,cod_cliente,cliente,comune,cap,prov,indirizzo_originale,via,civico,note,componenti,tipo,famiglie,fuori_lazio,lat,lon,geo_qualita,geo_indirizzo,geo_dubbio,geo_tentato_at,stato,durata_minuti,geo_fonte,indirizzo_cambiato';
 
 export const QUALITA: Record<string, string> = { esatto: 'Esatta (civico)', via: 'Via (punto medio)', centro_cap: 'Centro CAP', centro_comune: 'Centro comune', manuale: 'Manuale' };
 export const STATI: Record<string, string> = { da_pianificare: 'Da pianificare', pianificato: 'Pianificato', eseguito: 'Eseguito', annullato: 'Annullato' };
@@ -23,3 +24,10 @@ export function coloreTecnico(s: string | null): string {
 
 /** Da verificare: posizione mancante, approssimata al centro CAP/comune o segnata come dubbia. */
 export const daVerificare = (i: Intervento) => !i.fuori_lazio && i.geo_qualita !== 'manuale' && (i.lat == null || i.geo_dubbio || i.geo_qualita === 'centro_cap' || i.geo_qualita === 'centro_comune');
+
+/** "Cliente X – sede/impianto Y" (un cliente può avere molte sedi: si identifica sempre l'impianto). */
+export const etichettaSede = (i: Pick<Intervento, 'cliente' | 'cod_cliente' | 'impianto'>) =>
+  `${i.cliente ?? 'Cliente'}${i.cod_cliente ? ` (${i.cod_cliente})` : ''} – sede/impianto ${i.impianto ?? '—'}`;
+export const indirizzoBreve = (i: Pick<Intervento, 'via' | 'civico' | 'cap' | 'comune'>) =>
+  `${[i.via, i.civico].filter(Boolean).join(' ')}${i.cap || i.comune ? `, ${[i.cap, i.comune].filter(Boolean).join(' ')}` : ''}`;
+export const linkGoogle = (lat: number, lon: number) => `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lon.toFixed(6)}`;

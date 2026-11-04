@@ -4,6 +4,8 @@ import { rpc, supabase } from '../../lib/supabase';
 import { CATEGORIE, fmtData, fmtEuro, fmtKm, fmtOra } from '../../lib/format';
 import { useT } from '../../lib/i18n';
 import { Caricamento, Errore, Pill, useLoad } from '../../ui';
+import { RiepilogoPercorsi } from '../percorsi/Percorsi';
+import { domani, oggi } from '../../lib/percorsi/piano';
 
 interface Mese { mese: string; km: number; segnalazioni: number; fermi: number; chiuse: number; ore_chiusura: number | null; carburante_eur: number; litri: number; multe: number; multe_eur: number; piani_confermati: number; avvisi: number; avvisi_letti: number }
 interface V { targa: string; modello: string; km: number; giorni_uso: number; segnalazioni: number; fermi: number; carburante_eur: number; multe: number }
@@ -54,6 +56,10 @@ export default function Panoramica() {
         </div>
       </div>
 
+      <div className="kpis">
+        <RiepilogoPercorsi giorno={oggi()} titolo="Percorsi di oggi" />
+        <RiepilogoPercorsi giorno={domani()} titolo="Percorsi di domani" />
+      </div>
       <div className="kpis">
         <div className="kpi"><div className="lbl">{t('Km percorsi')}</div><div className="num">{fmtKm(km)}</div></div>
         <div className="kpi"><div className="lbl">{t('Costo carburante')}</div><div className="num num-sm">{fmtEuro(carb)}</div><div className="sub">{eurKm ? t('{x} €/km', { x: eurKm.toFixed(2) }) : t('nessun dato carta carburante')}</div></div>

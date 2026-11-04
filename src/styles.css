@@ -1278,3 +1278,46 @@ table.wk thead th { background:var(--surface-2); font-size:14px; }
 @media (min-width:600px) { .tec-main .mini-stat { grid-template-columns:repeat(2, 1fr); } }
 .tec-badge { position:absolute; top:-5px; inset-inline-end:-10px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--brand); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center; }
 .tec-nav a { min-width:0; }
+
+/* ---------- Percorsi giornalieri ---------- */
+.percorsi .perc-box { padding:18px; margin-bottom:16px; display:flex; flex-direction:column; gap:14px; }
+.perc-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:12px 0; }
+.perc-tappe { display:flex; flex-direction:column; gap:12px; margin-bottom:16px; }
+.perc-tappa { display:grid; grid-template-columns:44px minmax(0,1fr) auto; gap:14px; padding:16px; align-items:start; }
+.perc-num { width:40px; height:40px; border-radius:50%; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; }
+.perc-campi { display:flex; flex-direction:column; gap:10px; min-width:0; }
+.perc-campi input:not([type=checkbox]):not([type=number]) { width:100%; }
+.perc-azioni { display:flex; flex-direction:column; gap:6px; }
+.perc-durata { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.perc-chip { cursor:pointer; padding:8px 14px; border-radius:999px; border:1px solid var(--line-strong); background:var(--surface); font-size:15px; font-weight:500; }
+.perc-chip.on { background:var(--ink); color:var(--surface); border-color:var(--ink); }
+.perc-check { display:flex; gap:8px; align-items:center; font-size:15px; }
+.perc-ind { position:relative; display:flex; flex-direction:column; gap:4px; }
+.perc-sugg { position:absolute; top:44px; left:0; right:0; z-index:500; list-style:none; margin:0; padding:4px; background:var(--surface); border:1px solid var(--line-strong); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.12); max-height:280px; overflow:auto; }
+.perc-sugg button { display:block; width:100%; text-align:start; border:0; background:none; padding:8px 10px; cursor:pointer; font-size:14px; color:var(--ink); border-radius:6px; }
+.perc-sugg button:hover { background:var(--surface-2); }
+.perc-ok { font-size:12px; color:#1F7A3E; } .perc-no { font-size:12px; color:var(--ink-3); }
+.perc-sede { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.perc-sede-edit { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.perc-fascia { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+.perc-imp summary { cursor:pointer; font-weight:500; }
+.perc-tab td { vertical-align:top; }
+.perc-pausa td { background:var(--surface-2); font-style:italic; }
+.perc-sede-riga td { color:var(--ink-2); }
+.perc-att { font-size:13px; font-weight:500; margin-top:2px; }
+.perc-note { font-size:12px; color:var(--ink-3); white-space:pre-wrap; margin-top:2px; }
+.perc-allegati { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.perc-all { display:inline-flex; gap:4px; align-items:center; border:1px solid var(--line-strong); border-radius:999px; padding:3px 10px; font-size:13px; }
+.linklike { border:0; background:none; padding:0; cursor:pointer; color:var(--ink); font:inherit; }
+.perc-mappa { height:420px; border-radius:12px; border:1px solid var(--line-strong); margin:16px 0; z-index:0; }
+.perc-pin { background:var(--brand); color:#fff; border-radius:50%; display:flex !important; align-items:center; justify-content:center; font-weight:700; font-size:13px; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4); }
+.perc-pin.sede { background:#111; }
+.perc-griglia { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px; }
+.perc-card { padding:16px; display:flex; flex-direction:column; gap:8px; }
+.perc-card-h { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+.perc-card-n { display:flex; gap:10px; flex-wrap:wrap; font-size:13px; color:var(--ink-2); }
+.perc-card-l { margin:0; padding-inline-start:20px; font-size:13px; }
+.perc-avv { font-size:13px; color:#9A5B00; }
+.solo-stampa { display:none; }
+@media (max-width:640px) { .perc-tappa { grid-template-columns:1fr; } .perc-azioni { flex-direction:row; } .perc-num { width:32px; height:32px; font-size:15px; } }
+@media print { .solo-stampa { display:block; font-size:20px; } .perc-mappa { height:320px; break-inside:avoid; } .percorsi .kpis { grid-template-columns:repeat(4,1fr); } .perc-tab { font-size:12px; } }

@@ -87,7 +87,7 @@ export function Smistamento() {
 
 const GRUPPI: Gruppo[] = [
   { titolo: 'Operatività', voci: [
-    { to: '/cruscotto', label: 'Cruscotto', icona: 'cruscotto' }, { to: '/piano', label: 'Pianificazione', icona: 'piano' }, { to: '/avvisi', label: 'Avvisi', icona: 'avvisi' }] },
+    { to: '/cruscotto', label: 'Cruscotto', icona: 'cruscotto' }, { to: '/piano', label: 'Pianificazione', icona: 'piano' }, { to: '/percorsi', label: 'Percorsi', icona: 'percorsi' }, { to: '/avvisi', label: 'Avvisi', icona: 'avvisi' }] },
   { titolo: 'Risorse', voci: [
     { to: '/flotta', label: 'Flotta', icona: 'flotta' }, { to: '/tecnici', label: 'Tecnici', icona: 'tecnici' }, { to: '/attivita', label: 'Elenco attività', icona: 'attivita' }] },
   { titolo: 'Controllo', voci: [

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase, rpc, testoErrore } from '../lib/supabase';
 import { fascia, fmtGiorno, fmtOra, prossimoLavorativo, STATI_VEICOLO } from '../lib/format';
 import { useT } from '../lib/i18n';
@@ -118,7 +118,7 @@ function PianoGiorno() {
           {data && <div className="chips"><Pill s="ko">{t('{n} bloccati', { n: n('ko') })}</Pill><Pill s="warn">{t('{n} con avvisi', { n: n('warn') })}</Pill><Pill s="ok">{t('{n} idonei', { n: n('ok') })}</Pill>
             {assenti > 0 && <Pill s="na">{t('{n} assenti', { n: assenti })}</Pill>}</div>}
         </div>
-        <div className="row-flex"><button className="btn-ghost" onClick={proponi}>{t('Proponi assegnazioni')}</button><button className="btn" onClick={conferma}>{t('Conferma piano')}</button></div>
+        <div className="row-flex"><button className="btn-ghost" onClick={proponi}>{t('Proponi assegnazioni')}</button><button className="btn" onClick={conferma}>{t('Conferma piano')}</button><Link className="btn-ghost" to={`/giornata?data=${giorno}&urgenza=1`}>{t('Nuova urgenza')}</Link></div>
       </div>
       {data?.piano.confermato_il && <Banner s="ok">{t('Piano confermato il {d}. Ogni modifica a interventi, veicoli o assenze di questo giorno annulla la conferma.', { d: fmtOra(data.piano.confermato_il, locale) })}</Banner>}
       {data && daRiassegnare.length > 0 && <Banner s="warn">{t('{nome} sarà assente. {n} interventi da riassegnare prima di confermare il piano.', { nome: daRiassegnare.map(r => r.nome).join(', '), n: nInt })}</Banner>}

@@ -196,6 +196,30 @@ export const CATALOGO: Report[] = [
   },
 ];
 
+CATALOGO.push(
+  {
+    id: 'ritardi', gruppo: 'Tecnici', titolo: 'Ritardi', periodo: 'intervallo', filtri: { tecnico: true },
+    descrizione: 'Ritardi segnalati dai tecnici: motivo, minuti e fine giornata stimata.',
+    colonne: [
+      { k: 'data', l: 'Giorno', t: 'data', w: 11 }, { k: 'tecnico', l: 'Tecnico', t: 'testo', w: 20 }, { k: 'motivo', l: 'Motivo', t: 'testo', w: 28 },
+      { k: 'minuti', l: 'Minuti', t: 'num', tot: true, w: 9 }, { k: 'nota', l: 'Nota', t: 'testo', w: 26 }, { k: 'alle', l: 'Segnalato', t: 'dataora', w: 16 }, { k: 'fine_stimata', l: 'Fine stimata', t: 'testo', w: 10 },
+    ],
+    raggruppa: { k: 'tecnico', etichetta: r => String(r.tecnico ?? '') },
+    riepilogo: r => [{ l: 'Ritardi', v: String(r.length) }, { l: 'Minuti', v: String(somma(r, 'minuti')) },
+      ...Object.entries(r.reduce<Record<string, number>>((m, x) => { const k = String(x.motivo); m[k] = (m[k] ?? 0) + n(x.minuti); return m; }, {})).map(([l, v]) => ({ l, v: `${v} min` }))],
+  },
+  {
+    id: 'giornate', gruppo: 'Tecnici', titolo: 'Fine giornata', periodo: 'intervallo', filtri: { tecnico: true },
+    descrizione: 'Ora di «Giornata finita», interventi non fatti e ritardi per tecnico e giorno.',
+    colonne: [
+      { k: 'data', l: 'Giorno', t: 'data', w: 11 }, { k: 'tecnico', l: 'Tecnico', t: 'testo', w: 20 }, { k: 'fine', l: 'Fine', t: 'testo', w: 8 },
+      { k: 'tutto_fatto', l: 'Tutto fatto', t: 'testo', w: 9 }, { k: 'non_fatti', l: 'Non fatti', t: 'num', tot: true, w: 9 },
+      { k: 'ritardi', l: 'Ritardi', t: 'num', tot: true, w: 8 }, { k: 'minuti_ritardo', l: 'Minuti ritardo', t: 'num', tot: true, w: 10 }, { k: 'nota', l: 'Nota', t: 'testo', w: 24 },
+    ],
+    riepilogo: r => [{ l: 'Giornate', v: String(r.length) }, { l: 'Con interventi non fatti', v: String(r.filter(x => x.tutto_fatto === 'No').length) }],
+  },
+);
+
 export const GRUPPI_REPORT = ['Veicoli', 'Tecnici', 'Controllo e costi'] as const;
 
 /** Data e ora nel fuso di Roma, per tabelle e file. */

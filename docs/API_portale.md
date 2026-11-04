@@ -69,3 +69,6 @@ Ruolo: `admin_imposta_responsabile(p_user, 'formazione', p_attivo)` (area resta 
 Tabelle `corsi`, `corsi_dipendente` (scadenza automatica da trigger), vista `corsi_attuali`; bucket privato `attestati`.
 Archivio: `corsi_attestati` (più file per registrazione). Avvisi: `formazione_impostazioni.soglie_mesi` (6/3/1), `formazione_controlla()` (pg_cron 06:17 + apertura area; una notifica per registrazione/soglia, email riepilogo max 1/giorno). `formazione_dati()` per cruscotto/report.
 Attestato dal dipendente solo su richiesta: `formazione_chiedi_attestato(p_registrazioni[])`, `formazione_ricorda_attestato(p_id)`, `formazione_approva_richiesta(p_id)`, `formazione_rifiuta_richiesta(p_id, p_motivo)`; app: `dipendente_attestati_richiesti(p_token)`; edge `/carica-attestato` (form: token, richiesta_id, file ≤10 MB jpg/png/heic/pdf) e `/attestato` (token, id → URL 120 s, solo propri).
+
+## Variazioni della giornata e notifiche del piano
+Vedi `docs/VARIAZIONI_giornata.md`: `tecnico_giornata`, `tecnico_segnala_ritardo`, `tecnico_giornata_finita`, `tecnico_urgenza_letta` (token); `variazioni_*`, `pubblica_piano`, `piano_modifiche_pendenti`, `report_variazioni` (responsabile). `conferma_piano` usa ora `privato.piano_pubblica`.

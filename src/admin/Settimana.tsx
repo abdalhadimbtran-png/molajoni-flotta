@@ -106,6 +106,8 @@ export default function Settimana() {
         <div className="row-flex">
           <Stampa lun={lun} tecnici={data?.tecnici ?? []} etichetta={t('Stampa tutti')} />
           <Link className="btn-ghost" to={`/admin/report?report=agenda&da=${lun}&a=${venerdi}`}>{t('Apri nei report')}</Link>
+          <button className="btn" onClick={async () => { try { const r = await rpc<{ notificati: number }>('pubblica_piano', { p_tipo: 'settimana', p_data: lun }); toast(t('Piano della settimana pubblicato: {n} tecnici avvisati', { n: r.notificati })); } catch (e) { toast(testoErrore(e)); } }}>{t('Pubblica settimana')}</button>
+          <Link className="btn" to={`/giornata?data=${oggiISO()}&urgenza=1`}>{t('Nuova urgenza')}</Link>
         </div>
       </div>
       <p className="hint">{t('Tocca una casella vuota o il pulsante + per aggiungere un intervento.')}</p>

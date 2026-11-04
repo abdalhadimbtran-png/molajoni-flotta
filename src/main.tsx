@@ -30,6 +30,7 @@ import Avvisi from './admin/Avvisi';
 import Percorsi from './admin/percorsi/Percorsi';
 import Pianificatore from './admin/percorsi/Pianificatore';
 import Interventi from './admin/interventi/Interventi';
+import Giornata from './admin/giornata/Giornata';
 import Tecnico from './tecnico/Tecnico';
 import AreaAdmin from './admin/amm/AreaAdmin';
 import Panoramica from './admin/amm/Panoramica';
@@ -108,6 +109,7 @@ function App() {
           <Route path="/avvisi" element={<Avvisi />} />
           <Route path="/percorsi" element={<Percorsi />} />
           <Route path="/interventi" element={<Interventi />} />
+          <Route path="/giornata" element={<Giornata />} />
           <Route path="/percorsi/nuovo" element={<Pianificatore />} />
           <Route path="/percorsi/:id" element={<Pianificatore />} />
         </Route>

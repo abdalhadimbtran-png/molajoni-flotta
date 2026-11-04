@@ -12,7 +12,7 @@ import { giornoBreve, giornoLungo, intervallo } from './periodo';
 const Ico = ({ d }: { d: ReactNode }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
 const IcoTel = () => <Ico d={<path d="M5 3.5h3.5l2 5-2.5 1.5a11 11 0 0 0 6 6l1.5-2.5 5 2V19a1.5 1.5 0 0 1-1.5 1.5A16.5 16.5 0 0 1 3.5 5 1.5 1.5 0 0 1 5 3.5Z" />} />;
 
-interface DatiPiano { data: string; veicolo?: { targa: string; modello: string } | null; veicolo_prima?: { targa: string } | null; interventi?: { ora: string | null; ora_fine?: string | null; luogo: string; attivita: string }[]; aggiornato?: boolean; annullato?: boolean }
+interface DatiPiano { titolo?: string; righe?: string[]; totale?: number; periodo?: { tipo: string; da: string; a: string }; data: string; veicolo?: { targa: string; modello: string } | null; veicolo_prima?: { targa: string } | null; interventi?: { ora: string | null; ora_fine?: string | null; luogo: string; attivita: string }[]; aggiornato?: boolean; annullato?: boolean }
 interface DatiAvviso { livello: 'urgente' | 'importante' | 'info'; titolo: string; testo?: string; ora?: string; luogo?: string; contatto?: string; telefono?: string; targa?: string; da?: string; categoria?: string; evento?: string; richiesta_id?: number }
 
 /** Notifiche non lette in cima alla home (piano, avvisi, esiti delle richieste). Funzioni dipendente_notifiche / dipendente_notifica_letta. */
@@ -26,7 +26,8 @@ export function Notifiche() {
   // una nuova decisione arrivata mentre l'app è aperta: aggiorna anche saldi e richieste
   const nuoveFerie = l.filter(n => !n.letta && (n.dati as { categoria?: string }).categoria === 'ferie').map(n => n.id).join(',');
   useEffect(() => { if (nuoveFerie) ricarica(); }, [nuoveFerie, ricarica]);
-  const nonLette = l.filter(n => !n.letta).slice(0, 6);
+  // le urgenze del giorno hanno il loro banner rosso (tecnico/Giornata.tsx) con «Ho letto»
+  const nonLette = l.filter(n => !n.letta && (n.dati as { evento?: string }).evento !== 'urgenza_giornata').slice(0, 6);
   if (!nonLette.length) return null;
   async function letta(id: number) {
     try { await rpc('dipendente_notifica_letta', { p_token: token, p_id: id }); } catch { /* riprova al prossimo caricamento */ }
@@ -58,6 +59,14 @@ export function Notifiche() {
     }
     if (n.tipo === 'piano') {
       const p = n.dati as unknown as DatiPiano;
+      if (p.periodo && (p.periodo.tipo !== 'giorno' || (p.righe ?? []).length)) return (
+        <section key={n.id} className={`tec-card notifica ${p.aggiornato ? 'cambio' : ''}`}>
+          <div className="lbl-sm">{p.aggiornato ? t('Piano modificato') : t('Nuovo piano di lavoro')} · {fmtOra(n.creato_il, locale)}</div>
+          <div className="tec-h2">{p.titolo}</div>
+          {(p.righe ?? []).map((r, k) => <div key={k} className="int"><span>{r}</span></div>)}
+          <button className="btn brand big" onClick={() => letta(n.id)}>✓ {t('Ho visto')}</button>
+        </section>
+      );
       return (
         <section key={n.id} className={`tec-card notifica ${p.aggiornato || p.annullato ? 'cambio' : ''}`}>
           <div className="lbl-sm">{p.annullato ? t('Piano annullato') : p.aggiornato ? t('Piano modificato') : t('Nuovo piano di lavoro')} · {fmtOra(n.creato_il, locale)}</div>

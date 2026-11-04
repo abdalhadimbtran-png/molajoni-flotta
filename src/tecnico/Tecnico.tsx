@@ -17,6 +17,7 @@ import Corsi from '../dipendente/Corsi';
 import { DettaglioRichiesta, MieRichieste } from '../dipendente/Richieste';
 import { Attesa, BarraDipendente, VociAlto } from '../dipendente/componenti';
 import { AttivaNotifiche, Notifiche } from '../dipendente/Notifiche';
+import GiornataOggi from './Giornata';
 
 /* Icone semplici, riconoscibili senza leggere */
 const Ico = ({ d }: { d: ReactNode }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
@@ -119,6 +120,7 @@ function Home({ token, onScaduta }: { token: string; onScaduta: () => void }) {
       <Notifiche />
       <CardCorsiHome />
       <h1 className="tec-h1">{t('Ciao {n}', { n: h.nome.split(' ')[0] })}</h1>
+      <GiornataOggi token={token} onScaduta={onScaduta} />
       {h.avvisi.map((a, i) => <div key={i} className={`ph-msg ${a.l}`}>{tm(a.m)}</div>)}
       <InstallaApp />
       <AttivaNotifiche />

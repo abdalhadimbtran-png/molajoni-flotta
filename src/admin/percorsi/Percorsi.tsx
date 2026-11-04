@@ -65,6 +65,7 @@ export default function Percorsi() {
           </div>
           <input type="date" value={giorno} onChange={e => e.target.value && setGiorno(e.target.value)} />
           <Link className="btn brand" to={`/percorsi/nuovo?data=${giorno}`}>{t('Nuovo percorso')}</Link>
+          <Link className="btn" to={`/giornata?data=${giorno}&urgenza=1`}>{t('Nuova urgenza')}</Link>
         </div>
       </div>
       {!data ? <Caricamento /> : (() => {

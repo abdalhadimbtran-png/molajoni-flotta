@@ -295,6 +295,7 @@ const AR: Record<string, string> = {
   "Livello": "المستوى",
   "Media km/giorno": "معدل كم/يوم",
   "Mese scorso": "الشهر الماضي",
+  "Scegli un'attività…": "اختر نشاطاً…",
   "Domani": "غداً",
   "Settimana prossima": "الأسبوع القادم",
   "Mese prossimo": "الشهر القادم",

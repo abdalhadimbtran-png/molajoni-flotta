@@ -313,24 +313,25 @@ export function SceltaAttivita({ valore, precedenti = [], onChange }: { valore: 
   const lista = data ?? [];
   const inElenco = lista.some(a => a.nome === valore);
   const [libero, setLibero] = useState(!!valore && !inElenco && !!data);
-  const [cerca, setCerca] = useState('');
-  const q = cerca.trim().toLowerCase();
-  const filtrate = lista.filter(a => !q || a.nome.toLowerCase().includes(q) || (a.gruppo ?? '').toLowerCase().includes(q));
-  const gruppi = [...new Set(filtrate.map(a => a.gruppo ?? 'Altro'))];
+  const gruppi = [...new Set(lista.map(a => a.gruppo ?? 'Altro'))];
   const altro = libero || (!!valore && !!data && !inElenco);
+  const ALTRO = '__altro__';
   return (
     <div className="field">
-      <label>{t('Attività')}</label>
-      {lista.length > 6 && <input type="search" placeholder={t('Cerca attività…')} value={cerca} onChange={e => setCerca(e.target.value)} />}
-      <div className="att-scelta">
+      <label htmlFor="att-sel">{t('Attività')}</label>
+      <select id="att-sel" value={altro ? ALTRO : valore} onChange={e => {
+        const v = e.target.value;
+        if (v === ALTRO) { setLibero(true); if (inElenco) onChange(''); return; }
+        setLibero(false); const a = lista.find(x => x.nome === v); onChange(v, a?.durata_minuti);
+      }}>
+        <option value="" disabled>{t('Scegli un\'attività…')}</option>
         {gruppi.map(g => (
-          <div key={g}><div className="att-gruppo">{t(g)}</div>
-            <div className="wk-preset">{filtrate.filter(a => (a.gruppo ?? 'Altro') === g).map(a => (
-              <button type="button" key={a.id} className={`wk-chip${valore === a.nome ? ' on' : ''}`} onClick={() => { setLibero(false); onChange(a.nome, a.durata_minuti); }}>{a.nome}</button>
-            ))}</div></div>
+          <optgroup key={g} label={t(g)}>
+            {lista.filter(a => (a.gruppo ?? 'Altro') === g).map(a => <option key={a.id} value={a.nome}>{a.nome}{a.durata_minuti ? ` (${a.durata_minuti}′)` : ''}</option>)}
+          </optgroup>
         ))}
-        <div className="wk-preset"><button type="button" className={`wk-chip${altro ? ' on' : ''}`} onClick={() => { setLibero(true); if (inElenco) onChange(''); }}>{t('Altro…')}</button></div>
-      </div>
+        <option value={ALTRO}>{t('Altro…')}</option>
+      </select>
       {altro && <>
         <input list="att-prec" autoFocus autoComplete="off" value={valore} onChange={e => onChange(e.target.value)} placeholder={t('Scrivi l\'attività')} />
         <datalist id="att-prec">{precedenti.map(x => <option key={x} value={x} />)}</datalist></>}

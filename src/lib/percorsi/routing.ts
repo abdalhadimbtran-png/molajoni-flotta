@@ -43,7 +43,7 @@ export async function geocodifica(q: string): Promise<Risultato[]> {
   if (cache[chiave]) return cache[chiave];
   const url = `${NOMINATIM}?format=json&countrycodes=it&limit=5&accept-language=it&viewbox=${VIEWBOX_ROMA}&q=${encodeURIComponent(q)}`;
   let r: Response;
-  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' } })); }
+  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' }, referrerPolicy: 'strict-origin-when-cross-origin' })); }
   catch { throw new ErroreServizio('Ricerca indirizzi non raggiungibile. Controlla la rete e riprova.'); }
   if (!r.ok) throw new ErroreServizio(r.status === 429 ? 'Troppe ricerche ravvicinate: attendi qualche secondo.' : 'Ricerca indirizzi non disponibile al momento.');
   const j = await r.json() as { lat: string; lon: string; display_name: string }[];
@@ -59,7 +59,7 @@ export async function matrice(punti: Punto[]): Promise<Matrice> {
   const k = coord(punti);
   const c = cacheMatrici.get(k); if (c) return c;
   let r: Response;
-  try { r = await fetch(`${OSRM}/table/v1/driving/${k}?annotations=duration,distance`); }
+  try { r = await fetch(`${OSRM}/table/v1/driving/${k}?annotations=duration,distance`, { referrerPolicy: 'strict-origin-when-cross-origin' }); }
   catch { throw new ErroreServizio('Servizio percorsi (OSRM) non raggiungibile. Riprova tra qualche minuto.'); }
   if (!r.ok) throw new ErroreServizio('Servizio percorsi (OSRM) non disponibile al momento. Riprova più tardi.');
   const j = await r.json() as { code: string; durations?: (number | null)[][]; distances?: (number | null)[][] };
@@ -73,7 +73,7 @@ export async function matrice(punti: Punto[]): Promise<Matrice> {
 /** Linea del percorso (lat, lon) per la mappa. */
 export async function traccia(punti: Punto[]): Promise<[number, number][]> {
   let r: Response;
-  try { r = await fetch(`${OSRM}/route/v1/driving/${coord(punti)}?overview=full&geometries=geojson`); }
+  try { r = await fetch(`${OSRM}/route/v1/driving/${coord(punti)}?overview=full&geometries=geojson`, { referrerPolicy: 'strict-origin-when-cross-origin' }); }
   catch { throw new ErroreServizio('Traccia del percorso non disponibile.'); }
   if (!r.ok) throw new ErroreServizio('Traccia del percorso non disponibile.');
   const j = await r.json() as { code: string; routes?: { geometry: { coordinates: [number, number][] } }[] };
@@ -96,7 +96,7 @@ export async function geocodificaPrimo(q: string): Promise<Risultato | null> {
   if (cache[chiave]) return cache[chiave][0] ?? null;
   const url = `${NOMINATIM}?format=json&countrycodes=it&limit=1&accept-language=it&bounded=1&viewbox=${VIEWBOX_ROMA}&q=${encodeURIComponent(q)}`;
   let r: Response;
-  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' } })); }
+  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' }, referrerPolicy: 'strict-origin-when-cross-origin' })); }
   catch { throw new ErroreServizio('Ricerca indirizzi non raggiungibile. Controlla la rete e riprova.'); }
   if (!r.ok) throw new ErroreServizio('Ricerca indirizzi non disponibile al momento.');
   const j = await r.json() as { lat: string; lon: string; display_name: string }[];
@@ -113,7 +113,7 @@ export async function indirizzoDi(lat: number, lon: number): Promise<string> {
   if (cache[chiave]) return cache[chiave][0]?.etichetta ?? '';
   const url = `${NOMINATIM.replace('/search', '/reverse')}?format=json&accept-language=it&zoom=18&lat=${lat}&lon=${lon}`;
   let r: Response;
-  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' } })); }
+  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' }, referrerPolicy: 'strict-origin-when-cross-origin' })); }
   catch { throw new ErroreServizio('Ricerca indirizzi non raggiungibile. Controlla la rete e riprova.'); }
   if (!r.ok) throw new ErroreServizio('Ricerca indirizzi non disponibile al momento.');
   const j = await r.json() as { display_name?: string };

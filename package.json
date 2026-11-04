@@ -22,13 +22,16 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "jsqr": "^1.4.0",
+    "leaflet.markercluster": "^1.5.3",
     "qrcode": "1.5.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "^6.30.6"
+    "react-router-dom": "^6.30.6",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.12",
+    "@types/leaflet.markercluster": "^1.5.5",
     "@types/qrcode": "1.5.5",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",

@@ -5,6 +5,7 @@ import { CATEGORIE, fmtData, fmtEuro, fmtKm, fmtOra } from '../../lib/format';
 import { useT } from '../../lib/i18n';
 import { Caricamento, Errore, Pill, useLoad } from '../../ui';
 import { RiepilogoPercorsi } from '../percorsi/Percorsi';
+import { RiepilogoInterventi } from '../interventi/Interventi';
 import { domani, oggi } from '../../lib/percorsi/piano';
 
 interface Mese { mese: string; km: number; segnalazioni: number; fermi: number; chiuse: number; ore_chiusura: number | null; carburante_eur: number; litri: number; multe: number; multe_eur: number; piani_confermati: number; avvisi: number; avvisi_letti: number }
@@ -57,6 +58,7 @@ export default function Panoramica() {
       </div>
 
       <div className="kpis">
+        <RiepilogoInterventi />
         <RiepilogoPercorsi giorno={oggi()} titolo="Percorsi di oggi" />
         <RiepilogoPercorsi giorno={domani()} titolo="Percorsi di domani" />
       </div>

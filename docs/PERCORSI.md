@@ -3,7 +3,7 @@
 Accesso: responsabile flotta e amministratore (`is_responsabile`). Non ancora collegato alla Pianificazione.
 
 - `/percorsi` — cruscotto del giorno (Oggi / Domani / data): una scheda per tecnico attivo con tappe, km, guida, lavoro, partenza → rientro, stato (Nessun percorso / Bozza / Confermato), avvisi; Apri / Crea / Duplica da altro giorno; totali del giorno.
-- `/percorsi/nuovo?data=&tecnico=` e `/percorsi/:id` — pianificatore.
+- `/percorsi/nuovo?data=&tecnico=` e `/percorsi/:id` — pianificatore. Mappa sempre visibile: clic → «Aggiungi tappa qui» / «Imposta come sede» (Nominatim /reverse); segnaposto trascinabili. Indirizzi scritti senza scegliere un suggerimento vengono cercati all’uscita dal campo e al «Calcola» (primo risultato in Roma, poi Italia).
 - Riepilogo "Percorsi di domani" nel Cruscotto flotta; "oggi" + "domani" nella Panoramica amministratore.
 
 ## Dati

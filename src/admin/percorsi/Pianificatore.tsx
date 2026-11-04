@@ -4,7 +4,7 @@ import { supabase, testoErrore } from '../../lib/supabase';
 import { useT } from '../../lib/i18n';
 import { Banner, Caricamento, Errore, toast } from '../../ui';
 import { ottimizza, type Matrice } from '../../lib/percorsi/ottimizza';
-import { ErroreServizio, geocodifica, linkGoogleMaps, matrice, traccia, type Risultato as Geo } from '../../lib/percorsi/routing';
+import { ErroreServizio, geocodifica, geocodificaPrimo, indirizzoDi, linkGoogleMaps, matrice, traccia, type Risultato as Geo } from '../../lib/percorsi/routing';
 import { SceltaAttivita } from '../Settimana';
 import { OPZIONI_DEFAULT, TIPI_ALLEGATO, allegatiAttivi, apriAllegato, caricaAllegato, avvisiStatici, calcola, leggiSede, nuovaTappa, oggi, percorso, salva, salvaSede, type Allegato, type Luogo, type Percorso, type Tappa } from '../../lib/percorsi/piano';
 
@@ -22,7 +22,18 @@ function Indirizzo({ valore, onScelta, placeholder }: { valore: Luogo; onScelta:
   const [msg, setMsg] = useState<string | null>(null);
   const [aperto, setAperto] = useState(false);
   const toccato = useRef(false);
+  const scelto = useRef(false);
   useEffect(() => { setQ(valore.indirizzo); }, [valore.indirizzo]);
+  const cercaTesto = () => window.setTimeout(async () => {
+    setAperto(false);
+    if (scelto.current) { scelto.current = false; return; }
+    if (valore.lat != null || q.trim().length < 4) return;
+    try {
+      const r = await geocodificaPrimo(q);
+      if (r) { toccato.current = false; setLista([]); setMsg(t('Trovato: {a}', { a: r.etichetta })); onScelta({ ...valore, indirizzo: r.etichetta, lat: r.lat, lon: r.lon }); }
+      else setMsg(t('Indirizzo non trovato. Prova ad aggiungere il comune o il CAP.'));
+    } catch (e) { setMsg(e instanceof ErroreServizio ? t(e.message) : t('Ricerca non riuscita.')); }
+  }, 250);
   useEffect(() => {
     if (!toccato.current || q.trim().length < 4) { setLista([]); return; }
     let vivo = true;
@@ -38,11 +49,11 @@ function Indirizzo({ valore, onScelta, placeholder }: { valore: Luogo; onScelta:
   return (
     <div className="perc-ind">
       <input value={q} placeholder={placeholder} onChange={e => { toccato.current = true; setQ(e.target.value); if (valore.lat != null) onScelta({ ...valore, indirizzo: e.target.value, lat: null, lon: null }); }}
-        onFocus={() => setAperto(lista.length > 0)} onBlur={() => window.setTimeout(() => setAperto(false), 200)} />
-      {valore.lat != null ? <span className="perc-ok">✓ {t('posizione trovata')}</span> : q && <span className="perc-no">{t('scegli un suggerimento')}</span>}
+        onFocus={() => setAperto(lista.length > 0)} onBlur={cercaTesto} />
+      {valore.lat != null ? <span className="perc-ok">✓ {t('posizione trovata')}</span> : q && <span className="perc-no">{t('scegli un suggerimento o esci dal campo per cercarlo')}</span>}
       {msg && <div className="hint">{msg}</div>}
       {aperto && lista.length > 0 && <ul className="perc-sugg">{lista.map((r, i) =>
-        <li key={i}><button type="button" onMouseDown={() => { toccato.current = false; setQ(r.etichetta); setAperto(false); setLista([]); onScelta({ ...valore, indirizzo: r.etichetta, lat: r.lat, lon: r.lon }); }}>{r.etichetta}</button></li>)}</ul>}
+        <li key={i}><button type="button" onMouseDown={() => { toccato.current = false; scelto.current = true; setMsg(null); setQ(r.etichetta); setAperto(false); setLista([]); onScelta({ ...valore, indirizzo: r.etichetta, lat: r.lat, lon: r.lon }); }}>{r.etichetta}</button></li>)}</ul>}
     </div>
   );
 }
@@ -96,21 +107,43 @@ export default function Pianificatore() {
   useEffect(() => { setP(x => x ? conRisultato(x) : x); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [mat]);
 
   const pronto = p && p.partenza.lat != null && p.stops.length > 0 && p.stops.every(s => s.lat != null);
+  const compilato = p && p.stops.length > 0 && [p.partenza, ...p.stops].every(s => s.lat != null || s.indirizzo.trim().length >= 4);
+  /** Cerca gli indirizzi scritti ma non scelti dai suggerimenti. Restituisce il percorso aggiornato e chi manca. */
+  async function completaIndirizzi(pp: Percorso): Promise<{ pp: Percorso; mancano: string[] }> {
+    const mancano: string[] = [];
+    const cerca = async <L extends Luogo>(l: L, nome: string): Promise<L> => {
+      if (l.lat != null) return l;
+      const r = l.indirizzo.trim().length >= 4 ? await geocodificaPrimo(l.indirizzo) : null;
+      if (!r) { mancano.push(nome); return l; }
+      return { ...l, indirizzo: r.etichetta, lat: r.lat, lon: r.lon };
+    };
+    const partenza = await cerca(pp.partenza, t('Sede'));
+    const stops: Tappa[] = [];
+    for (let i = 0; i < pp.stops.length; i++) stops.push(await cerca(pp.stops[i], t('Tappa {n}', { n: i + 1 }) + (pp.stops[i].nome ? ` (${pp.stops[i].nome})` : '')));
+    return { pp: { ...pp, partenza, stops }, mancano };
+  }
   async function calcolaOrdine(soloOrdine = false) {
-    if (!p || !pronto) return;
+    if (!p || !compilato) return;
+    let cur: Percorso = p;
     setLavoro(true); setErrCalc(null);
     try {
-      let m = sottoMatrice(p);
-      const chiavi = [chiavePunto('sede', p.partenza), ...p.stops.map(s => chiavePunto(s.id, s))];
+      if (!pronto) {
+        const c = await completaIndirizzi(p);
+        setP(c.pp);
+        if (c.mancano.length) { setErrCalc(t('Indirizzo non trovato per: {l}. Correggilo o posiziona il punto sulla mappa.', { l: c.mancano.join(', ') })); return; }
+        cur = c.pp;
+      }
+      let m = sottoMatrice(cur);
+      const chiavi = [chiavePunto('sede', cur.partenza), ...cur.stops.map(s => chiavePunto(s.id, s))];
       if (!m || !soloOrdine) {
-        const mm = await matrice([p.partenza as { lat: number; lon: number }, ...p.stops.map(s => s as { lat: number; lon: number })]);
+        const mm = await matrice([cur.partenza as { lat: number; lon: number }, ...cur.stops.map(s => s as { lat: number; lon: number })]);
         setMat({ chiavi, m: mm }); m = mm;
       }
-      const prima = p.stops.findIndex(s => s.prima);
-      const o = ottimizza(p.stops.map((_, i) => i + 1), prima >= 0 ? prima + 1 : null, m, paramDi(p));
-      const stops = o.map(i => p.stops[i - 1]);
+      const prima = cur.stops.findIndex(s => s.prima);
+      const o = ottimizza(cur.stops.map((_, i) => i + 1), prima >= 0 ? prima + 1 : null, m, paramDi(cur));
+      const stops = o.map(i => cur.stops[i - 1]);
       const sub = { durate: [0, ...o].map(i => [0, ...o].map(j => m!.durate[i][j])), distanze: [0, ...o].map(i => [0, ...o].map(j => m!.distanze[i][j])) };
-      setP({ ...p, stops, risultato: calcola(sub, stops.map((_, i) => i + 1), stops, p.partenza, p.opzioni), stato: 'bozza' });
+      setP({ ...cur, stops, risultato: calcola(sub, stops.map((_, i) => i + 1), stops, cur.partenza, cur.opzioni), stato: 'bozza' });
     } catch (e) { setErrCalc(e instanceof ErroreServizio ? t(e.message) : t('Calcolo non riuscito. Controlla le tappe e riprova.')); }
     finally { setLavoro(false); }
   }
@@ -132,9 +165,34 @@ export default function Pianificatore() {
   }, [chiaveTraccia]);
 
   const punti = useMemo(() => !p ? [] : [
-    ...(p.partenza.lat != null ? [{ lat: p.partenza.lat, lon: p.partenza.lon!, etichetta: p.partenza.nome, sede: true }] : []),
-    ...p.stops.filter(s => s.lat != null).map(s => ({ lat: s.lat!, lon: s.lon!, etichetta: s.nome || s.indirizzo })),
+    ...(p.partenza.lat != null ? [{ id: 'sede', lat: p.partenza.lat, lon: p.partenza.lon!, etichetta: `${p.partenza.nome} — ${p.partenza.indirizzo}`, sede: true }] : []),
+    ...p.stops.map((s, i) => ({ s, i })).filter(x => x.s.lat != null).map(({ s, i }) => ({ id: s.id, numero: i + 1, lat: s.lat!, lon: s.lon!, etichetta: `${i + 1}. ${s.nome || s.indirizzo}` })),
   ], [p]);
+  const [scelto, setScelto] = useState<{ lat: number; lon: number; etichetta: string | null } | null>(null);
+  async function clicMappa(lat: number, lon: number) {
+    setScelto({ lat, lon, etichetta: null });
+    let et = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    try { et = await indirizzoDi(lat, lon); } catch { /* resta la coordinata */ }
+    setScelto(x => x && x.lat === lat && x.lon === lon ? { ...x, etichetta: et } : x);
+  }
+  async function sposta(idp: string, lat: number, lon: number) {
+    const metti = (et: string | null) => aggiorna(x => idp === 'sede'
+      ? { ...x, partenza: { ...x.partenza, lat, lon, ...(et ? { indirizzo: et } : {}) } }
+      : { ...x, stops: x.stops.map(y => y.id === idp ? { ...y, lat, lon, ...(et ? { indirizzo: et } : {}) } : y) });
+    metti(null);
+    try { metti(await indirizzoDi(lat, lon)); } catch { /* nulla */ }
+  }
+  function usaScelto(come: 'tappa' | 'sede') {
+    if (!scelto) return;
+    const l = { indirizzo: scelto.etichetta ?? `${scelto.lat.toFixed(5)}, ${scelto.lon.toFixed(5)}`, lat: scelto.lat, lon: scelto.lon };
+    if (come === 'sede') aggiorna(x => ({ ...x, partenza: { ...x.partenza, ...l } }));
+    else aggiorna(x => {
+      const vuota = x.stops.findIndex(y => y.lat == null && !y.indirizzo.trim());
+      if (vuota >= 0) return { ...x, stops: x.stops.map((y, k) => k === vuota ? { ...y, ...l } : y) };
+      return { ...x, stops: [...x.stops, { ...nuovaTappa(), ...l }] };
+    });
+    setScelto(null);
+  }
 
   async function registra(stato: 'bozza' | 'confermato') {
     if (!p) return;
@@ -155,7 +213,7 @@ export default function Pianificatore() {
   if (!p) return <Caricamento />;
   const R = p.risultato;
   const tec = tecnici.find(x => x.id === p.tecnico_id);
-  const statici = avvisiStatici(p).filter(a => a !== 'Percorso non calcolato');
+  const statici = avvisiStatici(p).filter(a => a !== 'Percorso non calcolato' && !/tappe senza indirizzo|Sede senza indirizzo/.test(a));
   const muovi = (i: number, d: number) => aggiorna(x => {
     const s = [...x.stops]; const j = i + d; if (j < 0 || j >= s.length) return x;
     [s[i], s[j]] = [s[j], s[i]]; return { ...x, stops: s };
@@ -172,22 +230,40 @@ export default function Pianificatore() {
       </div>
       <h2 className="solo-stampa">{t('Percorso del {d}', { d: new Date(p.data + 'T12:00').toLocaleDateString(locale) })}{tec ? ` · ${tec.nome} ${tec.cognome}` : ''}</h2>
 
+      <div className={`card perc-box perc-sede-card no-print ${p.partenza.lat == null ? 'manca' : ''}`}>
+        <div className="perc-sede">
+          <div><div className="lbl-sm">{t('Sede di partenza e rientro')}</div>
+            <strong>{p.partenza.nome}</strong> · <span>{p.partenza.indirizzo || t('indirizzo non impostato')}</span>
+            {p.partenza.lat != null ? <span className="perc-ok"> ✓</span> : null}</div>
+          <button className="btn brand" onClick={() => setSedeEdit(!(sede || p.partenza.lat == null))}>{t('Modifica sede')}</button>
+        </div>
+        {(sede || p.partenza.lat == null) && <div className="perc-sede-edit">
+          <input value={p.partenza.nome} onChange={e => aggiorna(x => ({ ...x, partenza: { ...x.partenza, nome: e.target.value } }))} />
+          <Indirizzo valore={p.partenza} placeholder={t('Indirizzo della sede')} onScelta={l => aggiorna(x => ({ ...x, partenza: l }))} />
+          <p className="hint">{t('Puoi anche cliccare sulla mappa e scegliere «Imposta come sede».')}</p>
+          <button className="btn btn-sm" disabled={p.partenza.lat == null} onClick={() => { salvaSede(p.partenza); setSedeEdit(false); toast(t('Sede salvata come predefinita.')); }}>{t('Salva come sede predefinita')}</button>
+        </div>}
+      </div>
+
       <div className="card perc-box no-print">
         <div className="form grid2">
           <div className="field"><label>{t('Tecnico')}</label>
             <select value={p.tecnico_id ?? ''} onChange={e => aggiorna(x => ({ ...x, tecnico_id: e.target.value ? Number(e.target.value) : null }))}>
               <option value="">{t('— nessuno —')}</option>{tecnici.map(x => <option key={x.id} value={x.id}>{x.nome} {x.cognome}</option>)}</select></div>
           <div className="field"><label>{t('Data')}</label><input type="date" value={p.data} onChange={e => aggiorna(x => ({ ...x, data: e.target.value }))} /></div>
-          <div className="field"><label>{t('Partenza')}</label>
-            <div className="perc-sede"><strong>{p.partenza.nome}</strong> <span className="sub">{p.partenza.indirizzo || t('indirizzo non impostato')}</span>
-              <button className="btn-ghost btn-sm" onClick={() => setSedeEdit(!sede)}>{t('Modifica sede')}</button></div>
-            {sede && <div className="perc-sede-edit">
-              <input value={p.partenza.nome} onChange={e => aggiorna(x => ({ ...x, partenza: { ...x.partenza, nome: e.target.value } }))} />
-              <Indirizzo valore={p.partenza} placeholder={t('Indirizzo della sede')} onScelta={l => aggiorna(x => ({ ...x, partenza: l }))} />
-              <button className="btn btn-sm" disabled={p.partenza.lat == null} onClick={() => { salvaSede(p.partenza); setSedeEdit(false); toast(t('Sede salvata come predefinita.')); }}>{t('Salva come sede predefinita')}</button>
-            </div>}</div>
           <div className="field"><label>{t('Ora di partenza')}</label><input type="time" value={p.opzioni.ora} onChange={e => aggiorna(x => ({ ...x, opzioni: { ...x.opzioni, ora: e.target.value || '08:00' } }))} /></div>
         </div>
+      </div>
+
+      <div className="perc-mappa-box">
+        <p className="hint no-print">{t('Clicca sulla mappa per aggiungere una tappa o impostare la sede; trascina i segnaposto per correggere la posizione.')}</p>
+        {scelto && <div className="perc-scelto no-print">
+          <span>📍 {scelto.etichetta ?? t('Cerco l\'indirizzo…')}</span>
+          <button className="btn btn-sm" onClick={() => usaScelto('tappa')}>{t('Aggiungi tappa qui')}</button>
+          <button className="btn-ghost btn-sm" onClick={() => usaScelto('sede')}>{t('Imposta come sede')}</button>
+          <button className="btn-ghost btn-sm" onClick={() => setScelto(null)}>{t('Annulla')}</button>
+        </div>}
+        <Suspense fallback={<div className="perc-mappa" />}><Mappa punti={punti} linea={linea} scelto={scelto} onClic={clicMappa} onSposta={sposta} /></Suspense>
       </div>
 
       <div className="section-title no-print">{t('Tappe')} <span className="meta">{t('{n} tappe · rientro in sede sempre incluso', { n: p.stops.length })}</span></div>
@@ -242,9 +318,9 @@ export default function Pianificatore() {
       </div>
 
       <div className="perc-bar no-print">
-        <button className="btn brand" disabled={!pronto || lavoro} onClick={() => calcolaOrdine(false)}>{lavoro ? t('Calcolo…') : t('Calcola percorso')}</button>
+        <button className="btn brand" disabled={!compilato || lavoro} onClick={() => calcolaOrdine(false)}>{lavoro ? t('Calcolo…') : t('Calcola percorso')}</button>
         {R && <button className="btn-ghost" disabled={lavoro} onClick={() => calcolaOrdine(true)}>{t('Ricalcola ordine migliore')}</button>}
-        {!pronto && <span className="hint">{p.partenza.lat == null ? t('Imposta prima l\'indirizzo della sede (Modifica sede).') : t('Ogni tappa deve avere un indirizzo scelto dai suggerimenti.')}</span>}
+        {!compilato && <span className="hint">{p.partenza.lat == null && p.partenza.indirizzo.trim().length < 4 ? t('Imposta prima l\'indirizzo della sede (Modifica sede).') : t('Manca l\'indirizzo per: {l}.', { l: p.stops.map((x, i) => x.lat == null && x.indirizzo.trim().length < 4 ? t('Tappa {n}', { n: i + 1 }) : '').filter(Boolean).join(', ') || t('almeno una tappa') })}</span>}
       </div>
       {errCalc && <Banner s="ko">{errCalc}</Banner>}
       {statici.map(a => <Banner key={a} s="warn">{tm(a)}</Banner>)}
@@ -280,7 +356,6 @@ export default function Pianificatore() {
         </div>
       </>}
 
-      {punti.length > 0 && <Suspense fallback={<Caricamento />}><Mappa punti={punti} linea={linea} /></Suspense>}
 
       <div className="perc-bar no-print perc-salva">
         <button className="btn-ghost" disabled={lavoro} onClick={() => registra('bozza')}>{t('Salva bozza')}</button>

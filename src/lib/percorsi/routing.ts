@@ -87,3 +87,37 @@ export function linkGoogleMaps(sede: Punto, tappe: Punto[]): string {
   const w = tappe.slice(0, 9).map(f).join('|');
   return `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${f(sede)}&destination=${f(sede)}${w ? `&waypoints=${encodeURIComponent(w)}` : ''}`;
 }
+
+/** Primo risultato per un testo libero: prima dentro Roma (bounded), poi in tutta Italia. */
+export async function geocodificaPrimo(q: string): Promise<Risultato | null> {
+  const chiave = 'b1:' + q.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (chiave.length < 6) return null;
+  const cache = leggiCache();
+  if (cache[chiave]) return cache[chiave][0] ?? null;
+  const url = `${NOMINATIM}?format=json&countrycodes=it&limit=1&accept-language=it&bounded=1&viewbox=${VIEWBOX_ROMA}&q=${encodeURIComponent(q)}`;
+  let r: Response;
+  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' } })); }
+  catch { throw new ErroreServizio('Ricerca indirizzi non raggiungibile. Controlla la rete e riprova.'); }
+  if (!r.ok) throw new ErroreServizio('Ricerca indirizzi non disponibile al momento.');
+  const j = await r.json() as { lat: string; lon: string; display_name: string }[];
+  let out: Risultato[] = j.map(x => ({ lat: Number(x.lat), lon: Number(x.lon), etichetta: x.display_name }));
+  if (!out.length) out = (await geocodifica(q)).slice(0, 1);
+  cache[chiave] = out; scriviCache(cache);
+  return out[0] ?? null;
+}
+
+/** Indirizzo leggibile per un punto (clic o trascinamento sulla mappa). */
+export async function indirizzoDi(lat: number, lon: number): Promise<string> {
+  const chiave = `rev:${lat.toFixed(5)},${lon.toFixed(5)}`;
+  const cache = leggiCache();
+  if (cache[chiave]) return cache[chiave][0]?.etichetta ?? '';
+  const url = `${NOMINATIM.replace('/search', '/reverse')}?format=json&accept-language=it&zoom=18&lat=${lat}&lon=${lon}`;
+  let r: Response;
+  try { r = await inCoda(() => fetch(url, { headers: { Accept: 'application/json' } })); }
+  catch { throw new ErroreServizio('Ricerca indirizzi non raggiungibile. Controlla la rete e riprova.'); }
+  if (!r.ok) throw new ErroreServizio('Ricerca indirizzi non disponibile al momento.');
+  const j = await r.json() as { display_name?: string };
+  const et = j.display_name ?? `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  cache[chiave] = [{ lat, lon, etichetta: et }]; scriviCache(cache);
+  return et;
+}

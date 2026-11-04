@@ -1321,3 +1321,9 @@ table.wk thead th { background:var(--surface-2); font-size:14px; }
 .solo-stampa { display:none; }
 @media (max-width:640px) { .perc-tappa { grid-template-columns:1fr; } .perc-azioni { flex-direction:row; } .perc-num { width:32px; height:32px; font-size:15px; } }
 @media print { .solo-stampa { display:block; font-size:20px; } .perc-mappa { height:320px; break-inside:avoid; } .percorsi .kpis { grid-template-columns:repeat(4,1fr); } .perc-tab { font-size:12px; } }
+.perc-sede-card .perc-sede { justify-content:space-between; }
+.perc-sede-card.manca { border:2px solid var(--brand); }
+.perc-mappa-box { margin:0 0 16px; }
+.perc-mappa-box .perc-mappa { margin:8px 0 0; cursor:crosshair; }
+.perc-scelto { display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px 12px; border:1px solid var(--line-strong); border-radius:10px; background:var(--surface); margin-top:8px; }
+.perc-scelto span { flex:1 1 220px; font-size:14px; }

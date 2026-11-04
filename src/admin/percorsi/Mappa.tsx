@@ -17,7 +17,7 @@ export default function Mappa({ punti, linea, scelto, onClic, onSposta }: {
   useEffect(() => {
     if (!div.current || mappa.current) return;
     const m = L.map(div.current, { scrollWheelZoom: false }).setView([41.9, 12.5], 11);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(m);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(m);
     m.on('click', e => cb.current.onClic?.(e.latlng.lat, e.latlng.lng));
     mappa.current = m; strato.current = L.layerGroup().addTo(m);
     return () => { m.remove(); mappa.current = null; };

@@ -3,11 +3,12 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
+import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 import { ESTENSIONI, apriAllegato, caricaAllegato, pratica, useAdesso, useAggiornamento, useConfig } from './comune';
 import { Ic, SlaChip, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
-import Avanza, { avanzaDiretto } from './Avanza';
+import Avanza, { avanzaDiretto, prossimoDi } from './Avanza';
+import Appunti from './Appunti';
 import ModaleEmail from './ModaleEmail';
 import { ModaleTrasferimento, RigaTrasf, segnaRichiamato, trasferimenti } from './Trasferimento';
 import { useCtx } from './ShellCentralino';
@@ -20,15 +21,20 @@ export default function Pratica() {
   const [qs, setQs] = useSearchParams();
   const { config } = useConfig();
   const { data, errore, reload } = useLoad(async () => {
-    const [d, tr] = await Promise.all([pratica(Number(id)), trasferimenti(undefined, Number(id))]);
-    return { ...d, tr };
+    const [d, tr, pr] = await Promise.all([pratica(Number(id)), trasferimenti(undefined, Number(id)), prossimoDi(Number(id)).catch(() => null)]);
+    return { ...d, tr, pr };
   }, [id, ctx.versione]);
   const r = useCallback(() => { reload(); }, [reload]); useAggiornamento(r);
-  const [modale, setModale] = useState<'' | 'avanza' | 'nota' | 'chiamata' | 'email' | 'dati' | 'chiudi' | 'trasf'>('');
+  const [modale, setModale] = useState<'' | 'avanza' | 'nota' | 'chiamata' | 'email' | 'dati' | 'chiudi' | 'trasf' | 'sposta'>('');
+  const [codiceEmail, setCodiceEmail] = useState<string | undefined>(undefined);
   const [riep, setRiep] = useState<Trasferimento | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const nuova = qs.get('nuova') === '1';
-  useEffect(() => { if (qs.get('trasferisci') === '1' && ctx.scrive) { setModale('trasf'); qs.delete('trasferisci'); setQs(qs, { replace: true }); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!ctx.scrive) return;
+    if (qs.get('trasferisci') === '1') { setModale('trasf'); qs.delete('trasferisci'); setQs(qs, { replace: true }); }
+    else if (qs.get('email')) { setCodiceEmail(qs.get('email') || undefined); setModale('email'); qs.delete('email'); setQs(qs, { replace: true }); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data || !config) return <Caricamento />;
@@ -41,7 +47,7 @@ export default function Pratica() {
 
   async function avanzaUno() {
     if (!prossimo) return;
-    if (!avanzaDiretto(prossimo)) { setModale('avanza'); return; }
+    if (!avanzaDiretto(prossimo) || (data?.pr?.mancanti.length ?? 0) > 0) { setModale('avanza'); return; }
     try { await rpc('centralino_avanza', { p_id: p.id, p_stadio: prossimo.key, p_dati: {}, p_testo: null }); toast(prossimo.nome); fatto(); } catch (e) { toast(testoErrore(e)); }
   }
   async function carica(l: FileList | null) {
@@ -62,8 +68,9 @@ export default function Pratica() {
         <div className="ct-dopo">
           <div><b>Pratica {p.numero} aperta.</b> {prossimo ? <>Prossimo passo: <b>{prossimo.nome}</b>.</> : null}</div>
           <div className="row-flex">
-            {prossimo && <button className="btn btn-sm" onClick={avanzaUno}>Fatto: {prossimo.nome}</button>}
-            <button className="btn-ghost btn-sm" onClick={() => setModale('email')}>Invia email al cliente</button>
+            {prossimo?.template ? <button className="btn btn-sm" onClick={() => { setCodiceEmail(prossimo.template); setModale('email'); }}>Invia email: {prossimo.nome}</button>
+              : prossimo && <button className="btn btn-sm" onClick={avanzaUno}>Fatto: {prossimo.nome}</button>}
+            <button className="btn-ghost btn-sm" onClick={() => { setCodiceEmail(undefined); setModale('email'); }}>Invia email al cliente</button>
             <button className="btn-ghost btn-sm" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
             <button className="btn-ghost btn-sm" onClick={() => { qs.delete('nuova'); setQs(qs); }}>Chiudi</button>
           </div>
@@ -89,19 +96,20 @@ export default function Pratica() {
       </header>
 
       <Stepper f={f} p={p} eventi={data.eventi} />
+      {aperta && data.pr && <div className={`ct-prossimo ${data.pr.mancanti.length ? 'manca' : 'ok'}`}><b>Prossimo passo: {data.pr.nome}</b>{data.pr.mancanti.length ? <span> · manca: {data.pr.mancanti.join(', ')}</span> : <span> · tutto pronto</span>}</div>}
 
       {ctx.scrive && (
         <div className="ct-azioni">
           {aperta && prossimo && <button className="btn" onClick={avanzaUno}>Avanza: {prossimo.nome}</button>}
-          {aperta && prossimo && <button className="btn-ghost" onClick={() => setModale('avanza')}>Avanza a…</button>}
-          <button className="btn-ghost" onClick={() => setModale('email')}><Ic n="email" size={16} /> Invia email</button>
+          <button className="btn-ghost" onClick={() => { setCodiceEmail(prossimo?.template); setModale('email'); }}><Ic n="email" size={16} /> Invia email</button>
+          {aperta && p.appuntamento_data && <button className="btn-ghost" onClick={() => setModale('sposta')}>Sposta appuntamento</button>}
           <button className="btn-ghost" onClick={() => setModale('chiamata')}><Ic n="telefono" size={16} /> Registra chiamata</button>
           <button className="btn-ghost" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
           <button className="btn-ghost" onClick={() => setModale('nota')}>Aggiungi nota</button>
           <button className="btn-ghost" onClick={() => setModale('dati')}>Dati e assegnazione</button>
           <button className="btn-ghost" onClick={() => file.current?.click()}>Allegati</button>
           <input ref={file} type="file" hidden multiple accept={ESTENSIONI} onChange={e => carica(e.target.files)} />
-          {scrive && <button className="btn-ghost ct-chiudi" onClick={() => setModale('chiudi')}>Chiudi pratica</button>}
+          {scrive && <button className="btn-ghost ct-chiudi" onClick={() => setModale('chiudi')}>Annulla pratica</button>}
         </div>)}
 
       <div className="ct-dett">
@@ -110,6 +118,7 @@ export default function Pratica() {
           <Timeline eventi={data.eventi} f={f} onApri={apri} />
         </section>
         <aside>
+          {ctx.scrive && <section className="ct-blocco"><Appunti chiave={`p:${p.id}`} /></section>}
           <section className="ct-blocco ct-dati">
             <h2>Cliente</h2>
             <dl>
@@ -129,7 +138,7 @@ export default function Pratica() {
               <dt>Assegnata a</dt><dd>{p.assegnato_nome || '—'}{p.tecnico_nome ? ` · tecnico ${p.tecnico_nome}` : ''}</dd>
               {p.commerciale_nome && <><dt>Commerciale</dt><dd>{p.commerciale_nome}</dd></>}
               {p.importo_stimato != null && <><dt>Importo stimato</dt><dd>{fmtEuro(p.importo_stimato)}</dd></>}
-              {p.tipo === 'manutenzione' && <><dt>Alert Taylor</dt><dd>{p.alert_taylor ? 'Inviato' : 'No'}</dd></>}
+              {p.tipo === 'manutenzione' && <><dt>Alert Taylor</dt><dd>{p.alert_taylor ? `Inviato${p.documento_intervento ? ` · doc. ${p.documento_intervento}` : ''}` : 'No'}</dd></>}
               {p.sottotipo === 'Allarme sonoro attivo' && <><dt>Tacitazione</dt><dd>{p.tacitazione_tentata ? 'Tentata al telefono' : 'Non tentata'}</dd></>}
               {p.esito_offerta && <><dt>Esito offerta</dt><dd>{p.esito_offerta.replace('_', ' ')}</dd></>}
               {p.descrizione && <><dt>Richiesta</dt><dd>{p.descrizione}</dd></>}
@@ -143,9 +152,10 @@ export default function Pratica() {
         </aside>
       </div>
 
-      {modale === 'avanza' && f && <Avanza p={p} f={f} stadio={prossimo} onClose={() => setModale('')} onFatto={fatto} />}
+      {modale === 'avanza' && f && <Avanza p={p} f={f} onClose={() => setModale('')} onFatto={fatto} onEmail={t => { setCodiceEmail(t); setModale('email'); }} />}
+      {modale === 'sposta' && <ModaleSposta p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {(modale === 'nota' || modale === 'chiamata') && <ModaleNota p={p} tipo={modale} onClose={() => setModale('')} onFatto={fatto} />}
-      {modale === 'email' && <ModaleEmail pratica={p} onClose={() => setModale('')} onFatto={fatto} />}
+      {modale === 'email' && <ModaleEmail pratica={p} codice={codiceEmail} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'dati' && <ModaleDati p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'chiudi' && <ModaleChiudi p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'trasf' && <ModaleTrasferimento pratica={p} onClose={() => setModale('')} onFatto={fatto} />}
@@ -181,7 +191,7 @@ function ModaleDati({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatt
     appuntamento_data: p.appuntamento_data ?? '', appuntamento_fascia: p.appuntamento_fascia ?? '', nota: '',
   });
   const [err, setErr] = useState<string | null>(null);
-  const comm = config?.impostazioni.commerciali ?? [];
+  const comm = p.tipo === 'offerta_grande' ? (config?.impostazioni.commerciali_offerte_grandi ?? []) : [...(config?.impostazioni.commerciali ?? []), ...(config?.impostazioni.commerciali_offerte_grandi ?? [])];
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   async function salva(e: FormEvent) {
     e.preventDefault(); setErr(null);
@@ -204,16 +214,18 @@ function ModaleDati({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatt
           <div className="field"><label htmlFor="d-nome">Persona</label><input id="d-nome" value={f.assegnato_nome} onChange={set('assegnato_nome')} /></div>
           <div className="field"><label htmlFor="d-tec">Tecnico</label><input id="d-tec" value={f.tecnico_nome} onChange={set('tecnico_nome')} /></div>
           <div className="field"><label htmlFor="d-cm">Commerciale</label>
-            <input id="d-cm" list="d-comm" value={f.commerciale_nome} onChange={e => { const c = comm.find(x => x.nome === e.target.value); setF({ ...f, commerciale_nome: e.target.value, commerciale_email: c?.email ?? f.commerciale_email }); }} />
-            <datalist id="d-comm">{comm.map(c => <option key={c.nome} value={c.nome} />)}</datalist></div>
+            <select id="d-cm" value={f.commerciale_nome} onChange={e => { const c = comm.find(x => x.nome === e.target.value); setF({ ...f, commerciale_nome: e.target.value, commerciale_email: c?.email ?? f.commerciale_email }); }}>
+              <option value="">—</option>{comm.map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)}{f.commerciale_nome && !comm.some(c => c.nome === f.commerciale_nome) && <option value={f.commerciale_nome}>{f.commerciale_nome}</option>}
+            </select></div>
           <div className="field"><label htmlFor="d-cme">Email commerciale</label><input id="d-cme" type="email" value={f.commerciale_email} onChange={set('commerciale_email')} /></div>
           <div className="field"><label htmlFor="d-imp">Importo stimato €</label><input id="d-imp" inputMode="decimal" value={f.importo_stimato} onChange={set('importo_stimato')} /></div>
         </div>
         <div className="ct-riga">
-          <input type="date" aria-label="Appuntamento" value={f.appuntamento_data} onChange={set('appuntamento_data')} />
-          <select aria-label="Fascia" value={f.appuntamento_fascia} onChange={set('appuntamento_fascia')}><option value="">—</option><option value="mattina">Mattina</option><option value="pomeriggio">Pomeriggio</option></select>
+          {!p.appuntamento_data && <><input type="date" aria-label="Appuntamento" value={f.appuntamento_data} onChange={set('appuntamento_data')} />
+          <select aria-label="Fascia" value={f.appuntamento_fascia} onChange={set('appuntamento_fascia')}><option value="">—</option><option value="mattina">Mattina</option><option value="pomeriggio">Pomeriggio</option></select></>}
           <select aria-label="Priorità" value={f.priorita} onChange={set('priorita')}><option value="normale">Normale</option><option value="urgente">Urgente</option></select>
         </div>
+        <p className="hint">{REGOLA_ANAGRAFICA}</p>
         <div className="field"><label htmlFor="d-desc">Richiesta</label><textarea id="d-desc" rows={2} value={f.descrizione} onChange={set('descrizione')} /></div>
         <div className="field"><label htmlFor="d-nota">Motivo del cambio (facoltativo)</label><input id="d-nota" value={f.nota} onChange={set('nota')} /></div>
         {err && <Banner s="ko">{err}</Banner>}
@@ -224,18 +236,51 @@ function ModaleDati({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatt
 }
 
 function ModaleChiudi({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatto: () => void }) {
-  const [e, setE] = useState<'chiusa_ok' | 'chiusa_ko' | 'annullata'>('chiusa_ok'); const [t, setT] = useState(''); const [err, setErr] = useState<string | null>(null);
+  const { config } = useConfig();
+  const motivi = config?.impostazioni.motivi_annullamento ?? ['Altro'];
+  const [m, setM] = useState(''); const [t, setT] = useState(''); const [err, setErr] = useState<string | null>(null);
   async function salva(x: FormEvent) {
     x.preventDefault();
-    try { await rpc('centralino_chiudi', { p_id: p.id, p_esito: e, p_testo: t || null }); toast('Pratica chiusa'); onFatto(); } catch (y) { setErr(testoErrore(y)); }
+    const motivo = m === 'Altro' ? (t.trim() ? `Altro: ${t.trim()}` : '') : [m, t.trim()].filter(Boolean).join(' · ');
+    try { await rpc('centralino_chiudi', { p_id: p.id, p_esito: 'annullata', p_testo: motivo }); toast('Pratica annullata'); onFatto(); } catch (y) { setErr(testoErrore(y)); }
   }
   return (
-    <Modal titolo={`Chiudi ${p.numero}`} onClose={onClose}>
+    <Modal titolo={`Annulla ${p.numero}`} onClose={onClose}>
       <form className="form" onSubmit={salva}>
-        <div className="ct-chips">{([['chiusa_ok', 'Risolta / positiva'], ['chiusa_ko', 'Negativa'], ['annullata', 'Annullata']] as const).map(([v, l]) => <button type="button" key={v} className={e === v ? 'on' : ''} onClick={() => setE(v)}>{l}</button>)}</div>
-        <div className="field"><label htmlFor="ch-t">{e === 'annullata' ? 'Motivo (obbligatorio)' : 'Nota (facoltativa)'}</label><input id="ch-t" value={t} onChange={x => setT(x.target.value)} /></div>
+        <p className="hint">Una pratica si chiude completando tutti i passi. Prima della fine si può solo annullare.</p>
+        <div className="field"><label htmlFor="ch-m">Motivo</label><select id="ch-m" value={m} onChange={e => setM(e.target.value)} required><option value="">— scegli —</option>{motivi.map(x => <option key={x}>{x}</option>)}</select></div>
+        <div className="field"><label htmlFor="ch-t">{m === 'Altro' ? 'Spiega (obbligatorio)' : 'Dettaglio (facoltativo)'}</label><input id="ch-t" value={t} onChange={x => setT(x.target.value)} /></div>
         {err && <Banner s="ko">{err}</Banner>}
-        <div className="row-flex"><button className="btn">Chiudi pratica</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
+        <div className="row-flex"><button className="btn">Annulla la pratica</button><button type="button" className="btn-ghost" onClick={onClose}>Indietro</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Spostamento dell'appuntamento: solo concordato al telefono e confermato per iscritto. */
+function ModaleSposta({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatto: () => void }) {
+  const { config } = useConfig();
+  const motivi = config?.impostazioni.motivi_spostamento ?? ['Altro'];
+  const [f, setF] = useState({ data: '', fascia: '', motivo: '', tel: false, scritto: false });
+  const [err, setErr] = useState<string | null>(null);
+  async function salva(e: FormEvent) {
+    e.preventDefault();
+    try { await rpc('centralino_sposta', { p_id: p.id, p_data: f.data || null, p_fascia: f.fascia, p_motivo: f.motivo, p_concordato: f.tel, p_confermato: f.scritto }); toast('Appuntamento spostato'); onFatto(); }
+    catch (x) { setErr(testoErrore(x)); }
+  }
+  return (
+    <Modal titolo="Sposta appuntamento" onClose={onClose}>
+      <form className="form" onSubmit={salva}>
+        <p className="hint">Ora: {dataLunga(p.appuntamento_data)}, {p.appuntamento_fascia}.</p>
+        <div className="ct-riga">
+          <input type="date" aria-label="Nuova data" value={f.data} onChange={e => setF({ ...f, data: e.target.value })} />
+          <select aria-label="Fascia" value={f.fascia} onChange={e => setF({ ...f, fascia: e.target.value })}><option value="">— fascia —</option><option value="mattina">Mattina</option><option value="pomeriggio">Pomeriggio</option></select>
+          <select aria-label="Motivo" value={f.motivo} onChange={e => setF({ ...f, motivo: e.target.value })}><option value="">— motivo —</option>{motivi.map(m => <option key={m}>{m}</option>)}</select>
+        </div>
+        <label className="check"><input type="checkbox" checked={f.tel} onChange={e => setF({ ...f, tel: e.target.checked })} /> Concordato al telefono con il cliente</label>
+        <label className="check"><input type="checkbox" checked={f.scritto} onChange={e => setF({ ...f, scritto: e.target.checked })} /> Confermato per iscritto (email)</label>
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn">Sposta</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
       </form>
     </Modal>
   );

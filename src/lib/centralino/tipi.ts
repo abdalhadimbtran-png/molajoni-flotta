@@ -2,9 +2,10 @@ import type { RegolaSla } from './sla';
 
 export type Canale = 'telefono' | 'whatsapp' | 'email' | 'collega' | 'tablet_tmq' | 'altro';
 export type Esito = 'aperta' | 'chiusa_ok' | 'chiusa_ko' | 'annullata';
-export type TipoPratica = 'manutenzione' | 'sopralluogo' | 'offerta_piccola' | 'offerta_grande' | 'modifica' | 'amministrazione' | 'fornitori' | 'informazione';
+export type TipoPratica = 'manutenzione' | 'sopralluogo' | 'offerta_piccola' | 'offerta_grande' | 'modifica' | 'amministrazione' | 'fornitori' | 'informazione' | 'trasferta' | 'abbigliamento';
+export type Requisito = 'appuntamento' | 'email' | 'taylor' | 'commerciale' | 'destinatario' | 'esito';
 
-export interface Stadio { key: string; nome: string; sla?: RegolaSla; azione?: 'appuntamento' | 'taylor' | 'esito'; template?: string }
+export interface Stadio { key: string; nome: string; sla?: RegolaSla; azione?: 'appuntamento' | 'taylor' | 'esito'; template?: string; requisiti?: Requisito[] }
 export interface Flusso {
   tipo: TipoPratica; nome: string; icona: string; ordine: number; sottotipi: string[]; sottotipi_urgenti: string[];
   stadi: Stadio[]; sla_sottotipi: Record<string, Record<string, RegolaSla>>; assegnazione: { ruolo: string; nome: string } | null;
@@ -20,7 +21,7 @@ export interface Pratica {
   esito_offerta: 'accettata' | 'rifiutata' | 'in_attesa' | null; stato_corrente: string; esito: Esito;
   sla_stadio: string | null; sla_scadenza: string | null; sla_rispettato: boolean | null;
   created_by: string | null; created_at: string; updated_at: string; closed_at: string | null;
-  stato_cliente: StatoCliente | null; stato_cliente_manuale: boolean;
+  stato_cliente: StatoCliente | null; stato_cliente_manuale: boolean; documento_intervento: string | null;
 }
 export type StatoCliente = 'nuovo' | 'ex_cliente' | 'attivo';
 export const STATI_CLIENTE: Record<StatoCliente, [string, string]> = { nuovo: ['info', 'Nuovo'], ex_cliente: ['warn', 'Ex cliente'], attivo: ['ok', 'Cliente attivo'] };
@@ -32,7 +33,8 @@ export interface Trasferimento {
   esito: EsitoTrasf; modalita: 'trasferita' | 'richiamo'; entro_testo: string | null; cliente_email: string | null;
   esito_richiamo: string | null; email_riepilogo_at: string | null; email_non_disponibile: string | null; richiamo_scadenza: string | null; richiamato_at: string | null; richiamato_da: string | null; autore_nome: string | null; at: string;
 }
-export interface Destinatario { nome: string; ruolo: string; email: string }
+export interface Destinatario { nome: string; ruolo: string; email: string; nota?: string }
+export interface Commerciale { nome: string; email: string | null; account: boolean; assente: boolean; occupato: boolean; disponibile: boolean }
 export type TipoEvento = 'creata' | 'stato' | 'nota' | 'email_inviata' | 'chiamata' | 'assegnata' | 'appuntamento' | 'allegato' | 'sla_scaduto' | 'chiusa' | 'modifica';
 export interface Evento {
   id: number; pratica_id: number; tipo: TipoEvento; da_stato: string | null; a_stato: string | null; testo: string | null;
@@ -47,6 +49,7 @@ export interface Impostazioni {
   orario: { inizio: string; fine: string }; soglia_arancio: number; cc_offerte_grandi: Persona[];
   amministrazione: Persona; fornitori: Persona & { giorni?: string }; commerciali: Persona[]; responsabili_info: Persona[];
   firma: string; sostituto: string; destinatari_trasferimento: Destinatario[]; trasferimento_sla: RegolaSla; mesi_cliente_attivo: number;
+  commerciali_offerte_grandi: Persona[]; motivi_annullamento: string[]; motivi_senza_email: string[]; motivi_spostamento: string[];
 }
 
 export const CANALI: { v: Canale; l: string; ic: string }[] = [
@@ -63,12 +66,14 @@ export const RICHIESTE: { v: TipoPratica | 'offerta'; l: string; ic: string; bre
   { v: 'modifica', l: 'Modifica / anagrafica / disdetta', ic: 'modifica', breve: 'Calendario, dati, disdetta' },
   { v: 'amministrazione', l: 'Fatture / amministrazione', ic: 'amministrazione', breve: '→ Simona Colagrossi' },
   { v: 'fornitori', l: 'Fornitori', ic: 'fornitori', breve: '→ Roberta Felci' },
-  { v: 'informazione', l: 'Informazione / altro', ic: 'informazione', breve: '→ responsabile' },
+  { v: 'informazione', l: 'Informazione / altro', ic: 'informazione', breve: '→ responsabile (anche info@)' },
+  { v: 'trasferta', l: 'Trasferta (alloggio TMQ)', ic: 'trasferta', breve: 'Richiesta di un collega' },
+  { v: 'abbigliamento', l: 'Abbigliamento di lavoro', ic: 'abbigliamento', breve: 'Richiesta di un collega' },
 ];
 
 export const NOME_TIPO: Record<TipoPratica, string> = {
   manutenzione: 'Manutenzione', sopralluogo: 'Sopralluogo', offerta_piccola: 'Offerta ≤ 1.000 €', offerta_grande: 'Offerta > 1.000 €',
-  modifica: 'Modifica / anagrafica', amministrazione: 'Amministrazione', fornitori: 'Fornitori', informazione: 'Informazione',
+  modifica: 'Modifica / anagrafica', amministrazione: 'Amministrazione', fornitori: 'Fornitori', informazione: 'Informazione', trasferta: 'Trasferta (alloggio)', abbigliamento: 'Abbigliamento',
 };
 export const ESITI: Record<Esito, [string, string]> = {
   aperta: ['info', 'Aperta'], chiusa_ok: ['ok', 'Chiusa'], chiusa_ko: ['ko', 'Chiusa (negativa)'], annullata: ['na', 'Annullata'],
@@ -80,6 +85,8 @@ export const RUOLI_ASSEGNA: { v: string; l: string }[] = [
 export const FASCE: Record<'mattina' | 'pomeriggio', string> = { mattina: 'mattina (8:30–13:00)', pomeriggio: 'pomeriggio (13:00–17:30)' };
 
 export const SCRIPT_TELEFONO = 'Molajoni dal 1930, buongiorno, sono Jennifer: come posso aiutarla?';
+export const REGOLA_ANAGRAFICA = 'Non chiedere al cliente di mandare per email l\'anagrafica completa: si completa dopo.';
+export const REGOLA_SQUILLI = 'Rispondi entro 3 squilli.';
 
 export const stadioDi = (f: Flusso | undefined, key: string | null) => f?.stadi.find(s => s.key === key);
 export const indiceStadio = (f: Flusso | undefined, key: string | null) => f ? f.stadi.findIndex(s => s.key === key) : -1;

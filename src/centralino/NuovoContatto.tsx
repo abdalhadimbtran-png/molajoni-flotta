@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Modal } from '../ui';
-import { CANALI, RICHIESTE, STATI_CLIENTE, type StatoCliente, SCRIPT_TELEFONO, richiedeAppuntamento, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
+import { CANALI, REGOLA_ANAGRAFICA, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, richiedeAppuntamento, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
 import { giornoRoma, lavorativo, prossimoLavorativo, scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla';
-import { useConfig } from './comune';
+import { salvaAppunti, useConfig } from './comune';
+import Appunti from './Appunti';
 import { Ic, iconaCanale } from './componenti';
 
 interface Cliente { codice: string | null; nome: string; stato_cliente?: StatoCliente | null; sedi?: number; fonte: 'taylor' | 'pratiche'; contatto?: string | null; telefono?: string | null; email?: string | null; indirizzo?: string | null; cap?: string | null; comune?: string | null }
@@ -17,7 +18,7 @@ function primoSla(f: Flusso | undefined, sottotipo: string): RegolaSla | null {
 }
 
 /** Nuovo contatto: una schermata, pochi tocchi (obiettivo < 30 secondi). */
-export default function NuovoContatto({ onClose, onCreata }: { onClose: () => void; onCreata: (id: number, trasferisci: boolean) => void }) {
+export default function NuovoContatto({ onClose, onCreata }: { onClose: () => void; onCreata: (id: number, dopo: string) => void }) {
   const { config } = useConfig();
   const [canale, setCanale] = useState<Canale>('telefono');
   const [richiesta, setRichiesta] = useState<TipoPratica | 'offerta' | null>(null);
@@ -35,7 +36,9 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
   const [tacit, setTacit] = useState(false);
   const [urgente, setUrgente] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [senzaApp, setSenzaApp] = useState(false);
+  const [appunti, setAppunti] = useState('');
+  const [comms, setComms] = useState<Commerciale[]>([]);
+  const [nessuno, setNessuno] = useState(false);
   const [invio, setInvio] = useState(false);
   const [stato, setStato] = useState<StatoCliente | null>(null);
   const [statoMan, setStatoMan] = useState(false);
@@ -51,7 +54,9 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
   const dopodomani = prossimoLavorativo(domani, fest);
   const regola = primoSla(flusso, sottotipo);
   const scad = regola && config ? scadenzaSla(new Date(), regola, fest, config.impostazioni.orario) : null;
-  const commerciali = config?.impostazioni.commerciali ?? [];
+  useEffect(() => { if (tipo === 'offerta_grande' && !comms.length) rpc<Commerciale[]>('centralino_commerciali', {}).then(setComms, () => undefined); }, [tipo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const disponibili = comms.filter(c => c.disponibile);
+  const nessunoEff = nessuno || (comms.length > 0 && !disponibili.length);
 
   useEffect(() => { if (allarme) { setData(lavorativo(oggi, fest) ? oggi : domani); setUrgente(true); } }, [allarme]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (richiesta === 'offerta' && importo) setGrande(Number(importo) > 1000); }, [importo, richiesta]);
@@ -87,16 +92,16 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
     const l: string[] = [];
     if (!tipo) l.push('cosa chiede');
     if (!q.trim()) l.push('cliente');
-    if (data && !fascia) l.push('mattina o pomeriggio');
+    if (tipo && richiedeAppuntamento(tipo) && !data) l.push('data dell\'appuntamento');
+    if ((data || (tipo && richiedeAppuntamento(tipo))) && !fascia) l.push('mattina o pomeriggio');
+    if (tipo === 'offerta_grande' && !f.commerciale) l.push('commerciale');
     return l;
-  }, [tipo, q, data, fascia]);
+  }, [tipo, q, data, fascia, f.commerciale]);
 
   async function salva(e?: FormEvent) {
     e?.preventDefault(); setErr(null);
     if (manca.length) { setErr(`Manca: ${manca.join(', ')}.`); return; }
-    if (tipo && richiedeAppuntamento(tipo) && !data && !senzaApp) { setSenzaApp(true); return; }
     setInvio(true);
-    const com = commerciali.find(c => c.nome === f.commerciale);
     try {
       const r = await rpc<{ id: number }>('centralino_crea', { p: {
         canale, tipo, sottotipo: sottotipo || null, priorita: urgente ? 'urgente' : 'normale',
@@ -104,17 +109,19 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
         contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, indirizzo: f.indirizzo, cap: f.cap, comune: f.comune, descrizione: f.descrizione,
         importo_stimato: richiesta === 'offerta' && importo ? Number(importo) : null,
         appuntamento_data: data || null, appuntamento_fascia: data ? fascia || null : null, tacitazione_tentata: tacit,
-        commerciale_nome: com?.nome ?? null, commerciale_email: com?.email ?? null,
+        commerciale_nome: tipo === 'offerta_grande' ? f.commerciale || null : null, nessuno_disponibile: tipo === 'offerta_grande' && nessunoEff,
+        stato_cliente: statoMan ? stato : null,
       } });
-      if (statoMan && stato) await rpc('centralino_imposta_stato_cliente', { p_id: r.id, p_stato: stato }).catch(() => undefined);
-      onCreata(r.id, trasf);
+      if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
+      // > 1.000 €: commerciale disponibile → trasferisci la chiamata; nessuno → email di presa in carico (richiamo 2 ore già creato)
+      onCreata(r.id, tipo === 'offerta_grande' ? (nessunoEff ? 'email=presa_offerta_grande' : 'trasferisci=1') : trasf ? 'trasferisci=1' : '');
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
 
   return (
     <Modal titolo="Nuovo contatto" onClose={onClose}>
       <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) salva(); }}>
-        {canale === 'telefono' && <p className="ct-script">«{SCRIPT_TELEFONO}»</p>}
+        {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
 
         <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b></div>
         <div className="ct-big ct-big-canali" role="radiogroup" aria-label="Canale">
@@ -127,14 +134,12 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
         <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta">
           {RICHIESTE.map(r => (
             <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} className={richiesta === r.v ? 'on' : ''}
-              onClick={() => { setRichiesta(r.v); setSottotipo(''); setSenzaApp(false); if (r.v !== 'manutenzione') setUrgente(false); }}>
+              onClick={() => { setRichiesta(r.v); setSottotipo(''); if (r.v !== 'manutenzione') setUrgente(false); }}>
               <Ic n={r.ic} size={22} /><span><b>{r.l}</b><span className="sub">{r.breve}</span></span></button>))}
         </div>
         {flusso && flusso.sottotipi.length > 0 && (
-          <div className="ct-chips" role="radiogroup" aria-label="Dettaglio">
-            {flusso.sottotipi.map(st => (
-              <button type="button" key={st} role="radio" aria-checked={sottotipo === st} className={`${sottotipo === st ? 'on' : ''} ${flusso.sottotipi_urgenti.includes(st) ? 'urg' : ''}`} onClick={() => setSottotipo(sottotipo === st ? '' : st)}>{st}</button>))}
-          </div>)}
+          <div className="field"><label htmlFor="ct-sotto">Dettaglio</label>
+            <select id="ct-sotto" value={sottotipo} onChange={e => setSottotipo(e.target.value)}><option value="">— scegli —</option>{flusso.sottotipi.map(st => <option key={st} value={st}>{st}{flusso.sottotipi_urgenti.includes(st) ? ' (urgente: in giornata)' : ''}</option>)}</select></div>)}
         {allarme && (
           <div className="ct-allarme">
             <b>Allarme sonoro attivo: intervento in giornata.</b>
@@ -148,11 +153,17 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
             </div>
             <div className="field ct-importo"><label htmlFor="ct-imp">Importo stimato (facoltativo)</label>
               <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>
-            {grande && commerciali.length > 0 && (
-              <div className="field"><label htmlFor="ct-com">Commerciale</label>
-                <select id="ct-com" value={f.commerciale} onChange={e => setF({ ...f, commerciale: e.target.value })}>
-                  <option value="">— da assegnare —</option>{commerciali.map(c => <option key={c.nome}>{c.nome}</option>)}
-                </select></div>)}
+          </div>)}
+        {tipo === 'offerta_grande' && (
+          <div className="ct-allarme ct-grande">
+            <b>Oltre 1.000 €: l'offerta la fa un Tecnico Commerciale.</b>
+            <div className="field"><label htmlFor="ct-com">Assegna a</label>
+              <select id="ct-com" value={f.commerciale} onChange={e => setF({ ...f, commerciale: e.target.value })}>
+                <option value="">— scegli —</option>
+                {comms.map(c => <option key={c.nome} value={c.nome} disabled={!nessunoEff && !c.disponibile}>{c.nome} · {c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : !c.account && c.email ? 'senza account' : 'occupato'}</option>)}
+              </select></div>
+            <label className="check"><input type="checkbox" checked={nessunoEff} disabled={comms.length > 0 && !disponibili.length} onChange={e => setNessuno(e.target.checked)} /> Nessuno disponibile ora</label>
+            <span className="sub">{nessunoEff ? 'Di\' al cliente: «un nostro Tecnico Commerciale la contatterà entro 2 ore». Dopo il salvataggio: email di presa in carico (cc commerciale + Esposito, Chiaradonna, Querini) e richiamo entro 2 ore.' : 'Dopo il salvataggio registri il trasferimento della chiamata al commerciale.'}</span>
           </div>)}
 
         <div className="ct-sez"><span className="ct-sez-n">3</span><b>Cliente</b><span className="sub">dati minimi: nome e telefono bastano</span></div>
@@ -189,7 +200,7 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
 
         {tipo && richiedeAppuntamento(tipo) && (<>
           <div className="ct-sez"><span className="ct-sez-n">4</span><b>Appuntamento</b></div>
-          {!data && <div className="ct-promemoria">Dai subito data e fascia al cliente.</div>}
+          {(!data || !fascia) && <div className="ct-promemoria">Dai subito data e fascia al cliente: senza non si salva.</div>}
           <div className="ct-riga">
             <div className="ct-chips">
               {[[oggi, 'Oggi'], [domani, 'Prossimo giorno lav.'], [dopodomani, 'Tra 2 giorni lav.']].map(([d, l]) => (
@@ -204,17 +215,20 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
           {tipo === 'sopralluogo' && data && data > dopodomani && <Banner s="warn">La procedura chiede il sopralluogo entro 2 giorni lavorativi.</Banner>}
         </>)}
 
-        {q.trim().length >= 3 && <div className="ct-chips" role="radiogroup" aria-label="Stato del cliente">
-          {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <button type="button" key={k} role="radio" aria-checked={stato === k} className={stato === k ? 'on' : ''} onClick={() => { setStato(k); setStatoMan(true); }}>{STATI_CLIENTE[k][1]}</button>)}
-        </div>}
+        {q.trim().length >= 3 && <div className="field"><label htmlFor="ct-stato">Il cliente è</label>
+          <select id="ct-stato" value={stato ?? ''} onChange={e => { setStato((e.target.value || null) as StatoCliente | null); setStatoMan(!!e.target.value); }}>
+            <option value="">{stato ? `Proposto: ${STATI_CLIENTE[stato][1]}` : '— proposta automatica —'}</option>
+            {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
+          </select></div>}
 
         <div className="ct-sez"><span className="ct-sez-n">{tipo && richiedeAppuntamento(tipo) ? 5 : 4}</span><b>Nota</b></div>
         <textarea rows={3} value={f.descrizione} onChange={e => setF({ ...f, descrizione: e.target.value })} placeholder="Cosa ha detto il cliente, in breve" aria-label="Nota" />
 
-        <label className="check ct-trasf-form"><input type="checkbox" checked={trasf} onChange={e => setTrasf(e.target.checked)} /> Chiamata per un responsabile (trasferita o non disponibile): lo registro subito dopo</label>
+        <Appunti chiave="bozza" righe={4} onTesto={setAppunti} />
+        <p className="hint">{REGOLA_ANAGRAFICA}</p>
+        {tipo !== 'offerta_grande' && <label className="check ct-trasf-form"><input type="checkbox" checked={trasf} onChange={e => setTrasf(e.target.checked)} /> Chiamata per un responsabile (trasferita o non disponibile): lo registro subito dopo</label>}
         {flusso?.nota_procedura && <p className="ct-proc"><b>Procedura:</b> {flusso.nota_procedura}</p>}
         {err && <Banner s="ko">{err}</Banner>}
-        {senzaApp && !data && <Banner s="warn">Manca l'appuntamento. Se il cliente non può fissarlo ora, premi di nuovo «Salva».</Banner>}
         <div className="ct-salva">
           <div className="sub">
             {scad && <>Prima scadenza: <b>{testoResiduo(scad)}</b> · </>}

@@ -21,6 +21,8 @@ const I: Record<string, ReactNode> = {
   fornitori: <><path d="M2.5 16.5V7a1 1 0 0 1 1-1h10v10.5M13.5 9.5h4l3.5 3.5v3.5h-2" /><circle cx="7" cy="17" r="2" /><circle cx="17" cy="17" r="2" /></>,
   informazione: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5.5M12 7.8v.2" /></>,
   allarme: <><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z" /><path d="M10 20a2 2 0 0 0 4 0M3 6l2 1.5M21 6l-2 1.5" /></>,
+  trasferta: <><path d="M3 20V9l9-5 9 5v11" /><path d="M9 20v-6h6v6" /></>,
+  abbigliamento: <path d="M8 3 4 6l2 4 2-1v12h8V9l2 1 2-4-4-3a4 4 0 0 1-8 0Z" />,
   cerca: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></>,
   piu: <path d="M12 5v14M5 12h14" />,
 };

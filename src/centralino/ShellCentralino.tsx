@@ -81,7 +81,7 @@ export default function ShellCentralino() {
         </>}>
         <Outlet context={ctx} />
       </Layout>
-      {aperto && <NuovoContatto onClose={() => setAperto(false)} onCreata={(id, tr) => { setAperto(false); setVersione(v => v + 1); nav(`/centralino/pratica/${id}?nuova=1${tr ? '&trasferisci=1' : ''}`); }} />}
+      {aperto && <NuovoContatto onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}
     </div>
   );
 }

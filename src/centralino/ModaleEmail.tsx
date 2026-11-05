@@ -124,7 +124,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
         {trasf && (
           <details open={senza} onToggle={e => setSenza((e.target as HTMLDetailsElement).open)}>
             <summary>Email non disponibile</summary>
-            <div className="ct-riga"><input aria-label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="es. il cliente non ha email / non vuole darla" />
+            <div className="ct-riga"><select aria-label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)}><option value="">— motivo —</option>{(config?.impostazioni.motivi_senza_email ?? ['Altro']).map(m => <option key={m}>{m}</option>)}</select>
               <button type="button" className="btn-ghost" onClick={senzaEmail}>Registra il motivo</button></div>
           </details>)}
       </form>

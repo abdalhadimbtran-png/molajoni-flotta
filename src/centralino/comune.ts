@@ -9,6 +9,7 @@ const IMP_DEFAULT: Impostazioni = {
   orario: ORARIO_DEFAULT, soglia_arancio: 0.25, cc_offerte_grandi: [], amministrazione: { nome: 'Simona Colagrossi', email: '' },
   fornitori: { nome: 'Roberta Felci', email: '' }, commerciali: [], responsabili_info: [], firma: 'Jennifer Marchetti\nFront Office · Molajoni Antincendi', sostituto: 'Simona Colagrossi',
   destinatari_trasferimento: [], trasferimento_sla: { tipo: 'ore', valore: 2 }, mesi_cliente_attivo: 12,
+  commerciali_offerte_grandi: [], motivi_annullamento: ['Altro'], motivi_senza_email: ['Altro'], motivi_spostamento: ['Altro'],
 };
 
 /** Flussi, impostazioni, modelli email e festività (una volta per area). */
@@ -111,4 +112,14 @@ export function useAdesso(ms = 30000) {
   const [t, setT] = useState(() => new Date());
   useEffect(() => { const k = window.setInterval(() => setT(new Date()), ms); return () => window.clearInterval(k); }, [ms]);
   return t;
+}
+
+/** Appunti privati (solo l'autore): salvataggio automatico. chiave = 'bozza' | 'p:<id>'. */
+export async function leggiAppunti(chiave: string): Promise<string> {
+  const { data } = await supabase.from('appunti').select('testo').eq('chiave', chiave).maybeSingle();
+  return (data as { testo: string } | null)?.testo ?? '';
+}
+export async function salvaAppunti(chiave: string, testo: string) {
+  const { data: u } = await supabase.auth.getUser(); if (!u.user) return;
+  await supabase.from('appunti').upsert({ autore: u.user.id, chiave, testo, aggiornato_il: new Date().toISOString() }, { onConflict: 'autore,chiave' });
 }

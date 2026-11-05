@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { ESITI_TRASF, NOME_TIPO, senzaRiepilogo, type EsitoTrasf, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
+import { ESITI_TRASF, NOME_TIPO, senzaRiepilogo, type Commerciale, type EsitoTrasf, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
 import { daRoma, giornoRoma, partiRoma, prossimoLavorativo, scadenzaSla, semaforo, testoResiduo } from '../lib/centralino/sla';
 import { useAdesso, useAggiornamento, useConfig } from './comune';
 import ModaleEmail from './ModaleEmail';
@@ -84,18 +84,19 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
           <div className="field"><label htmlFor="tr-em">Email (per il riepilogo)</label><input id="tr-em" type="email" value={cli.email} onChange={e => setCli({ ...cli, email: e.target.value })} /></div>
         </div>}
         <div className="ct-sez"><b>{modo === 'trasferita' ? 'A chi' : 'Chi deve richiamare'}</b></div>
-        <div className="ct-chips">{dest.map(d => <button type="button" key={d.nome} className={a === d.nome ? 'on' : ''} onClick={() => setA(d.nome)}>{d.nome}</button>)}</div>
+        <select aria-label="Responsabile" value={a} onChange={e => setA(e.target.value)}><option value="">— scegli —</option>{dest.map(d => <option key={d.nome} value={d.nome}>{d.nome}{d.nota ? ` · ${d.nota}` : ''}</option>)}</select>
+        {dest.find(d => d.nome === a)?.nota && <p className="hint">{dest.find(d => d.nome === a)!.nota}</p>}
         {a === 'Altro' && <div className="field"><label htmlFor="tr-altro">Nome</label><input id="tr-altro" value={altro} onChange={e => setAltro(e.target.value)} /></div>}
         <div className="ct-sez"><b>Di cosa</b></div>
-        <div className="ct-chips">{ARGOMENTI.map(x => <button type="button" key={x} className={tipo === x ? 'on' : ''} onClick={() => setTipo(x)}>{x}</button>)}</div>
+        <select aria-label="Argomento" value={tipo} onChange={e => setTipo(e.target.value)}><option value="">— scegli —</option>{[...new Set([...(tipo && !ARGOMENTI.includes(tipo) ? [tipo] : []), ...ARGOMENTI])].map(x => <option key={x}>{x}</option>)}</select>
         <div className="field"><label htmlFor="tr-arg">In breve</label><input id="tr-arg" value={arg} onChange={e => setArg(e.target.value)} placeholder="es. preventivo per 3 estintori" /></div>
         {modo === 'trasferita' ? (<>
           <div className="ct-sez"><b>Esito</b></div>
-          <div className="ct-chips">{(Object.keys(ESITI_TRASF) as EsitoTrasf[]).map(k => <button type="button" key={k} className={`${esito === k ? 'on' : ''} ${k !== 'risposto' ? 'urg' : ''}`} onClick={() => setEsito(k)}>{ESITI_TRASF[k]}</button>)}</div>
+          <select aria-label="Esito" value={esito} onChange={e => setEsito(e.target.value as EsitoTrasf)}><option value="">— scegli —</option>{(Object.keys(ESITI_TRASF) as EsitoTrasf[]).map(k => <option key={k} value={k}>{ESITI_TRASF[k]}</option>)}</select>
           {esito && esito !== 'risposto' && <p className="hint">Si crea il promemoria «Richiamare il cliente / far richiamare» con scadenza; la persona riceve la campanella se ha un account.</p>}
         </>) : (<>
           <div className="ct-sez"><b>«Vi ricontatteremo entro…»</b><span className="sub">Quando preferisce essere richiamato?</span></div>
-          <div className="ct-chips">{ENTRO.map(x => <button type="button" key={x.v} className={entro === x.v ? 'on' : ''} onClick={() => setEntro(x.v)}>{x.l}</button>)}</div>
+          <select aria-label="Vi ricontatteremo entro" value={entro} onChange={e => setEntro(e.target.value as Entro)}><option value="">— scegli —</option>{ENTRO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
           {entro === 'scelta' && <input type="datetime-local" aria-label="Data e ora scelte dal cliente" value={scelta} onChange={e => setScelta(e.target.value)} />}
           {sc && <p className="hint">Scadenza del richiamo: <b>{fmtOra(sc.quando.toISOString())}</b> · promemoria 15 minuti prima · se scade avvisa te e la direzione.</p>}
         </>)}
@@ -159,6 +160,7 @@ export default function Trasferimenti() {
     <>
       <div className="page-hero"><div><h1>Chiamate trasferite</h1><p className="sub">Ultimi 30 giorni. Chi non ha risposto o non era disponibile va richiamato entro la scadenza.</p></div>
         {ctx.scrive && <button className="btn" onClick={() => setNuovo(true)}>Chiamata per un responsabile</button>}</div>
+      <Disponibilita />
       <h2 className="section-title">Da richiamare ({aperti.length})</h2>
       {aperti.length ? aperti.map(t => <RigaTrasf key={t.id} t={t} ora={ora} onRichiamato={ric} onRiepilogo={ctx.scrive ? setRiep : undefined} base={ctx.base} />) : <p className="ct-vuoto">Nessun richiamo in sospeso.</p>}
       {senza.length > 0 && <><h2 className="section-title">Email di riepilogo da inviare ({senza.length})</h2>
@@ -168,5 +170,23 @@ export default function Trasferimenti() {
       {nuovo && <ModaleTrasferimento onClose={() => setNuovo(false)} onFatto={() => { setNuovo(false); reload(); }} />}
       {riep && <ModaleEmail trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
     </>
+  );
+}
+
+/** Disponibilità di L. Esposito, A. Chiaradonna, A. Querini per le offerte > 1.000 € (le imposta il centralino o la persona stessa). */
+function Disponibilita() {
+  const { data, reload } = useLoad(() => rpc<Commerciale[]>('centralino_commerciali', {}).catch(() => null));
+  if (!data?.length) return null;
+  async function cambia(c: Commerciale) {
+    try { await rpc('centralino_imposta_disponibile', { p_nome: c.nome, p_disponibile: c.occupato }); reload(); } catch (e) { toast(testoErrore(e)); }
+  }
+  return (
+    <section className="ct-blocco"><h2>Commerciali per offerte oltre 1.000 €</h2>
+      <div className="ct-disp">{data.map(c => (
+        <div key={c.nome} className={`ct-disp-i ${c.disponibile ? 'si' : 'no'}`}>
+          <b>{c.nome}</b><span className="sub">{c.assente ? 'assente oggi (ferie/permesso)' : c.occupato ? 'occupato' : c.disponibile ? 'disponibile' : 'non disponibile'}{!c.email ? ' · email da inserire' : ''}</span>
+          {!c.assente && <button className="btn-ghost btn-sm" onClick={() => cambia(c)}>{c.occupato ? 'Segna disponibile' : 'Segna occupato'}</button>}
+        </div>))}</div>
+    </section>
   );
 }

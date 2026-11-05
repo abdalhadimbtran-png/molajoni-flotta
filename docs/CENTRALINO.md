@@ -1,6 +1,6 @@
 # Centralino (front office) e monitoraggio Direzione
 
-Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043_centralino`, `0044_centralino_stato_cliente_trasferimenti`, `0045_centralino_richiamo_email_riepilogo`.
+Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0048` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte > 1.000 €).
 
 ## Pagine
 | Percorso | Chi | Cosa |
@@ -31,15 +31,44 @@ Giorni lavorativi lun–ven, festività (`festivita`) escluse, orario d'ufficio 
 |---|---|---|
 | Manutenzione (Guasto, Ritardo, Allarme sonoro attivo, Altro) | Ricevuta → Appuntamento fissato → Comunicato al tecnico («Alert inviato su Taylor») → ★Intervento eseguito → Chiusa | fine del giorno lavorativo successivo; **Allarme**: in giornata, urgente, «Tacitazione tentata» |
 | Sopralluogo | Ricevuta → ★Appuntamento → ★Confermato (email) → ★Commerciale informato → ★Sopralluogo eseguito → Offerta inviata → Esito → Contratto firmato | in giornata i primi; eseguito entro 2 giorni lavorativi |
-| Offerta ≤ 1.000 € | Ricevuta → ★Conferma al cliente → ★Offerta inviata → ★Follow-up → Esito → Contratto/Ordine | 15 min; offerta **60 min** dalla creazione; follow-up 2 gg lav. |
-| Offerta > 1.000 € | Ricevuta → ★Presa in carico (CC commerciale + Esposito, Chiaradonna, Querini) → ★Commerciale ha contattato → ★Offerta o sopralluogo → Esito → Contratto | 30 min; contatto **2 ore**; offerta in giornata |
+| Offerta ≤ 1.000 € (gestita da Jennifer) | Ricevuta → ★Conferma al cliente (email «entro 60 minuti») → ★Offerta inviata → ★Follow-up → Esito → Contratto/Ordine | conferma **10 min**, offerta **60 min dalla richiesta** (la promessa «entro 60 minuti» parte dalla telefonata, quindi la conferma deve arrivare subito); follow-up 2 gg lav. |
+| Offerta > 1.000 € (a L. Esposito / A. Chiaradonna / A. Querini) | Ricevuta → ★Presa in carico (CC commerciale + Esposito, Chiaradonna, Querini) → ★Commerciale ha contattato → ★Offerta o sopralluogo → Esito → Contratto | 30 min; contatto **2 ore**; offerta in giornata |
 | Modifica / anagrafica / disdetta | Ricevuta → ★Registrata → ★Evasione comunicata → Chiusa | in giornata; email entro giorno lav. successivo |
-| Amministrazione · Fornitori · Informazione | Ricevuta → ★Girata a Simona Colagrossi / Roberta Felci (lun/ven) / responsabile → Chiusa | in giornata |
+| Amministrazione · Fornitori · Informazione (anche info@) | Ricevuta → ★Girata a Simona Colagrossi / Roberta Felci (lun/ven) / responsabile → Chiusa | in giornata |
+| Trasferta (alloggio TMQ) · Abbigliamento di lavoro | Ricevuta → ★Prenotato / Ordinato → Comunicata / Consegnato → Chiusa | 1 / 2 gg lav. |
 
-Regole: la soglia 1.000 € (importo stimato o pulsante) sceglie il flusso offerta. Appuntamento dato al primo contatto → stadio raggiunto subito. Ultimo stadio → chiusa positiva; esito «rifiutata» → chiusa negativa. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
+Regole: **un passo alla volta** (mai salti), ogni passo con i suoi requisiti (`requisiti`: appuntamento, email, taylor, commerciale, destinatario, esito); «Prossimo passo: … · manca: …» nella scheda (`centralino_prossimo`). Prima della fine si può solo **annullare** con motivo dall'elenco. La soglia 1.000 € (importo stimato o pulsante) sceglie il flusso offerta. Appuntamento dato al primo contatto → stadio raggiunto subito. Ultimo stadio → chiusa positiva; esito «rifiutata» → chiusa negativa. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
 
 ### Modificare un flusso
 `/centralino/impostazioni` › Flussi: JSON `stadi` = `[{key, nome, sla?, azione?, template?}]`, `sla` = `{"tipo":"minuti|ore|stesso_giorno|giorni_lav","valore":N,"da":"creazione|ingresso"}`, `azione` = `appuntamento|taylor|esito`, `template` = codice modello suggerito. `sla_sottotipi` per SLA diversi per sottotipo. Il primo stadio resta `ricevuta`; non rinominare chiavi già usate (la storia le conserva).
+
+## Appunti privati
+Tabella `appunti` (chiave `bozza` nel nuovo contatto, `p:<id>` nella pratica), salvataggio automatico. RLS: solo l'autore legge e scrive; non vanno nella storia, alla direzione né nei report. Al salvataggio del nuovo contatto la bozza passa alla pratica.
+
+## Procedura applicata (Rev.01/2027 → portale)
+| Regola della procedura | Dove / come |
+|---|---|
+| 1.1 Rispondere entro 3 squilli + «Molajoni dal 1930, Buongiorno sono Jennifer…» | Promemoria in cima al nuovo contatto (telefono/WhatsApp) e nella home |
+| 1.1 In assenza passa il compito a Simona Colagrossi | `centralino_copertura()`: banner se l'operatrice ha un'assenza approvata oggi; Simona = Ufficio personale + «Anche centralino» |
+| 1.2 Risponditore: 1 manutenzione/commerciale, 2 fatture (pomeriggio cellulare Simona), 3 fornitori lun/ven (Roberta Felci) | Tipi «Fatture / amministrazione» e «Fornitori» con regola mostrata; destinatari dei trasferimenti con nota del tasto |
+| 1.3 Intervento: DATA + mattina/pomeriggio alla prima telefonata | `centralino_crea` **rifiuta** manutenzione/sopralluogo senza data e fascia; il modulo non salva |
+| 1.3 Comunicato ai tecnici via Taylor con Documento di Intervento | Passo «Comunicato al tecnico»: casella «Alert inviato su Taylor» + **numero documento** obbligatori |
+| 1.3 Allarme sonoro: in giornata, tacitazione al telefono · Altri: entro il giorno dopo | SLA `stesso_giorno` per il sottotipo, urgente, casella «Tacitazione tentata»; altri `giorni_lav 1` |
+| 1.4 Sopralluogo entro 2 giorni, confermato al cliente, cc al Tecnico Commerciale | SLA 2 gg lav.; passo «Confermato» richiede commerciale + email (modello con cc) |
+| 1.4 Il commerciale sposta solo dopo accordo telefonico e conferma scritta | «Sposta appuntamento» (`centralino_sposta`): motivo dall'elenco + 2 conferme; cambi diretti bloccati da trigger |
+| 1.4 Offerte ≤ 1.000 €: conferma a voce e email «entro 60 minuti» | Gestita dal centralino; conferma 10 min con email, offerta 60 min dalla richiesta, entrambe con email obbligatoria |
+| 1.4 Offerte > 1.000 €: commerciale + cc Esposito/Chiaradonna/Querini, «la contatterà entro 2 ore», commerciale telefona in giornata e conferma per email | Assegnazione solo ai tre (disponibilità: account, assenze approvate, «disponibile/occupato»); disponibile → trasferimento; nessuno → email di presa in carico + **richiamo 2 ore** creato da `centralino_crea`; passi «Commerciale ha telefonato» (2 h) e «Offerta o sopralluogo (email)» in giornata |
+| Note: mai chiedere l'anagrafica completa per email | Avviso nel nuovo contatto e in «Dati e assegnazione»; bastano nome e telefono |
+| 1.5 Modifiche calendario/anagrafica/disdetta registrate in giornata, evasione per email | Passo «Registrata» in giornata, «Evasione comunicata» richiede email |
+| info@molajoni.it monitorata, girata al competente | Canale Email + tipo «Informazione» → passo «Girata» con destinatario obbligatorio |
+| WhatsApp: stesse regole del telefono per gli interventi | Stessi controlli (data/fascia, Taylor) per ogni canale |
+| B) Offerte da tablet TMQ e ≤ 1.000 € | Canale «Tablet TMQ» + flusso offerta ≤ 1.000 €; contatore dedicato |
+| C) Attestati di formazione | Link «Altre attività» → `/formazione` |
+| D) Anagrafica clienti/impianti | Tipo «Modifica / anagrafica» (sottotipo Anagrafica), contatore «Aggiornamento anagrafica» |
+| E) Trasferte (alloggio TMQ), abbigliamento di lavoro | Tipi dedicati (canale Collega); flotta resta nel pannello flotta |
+| Jennifer pannel: telefonate, offerte da tablet / WA / cliente, aggiornamento anagrafica | «Il mio registro di oggi» (`centralino_registro_giorno`), calcolato dalle pratiche |
+
+Scelte: canale e tipo restano pulsanti grandi (scelta chiusa, più rapida di un menu); tutte le altre scelte sono menu a tendina (dettaglio, fascia, commerciale, destinatario, argomento, esito, «entro», stato cliente, motivi). Testo libero solo per nomi, descrizioni e note.
 
 ## Stato del cliente
 `pratiche.stato_cliente`: **attivo** (interventi Taylor negli ultimi `mesi_cliente_attivo` = 12 mesi), **ex cliente** (codice noto in `interventi_importati`/`impianti_posizione` ma niente di recente), **nuovo** (sconosciuto). Proposto automaticamente (trigger), modificabile a mano (`centralino_imposta_stato_cliente`, null = torna alla proposta). KPI e funnel divisi per stato.
@@ -66,4 +95,4 @@ Da compilare in Impostazioni: email di L. Esposito, A. Chiaradonna, A. Querini (
 
 ## Prove
 - `npm test` → `src/lib/centralino/sla.test.ts` (SLA con weekend, festività, orario, ora legale; semaforo; modelli; KPI; trasferimenti).
-- `supabase/prove/centralino_prove.sql`: blocco DO annullato (RLS per ruolo incl. anon, storia solo in aggiunta, SLA, contatori, SLA scaduto). Da eseguire in SQL editor: risultato atteso `PROVE CENTRALINO OK`. Il calcolo SLA è stato verificato sul database con 8 casi (tutti ok).
+- `supabase/prove/centralino_prove.sql`: blocco DO annullato (RLS per ruolo incl. anon, storia solo in aggiunta, SLA, contatori, SLA scaduto, **ordine rigido dei passi**, requisiti Taylor/email, annullo, spostamento, **appunti solo dell'autore**, **offerte > 1.000 €** con richiamo 2 ore). Da eseguire in SQL editor: risultato atteso `PROVE CENTRALINO OK`. Il calcolo SLA è stato verificato sul database con 8 casi (tutti ok).

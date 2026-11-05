@@ -1,4 +1,5 @@
 import { DragEvent, useCallback, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Caricamento, Errore, toast, useLoad } from '../ui';
 import { NOME_TIPO, SCRIPT_TELEFONO, indiceStadio, prossimoStadio, type Pratica, type Stadio, type TipoPratica } from '../lib/centralino/tipi';
@@ -18,6 +19,7 @@ const PESO: Record<string, number> = { rosso: 0, arancio: 1, verde: 2, nessuno: 
 /** Pannello di Jennifer: cosa fare adesso, scadenze, kanban per tipo, registro del giorno. */
 export default function Home() {
   const ctx = useCtx();
+  const nav = useNavigate();
   const ora = useAdesso();
   const { config } = useConfig();
   const inizioGiorno = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); }, []);
@@ -49,10 +51,10 @@ export default function Home() {
   const richiami = daRichiamare(data.tr);
   const senzaEmail = data.tr.filter(t => senzaRiepilogo(t) && !richiami.includes(t));
 
-  async function avanzaUno(p: Pratica, s?: Stadio | null) {
-    const st = s ?? prossimoStadio(fl(p.tipo), p);
+  async function avanzaUno(p: Pratica) {
+    const st = prossimoStadio(fl(p.tipo), p);
     if (!st) return;
-    if (!avanzaDiretto(st) || (s && indiceStadio(fl(p.tipo), s.key) !== indiceStadio(fl(p.tipo), p.stato_corrente) + 1)) { setAvanza({ p, s: st }); return; }
+    if (!avanzaDiretto(st)) { setAvanza({ p }); return; }
     try { await rpc('centralino_avanza', { p_id: p.id, p_stadio: st.key, p_dati: {}, p_testo: null }); toast(`${p.numero}: ${st.nome}`); reload(); }
     catch (e) { toast(testoErrore(e)); }
   }
@@ -67,8 +69,8 @@ export default function Home() {
     e.preventDefault();
     const p = data!.aperte.find(x => x.id === trascina); setTrascina(null);
     if (!p || p.stato_corrente === s.key) return;
-    if (indiceStadio(flK, s.key) <= indiceStadio(flK, p.stato_corrente)) { toast('Si avanza solo in avanti: la storia non torna indietro.'); return; }
-    avanzaUno(p, s);
+    if (indiceStadio(flK, s.key) !== indiceStadio(flK, p.stato_corrente) + 1) { toast(`Un passo alla volta: il prossimo è «${prossimoStadio(flK, p)?.nome ?? ''}».`); return; }
+    avanzaUno(p);
   }
   const R = data.reg;
 
@@ -142,7 +144,15 @@ export default function Home() {
               </div>);
           })}
         </div>
-        {ctx.scrive && <p className="hint">Trascina una scheda nella colonna successiva o usa «Prossimo». Si va solo in avanti.</p>}
+        {ctx.scrive && <p className="hint">Trascina una scheda nella colonna successiva o usa «Prossimo»: un passo alla volta, con i dati che ogni passo richiede.</p>}
+      </section>
+
+      <section className="ct-blocco ct-altro">
+        <h2>Altre attività</h2>
+        <div className="row-flex">
+          <Link to="/formazione" className="btn-ghost btn-sm">Attestati di formazione (D.M. 01.09.2021 · D.Lgs. 81/2008)</Link>
+          <span className="sub">Anagrafica clienti/impianti: «Modifica / anagrafica». Trasferte e abbigliamento: «Nuovo contatto» › canale Collega.</span>
+        </div>
       </section>
 
       <section className="ct-blocco">
@@ -150,7 +160,7 @@ export default function Home() {
         <div className="ct-griglia-card">{data.chiuse.length ? data.chiuse.map(p => <CardPratica key={p.id} p={p} f={fl(p.tipo)} ora={ora} base={ctx.base} />) : <Vuoto>Nessuna pratica chiusa oggi.</Vuoto>}</div>
       </section>
 
-      {avanza && fl(avanza.p.tipo) && <Avanza p={avanza.p} f={fl(avanza.p.tipo)!} stadio={avanza.s} onClose={() => setAvanza(null)} onFatto={() => { setAvanza(null); reload(); }} />}
+      {avanza && fl(avanza.p.tipo) && <Avanza p={avanza.p} f={fl(avanza.p.tipo)!} onClose={() => setAvanza(null)} onFatto={() => { setAvanza(null); reload(); }} onEmail={t => nav(`${ctx.base}/pratica/${avanza.p.id}${t ? `?email=${t}` : '?email=1'}`)} />}
       {riep && <ModaleEmail trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
       {trasf && <ModaleTrasferimento onClose={() => setTrasf(false)} onFatto={() => { setTrasf(false); reload(); }} />}
     </div>

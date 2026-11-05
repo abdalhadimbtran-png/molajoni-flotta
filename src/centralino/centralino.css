@@ -178,3 +178,15 @@
 .ct-tab td.num { text-align:end; font-variant-numeric:tabular-nums; }
 .ko-t { color:var(--ct-rosso); font-weight:600; }
 .ct-feed { list-style:none; margin:0; padding:0; font-size:13.5px; display:grid; gap:6px; }
+
+.ct-grande { background:var(--info-bg); border-color:var(--info-line); color:var(--ink); flex-direction:column; align-items:flex-start; gap:8px; }
+.ct-prossimo { border-radius:12px; padding:10px 14px; margin-bottom:12px; font-size:14px; }
+.ct-prossimo.ok { background:var(--ok-bg); border:1px solid var(--ok-line); }
+.ct-prossimo.manca { background:var(--ct-arancio-bg); border:1px solid var(--warn-line); color:var(--ct-arancio); }
+.ct-appunti { display:grid; gap:6px; }
+.ct-appunti-h { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.ct-appunti-s { margin-inline-start:auto; }
+.ct-appunti textarea { width:100%; background:#FFFDF3; border:1px dashed var(--warn-line); border-radius:10px; padding:10px; font:inherit; font-size:15px; line-height:1.5; }
+.ct-disp { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:8px; }
+.ct-disp-i { display:flex; flex-direction:column; gap:4px; border:1px solid var(--line); border-inline-start:4px solid var(--line-strong); border-radius:10px; padding:10px 12px; }
+.ct-disp-i.si { border-inline-start-color:#3C9A5F; } .ct-disp-i.no { border-inline-start-color:var(--brand); }

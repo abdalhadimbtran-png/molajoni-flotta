@@ -19,7 +19,7 @@ function primoSla(f: Flusso | undefined, sottotipo: string): RegolaSla | null {
 }
 
 /** Nuovo contatto: una schermata, pochi tocchi (obiettivo < 30 secondi). */
-export default function NuovoContatto({ onClose, onCreata }: { onClose: () => void; onCreata: (id: number, dopo: string) => void }) {
+export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?: { codice: string | null; nome: string; fonte?: 'taylor' | 'pratiche' }; onClose: () => void; onCreata: (id: number, dopo: string) => void }) {
   const { config } = useConfig();
   const [canale, setCanale] = useState<Canale>('telefono');
   const [richiesta, setRichiesta] = useState<TipoPratica | 'offerta' | null>(null);
@@ -80,6 +80,9 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
     const k = window.setTimeout(() => { rpc<StatoCliente>('centralino_stato_cliente', { p_codice: cli?.codice ?? null, p_nome: q }).then(setStato, () => undefined); }, 400);
     return () => window.clearTimeout(k);
   }, [cli, q, statoMan]);
+
+  // «Nuovo contatto per questo cliente» dalla scheda cliente
+  useEffect(() => { if (cliente) scegli({ codice: cliente.codice, nome: cliente.nome, fonte: cliente.fonte ?? (cliente.codice ? 'taylor' : 'pratiche') }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function scegli(c: Cliente) {
     setCli(c); setQ(c.nome); setSugg([]); setSede('');

@@ -63,7 +63,7 @@ export default function Direzione() {
   const maxF = Math.max(1, F.richieste);
   return (
     <div className="ct-dir">
-      <div className="page-hero"><div><h1>Monitoraggio centralino</h1><p className="sub">Sola lettura · si aggiorna da solo</p></div>
+      <div className="page-hero"><div><h1>{ctx.scrive ? 'Analisi del centralino' : 'Monitoraggio centralino'}</h1><p className="sub">{ctx.scrive ? 'Clic su un numero per l\'elenco completo' : 'Sola lettura'} · si aggiorna da solo</p></div>
         <div className="segmented" role="group" aria-label="Periodo">
           {([['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['mese', 'Mese']] as const).map(([v, l]) => <button key={v} className={per === v ? 'on' : ''} onClick={() => setPer(v)}>{l}</button>)}
         </div></div>

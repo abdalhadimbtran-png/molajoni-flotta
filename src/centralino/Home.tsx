@@ -1,76 +1,71 @@
-import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
+import { fmtOra } from '../lib/format';
 import { Banner, Errore, toast, useLoad } from '../ui';
-import { NOME_TIPO, SCRIPT_TELEFONO, indiceStadio, prossimoStadio, type Pratica, type Stadio, type TipoPratica } from '../lib/centralino/tipi';
+import { NOME_TIPO, REGOLA_SQUILLI, SCRIPT_TELEFONO, prossimoStadio, senzaRiepilogo, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
 import { giornoRoma, semaforo } from '../lib/centralino/sla';
-import { praticheAperte, praticheChiuseDal, useAdesso, useAggiornamento, useConfig } from './comune';
-import { CardPratica, Ic, Vuoto } from './componenti';
+import { praticheAperte, useAdesso, useAggiornamento, useConfig } from './comune';
+import { CardPratica, Ic, Vuoto, nomeStadio } from './componenti';
 import Avanza, { avanzaDiretto } from './Avanza';
-import { ModaleTrasferimento, RigaTrasf, daRichiamare, segnaRichiamato, trasferimenti } from './Trasferimento';
+import { RigaTrasf, daRichiamare, segnaRichiamato, trasferimenti } from './Trasferimento';
 import EmailTrasferimento from './EmailTrasferimento';
-import { senzaRiepilogo, type Trasferimento } from '../lib/centralino/tipi';
 import { bip, suonoAttivo, useCtx } from './ShellCentralino';
 import { datiPeriodo } from './Direzione';
 import { Cifra, Tessera } from './Tessera';
-import KpiTrasferimenti from './KpiTrasferimenti';
 import { Scheletro } from './Scheletro';
 
-
 const PESO: Record<string, number> = { rosso: 0, arancio: 1, verde: 2, nessuno: 3 };
+const ETICHETTA_EV: Record<string, string> = { creata: 'ha aperto', stato: 'è passata a', email_inviata: 'email', chiamata: 'chiamata', nota: 'nota', assegnata: 'assegnata', appuntamento: 'appuntamento', allegato: 'allegato', sla_scaduto: 'SLA scaduto', chiusa: 'chiusa', modifica: 'dati modificati' };
 
-/** Pannello di Jennifer: cosa fare adesso, scadenze, kanban per tipo, registro del giorno. */
+/** «Oggi»: la plancia di Jennifer. Coda «Adesso» per urgenza, contatori del giorno, richiami dovuti, email da inviare, movimenti. */
 export default function Home() {
   const ctx = useCtx();
   const nav = useNavigate();
   const ora = useAdesso();
   const { config } = useConfig();
-  const inizioGiorno = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); }, []);
   const { data, errore, reload } = useLoad(async () => {
     const g = giornoRoma(new Date());
-    const [aperte, chiuse, oggiD, cop, tr] = await Promise.all([
-      praticheAperte(), praticheChiuseDal(inizioGiorno), datiPeriodo(g, g),
+    const [aperte, oggiD, cop, tr] = await Promise.all([
+      praticheAperte(), datiPeriodo(g, g),
       rpc<{ assenti: string[]; sostituto: string }>('centralino_copertura', {}).catch(() => null), trasferimenti(new Date(Date.now() - 30 * 864e5).toISOString()),
     ]);
-    return { aperte, chiuse, oggiD, cop, tr, g };
+    return { aperte, oggiD, cop, tr, g };
   }, [ctx.versione]);
   const ricarica = useCallback(() => { reload(); }, [reload]);
   useAggiornamento(ricarica);
-  const [avanza, setAvanza] = useState<{ p: Pratica; s?: Stadio | null } | null>(null);
-  const [trasf, setTrasf] = useState(false);
+  const [avanza, setAvanza] = useState<Pratica | null>(null);
   const [riep, setRiep] = useState<Trasferimento | null>(null);
-  const [tipoK, setTipoK] = useState<TipoPratica>('manutenzione');
-  const [trascina, setTrascina] = useState<number | null>(null);
-  // avviso quando una pratica diventa rossa mentre la pagina è aperta
+  const [filtro, setFiltro] = useState<'tutte' | 'rosse' | 'oggi'>('tutte');
   const rosse = useRef<Set<number> | null>(null);
   useEffect(() => {
     if (!data) return;
-    const ora2 = new Date();
-    const ora_rosse = new Set(data.aperte.filter(p => p.sla_scadenza && new Date(p.sla_scadenza) < ora2).map(p => p.id));
+    const adesso = new Date();
+    const ora_rosse = new Set(data.aperte.filter(p => p.sla_scadenza && new Date(p.sla_scadenza) < adesso).map(p => p.id));
     if (rosse.current) for (const id of ora_rosse) if (!rosse.current.has(id)) {
-      const p = data.aperte.find(x => x.id === id)!; toast(`In ritardo: ${p.cliente_nome} (${p.numero})`);
-      if (suonoAttivo()) bip();
+      const p = data.aperte.find(x => x.id === id)!; toast(`In ritardo: ${p.cliente_nome} (${p.numero})`); if (suonoAttivo()) bip();
     }
     rosse.current = ora_rosse;
   }, [data, ora]);
+  const coda = useMemo(() => {
+    if (!data || !config) return [];
+    const soglia = Number(config.impostazioni.soglia_arancio) || 0.25;
+    const s = (p: Pratica) => semaforo(p.created_at, p.sla_scadenza, ora, soglia);
+    return [...data.aperte].sort((a, b) => PESO[s(a)] - PESO[s(b)] || (a.priorita === 'urgente' ? -1 : 0) - (b.priorita === 'urgente' ? -1 : 0) || (a.sla_scadenza ?? '9').localeCompare(b.sla_scadenza ?? '9'))
+      .filter(p => filtro === 'tutte' || (filtro === 'rosse' ? s(p) === 'rosso' : p.sla_scadenza && giornoRoma(p.sla_scadenza) === data.g));
+  }, [data, config, ora, filtro]);
 
   if (errore) return <Errore testo={errore} onRetry={reload} />;
-  if (!data || !config) return <Scheletro tessere={8} righe={8} />;
+  if (!data || !config) return <Scheletro tessere={8} righe={10} />;
   const fl = (t: string) => config.flussi.find(f => f.tipo === t);
-  const soglia = Number(config.impostazioni.soglia_arancio) || 0.25;
-  const oggi = giornoRoma(ora);
-  const sem = (p: Pratica) => semaforo(p.created_at, p.sla_scadenza, ora, soglia);
-  const ordinate = [...data.aperte].sort((a, b) => PESO[sem(a)] - PESO[sem(b)] || (a.priorita === 'urgente' ? -1 : 0) - (b.priorita === 'urgente' ? -1 : 0) || (a.sla_scadenza ?? '9').localeCompare(b.sla_scadenza ?? '9'));
-  const scadute = ordinate.filter(p => sem(p) === 'rosso');
-  const inScadenza = ordinate.filter(p => sem(p) !== 'rosso' && p.sla_scadenza && giornoRoma(p.sla_scadenza) === oggi);
-  const daFare = ordinate.filter(p => sem(p) !== 'nessuno').slice(0, 8);
   const richiami = daRichiamare(data.tr);
   const senzaEmail = data.tr.filter(t => senzaRiepilogo(t) && !richiami.includes(t));
+  const feed = [...data.oggiD.eventi].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 14);
 
   async function avanzaUno(p: Pratica) {
     const st = prossimoStadio(fl(p.tipo), p);
     if (!st) return;
-    if (!avanzaDiretto(st)) { setAvanza({ p }); return; }
+    if (!avanzaDiretto(st)) { setAvanza(p); return; }
     try { await rpc('centralino_avanza', { p_id: p.id, p_stadio: st.key, p_dati: {}, p_testo: null }); toast(`${p.numero}: ${st.nome}`); reload(); }
     catch (e) { toast(testoErrore(e)); }
   }
@@ -78,107 +73,74 @@ export default function Home() {
     try { await rpc('centralino_chiamata_info', { p_canale: canale, p_nota: null }); toast('+1 contatto informativo'); reload(); } catch (e) { toast(testoErrore(e)); }
   }
   async function richiamato(t: Trasferimento) { if (await segnaRichiamato(t)) reload(); }
-  const flK = fl(tipoK);
-  const colonne = flK ? flK.stadi.slice(0, -1) : [];
-  const perTipo = (t: string) => data.aperte.filter(p => p.tipo === t).length;
-  function suDrop(e: DragEvent, s: Stadio) {
-    e.preventDefault();
-    const p = data!.aperte.find(x => x.id === trascina); setTrascina(null);
-    if (!p || p.stato_corrente === s.key) return;
-    if (indiceStadio(flK, s.key) !== indiceStadio(flK, p.stato_corrente) + 1) { toast(`Un passo alla volta: il prossimo è «${prossimoStadio(flK, p)?.nome ?? ''}».`); return; }
-    avanzaUno(p);
-  }
 
   return (
-    <div className="ct-home">
+    <div className="ct-cockpit">
       {data.cop && data.cop.assenti.length > 0 && <Banner s="warn">Oggi {data.cop.assenti.join(', ')} è assente: centralino coperto da {data.cop.sostituto}.</Banner>}
-      <div className="ct-hero">
-        <div><h1>Buongiorno</h1><p className="sub ct-script-h">«{SCRIPT_TELEFONO}»</p></div>
-        {ctx.scrive && <div className="row-flex">
-          <button className="btn-ghost" onClick={() => setTrasf(true)}><Ic n="telefono" size={17} /> Chiamata per un responsabile</button>
-          <button className="btn ct-btn-xl" onClick={ctx.nuovo}><Ic n="piu" size={20} /> Nuovo contatto <kbd>N</kbd></button>
-        </div>}
-      </div>
-
-      <section className="ct-registro" aria-label="Il mio registro di oggi">
-        <div className="ct-reg-h"><b>Il mio registro di oggi</b><span className="sub">si compila da solo · clic su un numero per l'elenco</span></div>
-        <div className="kpis ct-reg-k">
-          {['reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_tablet', 'reg_wa_offerte', 'reg_cliente', 'reg_anagrafica', 'reg_chiuse'].map(id => <Tessera key={id} id={id} d={data.oggiD} da={data.g} a={data.g} />)}
-        </div>
-        {ctx.scrive && <div className="ct-reg-q"><span className="sub">Solo informazioni, senza pratica:</span>
-          <button className="btn-ghost btn-sm" onClick={() => info('telefono')}>+1 chiamata informativa</button>
-          <button className="btn-ghost btn-sm" onClick={() => info('whatsapp')}>+1 WhatsApp</button>
-          <button className="btn-ghost btn-sm" onClick={() => info('email')}>+1 email</button>
-          <Cifra id="reg_info" d={data.oggiD} da={data.g} a={data.g} /> <span className="sub">oggi</span></div>}
-      </section>
-
-      <div className="ct-colonne">
-        <section className="ct-blocco ct-adesso">
-          <h2>Da fare adesso <span className="ct-n">{daFare.length}</span></h2>
-          {daFare.length ? daFare.map(p => <CardPratica key={p.id} p={p} f={fl(p.tipo)} ora={ora} base={ctx.base} soglia={soglia} onAvanza={ctx.scrive ? x => avanzaUno(x) : undefined} />)
-            : <Vuoto>Tutto in ordine. Nessuna scadenza aperta.</Vuoto>}
-        </section>
+      <header className="ct-hero2">
         <div>
-          <section className="ct-blocco">
-            <h2>Scadute <span className={`ct-n ${scadute.length ? 'ko' : ''}`}>{scadute.length}</span></h2>
-            {scadute.length ? scadute.map(p => <CardPratica key={p.id} p={p} f={fl(p.tipo)} ora={ora} base={ctx.base} soglia={soglia} />) : <Vuoto>Nessuna pratica scaduta.</Vuoto>}
-          </section>
-          <section className="ct-blocco">
-            <h2>In scadenza oggi <span className="ct-n">{inScadenza.length}</span></h2>
-            {inScadenza.length ? inScadenza.map(p => <CardPratica key={p.id} p={p} f={fl(p.tipo)} ora={ora} base={ctx.base} soglia={soglia} />) : <Vuoto>Niente in scadenza oggi.</Vuoto>}
-          </section>
-          {richiami.length > 0 && <section className="ct-blocco">
-            <h2>Da richiamare <span className="ct-n ko">{richiami.length}</span></h2>
-            {richiami.map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRichiamato={ctx.scrive ? richiamato : undefined} onRiepilogo={ctx.scrive ? setRiep : undefined} />)}
-          </section>}
-          {senzaEmail.length > 0 && <section className="ct-blocco">
-            <h2>Email di riepilogo da inviare <span className="ct-n ko">{senzaEmail.length}</span></h2>
-            {senzaEmail.map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRiepilogo={ctx.scrive ? setRiep : undefined} />)}
-          </section>}
+          <p className="ct-ora">{ora.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} · {ora.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</p>
+          <h1>Oggi</h1>
+          <p className="ct-script-h">{REGOLA_SQUILLI} «{SCRIPT_TELEFONO}»</p>
         </div>
+        {ctx.scrive && <div className="ct-hero2-a">
+          <button className="btn ct-btn-xl" onClick={() => ctx.nuovo()}><Ic n="piu" size={20} /> Nuovo contatto <kbd>N</kbd></button>
+          <div className="ct-info-rapide"><span className="sub">Solo informazione:</span>
+            <button className="btn-ghost btn-sm" onClick={() => info('telefono')}>+1 telefonata</button>
+            <button className="btn-ghost btn-sm" onClick={() => info('whatsapp')}>+1 WhatsApp</button>
+            <button className="btn-ghost btn-sm" onClick={() => info('email')}>+1 email</button>
+            <Cifra id="reg_info" d={data.oggiD} da={data.g} a={data.g} /></div>
+        </div>}
+      </header>
+
+      <section className="ct-contatori" aria-label="Il mio registro di oggi">
+        {['reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_tablet', 'reg_wa_offerte', 'reg_cliente', 'reg_anagrafica', 'trasferite', 'reg_chiuse'].map(id => <Tessera key={id} id={id} d={data.oggiD} da={data.g} a={data.g} />)}
+      </section>
+
+      <div className="ct-plancia">
+        <section className="ct-blocco ct-coda" aria-label="Adesso">
+          <div className="ct-blocco-h"><h2>Adesso <span className="ct-n">{coda.length}</span></h2>
+            <div className="segmented" role="group" aria-label="Filtro">
+              {([['tutte', 'Tutte'], ['rosse', 'In ritardo'], ['oggi', 'Scadono oggi']] as const).map(([v, l]) => <button key={v} className={filtro === v ? 'on' : ''} onClick={() => setFiltro(v)}>{l}</button>)}
+            </div></div>
+          {coda.length ? coda.slice(0, 40).map(p => <CardPratica key={p.id} p={p} f={fl(p.tipo)} ora={ora} base={ctx.base} onAvanza={ctx.scrive ? avanzaUno : undefined} />)
+            : <Vuoto>{filtro === 'tutte' ? 'Nessuna pratica aperta. Quando arriva una chiamata premi N.' : 'Niente qui: ottimo.'}</Vuoto>}
+          {coda.length > 40 && <Link to="/centralino/pratiche" className="ct-link">Tutte le {coda.length} pratiche →</Link>}
+        </section>
+
+        <aside className="ct-lato">
+          <section className="ct-blocco">
+            <div className="ct-blocco-h"><h2>Richiami dovuti <span className={`ct-n ${richiami.length ? 'ko' : ''}`}>{richiami.length}</span></h2><Link to="/centralino/trasferimenti" className="ct-link">tutti</Link></div>
+            {richiami.length ? richiami.slice(0, 6).map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRichiamato={ctx.scrive ? richiamato : undefined} onRiepilogo={ctx.scrive ? setRiep : undefined} />)
+              : <Vuoto>Nessun cliente da richiamare.</Vuoto>}
+          </section>
+          {senzaEmail.length > 0 && <section className="ct-blocco">
+            <h2>Email da inviare <span className="ct-n ko">{senzaEmail.length}</span></h2>
+            {senzaEmail.slice(0, 5).map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRiepilogo={ctx.scrive ? setRiep : undefined} />)}
+          </section>}
+          <section className="ct-blocco">
+            <h2>Movimenti di oggi</h2>
+            {feed.length ? <ol className="ct-feed2">{feed.map(e => (
+              <li key={e.id} onClick={() => nav(`${ctx.base}/pratica/${e.pratica_id}`)} className="ct-clic">
+                <span className="ct-feed2-t">{fmtOra(e.at).split(' ').pop()}</span>
+                <span><b>{e.pratiche?.cliente_nome ?? ''}</b> · {e.tipo === 'stato' ? `${ETICHETTA_EV.stato} «${nomeStadio(config.flussi.find(f => f.stadi.some(s => s.key === e.a_stato)), e.a_stato)}»` : `${ETICHETTA_EV[e.tipo] ?? e.tipo}${e.testo ? `: ${e.testo}` : ''}`}
+                  <span className="sub"> · {e.autore_nome ?? 'Sistema'}</span></span>
+              </li>))}</ol> : <Vuoto>Ancora nessun movimento oggi.</Vuoto>}
+          </section>
+          <section className="ct-blocco ct-altro">
+            <h2>Altre attività</h2>
+            <div className="ct-link-list">
+              <Link to="/formazione">Attestati di formazione</Link>
+              <Link to="/centralino/clienti">Anagrafica clienti</Link>
+              <Link to="/centralino/monitoraggio">Analisi del centralino</Link>
+            </div>
+            <p className="sub">Trasferte e abbigliamento: Nuovo contatto › canale Collega. Tipi: {NOME_TIPO.trasferta}, {NOME_TIPO.abbigliamento}.</p>
+          </section>
+        </aside>
       </div>
 
-      <section className="ct-blocco">
-        <h2>Aperte per tipo</h2>
-        <div className="ct-tabs" role="tablist">
-          {config.flussi.filter(f => f.attivo).map(f => (
-            <button key={f.tipo} role="tab" aria-selected={tipoK === f.tipo} className={tipoK === f.tipo ? 'on' : ''} onClick={() => setTipoK(f.tipo)}>
-              <Ic n={f.icona} size={16} />{NOME_TIPO[f.tipo] ?? f.nome}<span className="ct-n">{perTipo(f.tipo)}</span></button>))}
-        </div>
-        <div className="ct-kanban" style={{ gridTemplateColumns: `repeat(${Math.max(1, colonne.length)}, minmax(220px, 1fr))` }}>
-          {colonne.map(s => {
-            const l = data.aperte.filter(p => p.tipo === tipoK && p.stato_corrente === s.key).sort((a, b) => PESO[sem(a)] - PESO[sem(b)]);
-            return (
-              <div key={s.key} className={`ct-col ${trascina ? 'drop' : ''}`} onDragOver={e => ctx.scrive && e.preventDefault()} onDrop={e => suDrop(e, s)}>
-                <div className="ct-col-h"><b>{s.nome}</b><span className="ct-n">{l.length}</span></div>
-                {l.map(p => (
-                  <div key={p.id} draggable={ctx.scrive} onDragStart={() => setTrascina(p.id)} onDragEnd={() => setTrascina(null)}>
-                    <CardPratica p={p} f={flK} ora={ora} base={ctx.base} soglia={soglia} onAvanza={ctx.scrive ? x => avanzaUno(x) : undefined} />
-                  </div>))}
-              </div>);
-          })}
-        </div>
-        {ctx.scrive && <p className="hint">Trascina una scheda nella colonna successiva o usa «Prossimo»: un passo alla volta, con i dati che ogni passo richiede.</p>}
-      </section>
-
-      <KpiTrasferimenti d={data.oggiD} da={data.g} a={data.g} base={ctx.base} trend={data.tr} />
-
-      <section className="ct-blocco ct-altro">
-        <h2>Altre attività</h2>
-        <div className="row-flex">
-          <Link to="/formazione" className="btn-ghost btn-sm">Attestati di formazione (D.M. 01.09.2021 · D.Lgs. 81/2008)</Link>
-          <span className="sub">Anagrafica clienti/impianti: «Modifica / anagrafica». Trasferte e abbigliamento: «Nuovo contatto» › canale Collega.</span>
-        </div>
-      </section>
-
-      <section className="ct-blocco">
-        <h2>Chiuse oggi <span className="ct-n">{data.chiuse.length}</span></h2>
-        <div className="ct-griglia-card">{data.chiuse.length ? data.chiuse.map(p => <CardPratica key={p.id} p={p} f={fl(p.tipo)} ora={ora} base={ctx.base} />) : <Vuoto>Nessuna pratica chiusa oggi.</Vuoto>}</div>
-      </section>
-
-      {avanza && fl(avanza.p.tipo) && <Avanza p={avanza.p} f={fl(avanza.p.tipo)!} onClose={() => setAvanza(null)} onFatto={() => { setAvanza(null); reload(); }} onEmail={t => nav(`${ctx.base}/pratica/${avanza.p.id}${t ? `?email=${t}` : '?email=1'}`)} />}
+      {avanza && fl(avanza.tipo) && <Avanza p={avanza} f={fl(avanza.tipo)!} onClose={() => setAvanza(null)} onFatto={() => { setAvanza(null); reload(); }} onEmail={t => nav(`${ctx.base}/pratica/${avanza.id}${t ? `?email=${t}` : '?email=1'}`)} />}
       {riep && <EmailTrasferimento trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
-      {trasf && <ModaleTrasferimento onClose={() => setTrasf(false)} onFatto={() => { setTrasf(false); reload(); }} />}
     </div>
   );
 }

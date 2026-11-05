@@ -64,7 +64,7 @@ export default function Pratica() {
 
   return (
     <div className="ct-pratica">
-      <Link to={ctx.base} className="ct-indietro">← {ctx.scrive ? 'Da fare' : 'Monitoraggio'}</Link>
+      <Link to={`${ctx.base}/pratiche`} className="ct-indietro ct-solo-stretto">← Elenco</Link>
       {nuova && aperta && ctx.scrive && (
         <div className="ct-dopo">
           <div><b>Pratica {p.numero} aperta.</b> {prossimo ? <>Prossimo passo: <b>{prossimo.nome}</b>.</> : null}</div>

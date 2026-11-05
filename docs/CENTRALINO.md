@@ -1,6 +1,15 @@
 # Centralino (front office) e monitoraggio Direzione
 
-Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0051` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte > 1.000 €).
+Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0053` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte > 1.000 €).
+
+## Struttura (rifacimento)
+Menu: **Oggi** (plancia: grande «Nuovo contatto», contatori del giorno cliccabili, coda «Adesso» per urgenza con conti alla rovescia, richiami dovuti, email da inviare, movimenti di oggi) · **Nuovo contatto** · **Pratiche** (vista divisa: elenco a sinistra, scheda a destra; `/centralino/pratica/:id`) · **Trasferimenti e richiami** · **Clienti** (ricerca, scheda con contatti, sedi, storico pratiche e chiamate, «Nuovo contatto per questo cliente») · **Analisi** (`/centralino/monitoraggio`) · Report · Modelli email · **Referenti** · Impostazioni. Barra in alto: stato in diretta (in scadenza 60 min, scadute, richiami dovuti → elenco).
+
+## Referenti e responsabilità (0053)
+`/centralino/referenti`: tabella `referenti` (nome, ruolo, email, telefono, cellulare, attivo, responsabilità: offerte > 1.000 €, ≤ 1.000 €, sopralluoghi, amministrazione, fornitori, interventi, sostituto, formazione, flotta, trasferte, abbigliamento). **Fonte unica**: un trigger riscrive le impostazioni derivate (`commerciali_offerte_grandi`, `cc_offerte_grandi`, `commerciali`, `destinatari_trasferimento`, `amministrazione`, `fornitori`, `sostituto`), non più modificabili a mano. Avvisi per responsabilità senza email o senza nessuno.
+
+## Import clienti da Taylor (formato reale)
+Intestazioni «Codice», «Ragione sociale», «Località», «Telefono», «Email» (spazi, maiuscole, accenti non contano; sinonimi Cod. cli., Cliente, Loc., Città, Tel, E-mail, Mail, PEC…). Colonne sconosciute mostrate come «non importate». Più numeri per cella (/ ; - ,): fisso → telefono, che inizia con 3 → cellulare, altri in rubrica; più email: prima → email, PEC → pec, altre in rubrica. «00186 ROMA (RM)» → CAP, comune, provincia. Doppioni per Codice: vince l'ultima riga. Blocchi da 500 righe con barra di avanzamento (10.000 righe ok). Logica in `src/lib/centralino/importa.ts` (test `importa.test.ts`).
 
 ## Pagine
 | Percorso | Chi | Cosa |

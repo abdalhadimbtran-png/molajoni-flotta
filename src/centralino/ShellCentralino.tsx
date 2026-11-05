@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Navigate, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Caricamento } from '../ui';
 import { Icona, Layout, type Gruppo } from '../admin/Barra';
@@ -24,7 +24,8 @@ export function bip() {
 import NuovoContatto from './NuovoContatto';
 import './centralino.css';
 
-export interface CtxCentralino { scrive: boolean; base: string; nuovo: () => void; versione: number; aggiorna: () => void }
+export interface ClientePreset { codice: string | null; nome: string; fonte?: 'taylor' | 'pratiche' }
+export interface CtxCentralino { scrive: boolean; base: string; nuovo: (cliente?: ClientePreset) => void; versione: number; aggiorna: () => void }
 export const useCtx = () => useOutletContext<CtxCentralino>();
 
 /**
@@ -36,6 +37,7 @@ export default function ShellCentralino() {
   const loc = useLocation();
   const nav = useNavigate();
   const [aperto, setAperto] = useState(false);
+  const [preset, setPreset] = useState<ClientePreset | undefined>(undefined);
   const [versione, setVersione] = useState(0);
   const direzione = loc.pathname.startsWith('/direzione');
   useEffect(() => { document.title = direzione ? 'Molajoni · Direzione' : 'Molajoni · Centralino'; return () => { document.title = 'Molajoni'; }; }, [direzione]);
@@ -66,11 +68,12 @@ export default function ShellCentralino() {
     const k = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey || t.closest('input,textarea,select,[contenteditable],.modal')) return;
-      e.preventDefault(); setAperto(true);
+      e.preventDefault(); setPreset(undefined); setAperto(true);
     };
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
   }, [scrive]);
 
+  useEffect(() => { if (loc.pathname === '/centralino/nuovo' && s.centralino) { setPreset(undefined); setAperto(true); nav('/centralino', { replace: true }); } }, [loc.pathname, s.centralino]); // eslint-disable-line react-hooks/exhaustive-deps
   if (s.stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
   if (s.stato === 'anonimo') return <Navigate to="/accesso" replace state={{ da: loc.pathname + loc.search }} />;
   const soloTrasf = loc.pathname === '/centralino/trasferimenti' && !s.centralino && !s.direzione;
@@ -87,23 +90,28 @@ export default function ShellCentralino() {
     { titolo: 'Direzione', voci: [{ to: '/direzione/centralino', label: 'Monitoraggio centralino', icona: 'panoramica', end: true }] },
     ...(s.centralino ? [{ titolo: 'Centralino', voci: [{ to: '/centralino', label: 'Apri il centralino', icona: 'telefono', end: true }] }] : []),
   ] : [
-    { titolo: 'Centralino', voci: [
-      { to: '/centralino', label: 'Da fare', icona: 'cruscotto', end: true },
-      { to: '/centralino/pratiche', label: 'Tutte le pratiche', icona: 'pratiche' },
-      { to: '/centralino/trasferimenti', label: 'Chiamate trasferite', icona: 'telefono' }] },
-    { titolo: 'Strumenti', voci: [
+    { titolo: 'Lavoro', voci: [
+      { to: '/centralino', label: 'Oggi', icona: 'cruscotto', end: true },
+      { to: '/centralino/nuovo', label: 'Nuovo contatto', icona: 'attivita' },
+      { to: '/centralino/pratiche', label: 'Pratiche', icona: 'pratiche' },
+      { to: '/centralino/trasferimenti', label: 'Trasferimenti e richiami', icona: 'telefono' },
+      { to: '/centralino/clienti', label: 'Clienti', icona: 'tecnici' }] },
+    { titolo: 'Dati', voci: [
+      { to: '/centralino/monitoraggio', label: 'Analisi', icona: 'panoramica' },
+      { to: '/centralino/report', label: 'Report', icona: 'report' }] },
+    { titolo: 'Configurazione', voci: [
       { to: '/centralino/modelli', label: 'Modelli email', icona: 'email' },
-      { to: '/centralino/report', label: 'Report', icona: 'report' },
-      { to: '/centralino/impostazioni', label: 'Flussi e impostazioni', icona: 'impostazioni' }] },
-    ...(s.direzione ? [{ titolo: 'Direzione', voci: [{ to: '/direzione/centralino', label: 'Monitoraggio', icona: 'panoramica', end: true }] }] : []),
+      { to: '/centralino/referenti', label: 'Referenti', icona: 'account' },
+      { to: '/centralino/impostazioni', label: 'Impostazioni', icona: 'impostazioni' }] },
   ];
-  const ctx: CtxCentralino = { scrive, base, nuovo: () => setAperto(true), versione, aggiorna: () => setVersione(v => v + 1) };
+  const ctx: CtxCentralino = { scrive, base, nuovo: c => { setPreset(c); setAperto(true); }, versione, aggiorna: () => setVersione(v => v + 1) };
   return (
     <div className="hr-area ct-area">
       <Layout prodotto={direzione ? 'Direzione' : 'Centralino'} gruppi={gruppi} email={s.sessione?.user.email ?? ''}
         utilita={<>
+          {!soloTrasf && <StatoLive base={base} versione={versione} />}
           {!soloTrasf && <Ricerca base={base} />}
-          {scrive && <button className="btn ct-nuovo-btn" onClick={() => setAperto(true)} title="Nuovo contatto (tasto N)"><Ic n="piu" size={18} /><span>Nuovo contatto</span><kbd>N</kbd></button>}
+          {scrive && <button className="btn ct-nuovo-btn" onClick={() => { setPreset(undefined); setAperto(true); }} title="Nuovo contatto (tasto N)"><Ic n="piu" size={18} /><span>Nuovo contatto</span><kbd>N</kbd></button>}
           <Campanella />
         </>}
         menuUtente={<>
@@ -113,10 +121,39 @@ export default function ShellCentralino() {
         </>}>
         <Outlet context={ctx} />
       </Layout>
-      {aperto && <NuovoContatto onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}
+      {aperto && <NuovoContatto cliente={preset} onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}
     </div>
   );
 }
+
+/** Stato in diretta nella barra: in scadenza (60 min), scadute, richiami dovuti. Clic → elenco. */
+function StatoLive({ base, versione }: { base: string; versione: number }) {
+  const [d, setD] = useState<{ ap: Pratica[]; tr: { richiamo_scadenza: string | null; richiamato_at: string | null }[] } | null>(null);
+  const ora = useAdessoShell();
+  useEffect(() => {
+    let ok = true;
+    const carica = () => Promise.all([
+      supabase.from('pratiche').select('id,sla_scadenza').eq('esito', 'aperta').not('sla_scadenza', 'is', null).limit(2000),
+      supabase.from('chiamate_trasferite').select('richiamo_scadenza,richiamato_at').is('richiamato_at', null).not('richiamo_scadenza', 'is', null).limit(2000),
+    ]).then(([a, t]) => ok && setD({ ap: (a.data ?? []) as Pratica[], tr: (t.data ?? []) as { richiamo_scadenza: string | null; richiamato_at: string | null }[] }));
+    carica(); const k = window.setInterval(carica, 60000);
+    return () => { ok = false; window.clearInterval(k); };
+  }, [versione]);
+  if (!d) return null;
+  const t = ora.getTime();
+  const scadute = d.ap.filter(p => new Date(p.sla_scadenza!).getTime() < t).length;
+  const inScad = d.ap.filter(p => { const x = new Date(p.sla_scadenza!).getTime(); return x >= t && x - t <= 3600e3; }).length;
+  const richiami = d.tr.filter(x => new Date(x.richiamo_scadenza!).getTime() - t <= 3600e3).length;
+  const oggi = new Date().toISOString().slice(0, 10), da30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  return (
+    <div className="ct-live" aria-label="Situazione in diretta">
+      <Link to={`${base}/analisi?kpi=in_scadenza&da=${oggi}&a=${oggi}`} className={`ct-live-c ${inScad ? 'arancio' : ''}`}><b>{inScad}</b> in scadenza</Link>
+      <Link to={`${base}/analisi?kpi=in_ritardo&da=${oggi}&a=${oggi}`} className={`ct-live-c ${scadute ? 'rosso' : ''}`}><b>{scadute}</b> scadute</Link>
+      <Link to={`${base}/analisi?kpi=richiami_dovuti&da=${da30}&a=${oggi}`} className={`ct-live-c ${richiami ? 'rosso' : ''}`}><b>{richiami}</b> richiami</Link>
+    </div>
+  );
+}
+function useAdessoShell() { const [t, setT] = useState(() => new Date()); useEffect(() => { const k = window.setInterval(() => setT(new Date()), 30000); return () => window.clearInterval(k); }, []); return t; }
 
 /** Ricerca globale: cliente, telefono, numero pratica. */
 function Ricerca({ base }: { base: string }) {

@@ -20,6 +20,8 @@ const COL_TRASF: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('cliente',
   c('esito', 'Esito', 'testo', 16), c('scadenza', 'Richiamo entro', 'dataora', 15), c('richiamato', 'Richiamato', 'dataora', 15), c('ritardo', 'Ritardo', 'testo', 10), c('email_ref', 'Email referente', 'testo', 10), c('email_cli', 'Email cliente', 'testo', 10)];
 const COL_INFO: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 12), c('cliente', 'Cliente / nota', 'testo', 40), c('tipo', 'Tipo', 'testo', 20)];
 const iso = (d: Date) => d.toISOString().slice(0, 10);
+/** Persona reale se nota (tecnico, commerciale), altrimenti il ruolo assegnato. */
+const chiDi = (p: RecPratica) => { const x = p as RecPratica & { tecnico_nome?: string | null; commerciale_nome?: string | null }; return x.tecnico_nome || x.commerciale_nome || p.assegnato_nome || ''; };
 
 /**
  * /centralino/analisi?kpi=…&da=…&a=…&dest=…&arg=…&stato=…&tipo=…&canale=…&giorno=…
@@ -56,7 +58,7 @@ export default function Analisi() {
     const p = r as RecPratica;
     const rit = p.esito === 'aperta' && p.sla_scadenza && new Date(p.sla_scadenza) < ora ? orologio((ora.getTime() - new Date(p.sla_scadenza).getTime()) / 1000) : '';
     return { _p: p.id, _r: p, numero: p.numero, quando: p.created_at, canale: nomeCanale(p.canale), tipo: NOME_TIPO[p.tipo as 'manutenzione'] + (p.sottotipo ? ` · ${p.sottotipo}` : ''), cliente: p.cliente_nome,
-      stato_cliente: p.stato_cliente ? STATI_CLIENTE[p.stato_cliente as 'nuovo'][1] : '', referente: p.assegnato_nome ?? '', stadio: nomeStadio(fl(p.tipo), p.stato_corrente),
+      stato_cliente: p.stato_cliente ? STATI_CLIENTE[p.stato_cliente as 'nuovo'][1] : '', referente: chiDi(p), stadio: nomeStadio(fl(p.tipo), p.stato_corrente),
       scadenza: p.esito === 'aperta' ? p.sla_scadenza : null, ritardo: rit, esito: ESITI[p.esito as Esito][1], importo: p.importo_stimato };
   }), [v, ora, config]); // eslint-disable-line react-hooks/exhaustive-deps
   const colonne = def.fonte === 'trasferimenti' ? COL_TRASF : def.conInfo ? COL_INFO : COL_PRATICHE;
@@ -105,19 +107,19 @@ export default function Analisi() {
       </div>
       {!v ? <Scheletro righe={6} /> : <>
         <div className="kpis ct-riep">
-          <div className="kpi"><div className="num">{def.den ? (v.pct == null ? '—' : `${v.pct}%`) : v.n}</div><div className="lbl">{def.den ? `${v.n} su ${v.den}` : 'elementi'}</div></div>
+          <div className="kpi"><div className="num">{def.den ? (v.pct == null ? '—' : `${v.pct}%`) : v.n}</div><div className="lbl">{def.den ? `${v.n} su ${v.den}` : 'Elementi'}</div></div>
           {def.den && <div className="kpi"><div className="num">{v.n}</div><div className="lbl">Numeratore (elenco qui sotto)</div></div>}
           {def.den && <div className="kpi"><div className="num">{v.den}</div><div className="lbl">Denominatore</div></div>}
           {medio && <div className="kpi"><div className="num num-sm">{medio}</div><div className="lbl">Tempo medio di richiamo</div></div>}
           {valore > 0 && <div className="kpi"><div className="num num-sm">{fmtEuro(valore)}</div><div className="lbl">Valore stimato</div></div>}
         </div>
         {righe.length === 0 ? <p className="ct-vuoto">Nessun elemento con questi filtri. Prova ad allargare il periodo.</p> : (
-          <div className="table-wrap"><table className="ct-tab-analisi">
-            <thead><tr>{colonne.map(x => <th key={x.k}>{x.l}</th>)}</tr></thead>
+          <div className="table-wrap ct-tw-analisi"><table className="ct-tab-analisi">
+            <thead><tr>{colonne.map(x => <th key={x.k} className={`c-${x.k}`}>{x.l}</th>)}</tr></thead>
             <tbody>{righe.slice(0, 1000).map((r, i) => (
               <tr key={i} className={r._p ? 'ct-clic' : ''} onClick={() => r._p && nav(`${ctx.base}/pratica/${r._p}`)}>
-                {colonne.map(x => <td key={x.k}>{x.k === 'scadenza' && r.scadenza && !r.richiamato && (r._r ? (r._r as RecPratica).esito === 'aperta' : true)
-                  ? <Conto inizio={String(r.quando)} scadenza={String(r.scadenza)} /> : x.k === 'ritardo' && r.ritardo ? <span className="ko-t">{String(r.ritardo)}</span> : testoCella(r[x.k], x.t)}</td>)}
+                {colonne.map(x => <td key={x.k} title={typeof r[x.k] === 'string' ? String(r[x.k]) : undefined} className={`c-${x.k}`}>{x.k === 'scadenza' && r.scadenza && !r.richiamato && (r._r ? (r._r as RecPratica).esito === 'aperta' : true)
+                  ? <Conto inizio={String(r.quando)} scadenza={String(r.scadenza)} /> : x.k === 'ritardo' && r.ritardo ? <span className="ko-t">{String(r.ritardo)}</span> : x.t === 'dataora' && r[x.k] ? fmtOra(String(r[x.k])) : testoCella(r[x.k], x.t)}</td>)}
               </tr>))}</tbody>
           </table></div>)}
         {righe.length > 1000 && <p className="hint">Mostrate le prime 1000 righe; l'esportazione le contiene tutte.</p>}

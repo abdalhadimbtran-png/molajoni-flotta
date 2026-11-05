@@ -340,3 +340,23 @@ tr.ct-spento td { opacity:.5; }
 @media (max-width:1000px) { .ct-hero2 { grid-template-columns:1fr; } .ct-hero2-a { align-items:flex-start; } .ct-info-rapide { justify-content:flex-start; } }
 .ct-contatori { grid-template-columns:repeat(auto-fit, minmax(104px, 1fr)); }
 @media (min-width:1300px) { .ct-contatori { grid-template-columns:repeat(9, minmax(0, 1fr)); } }
+
+/* revisione screenshot */
+.ct-area .gest { background:linear-gradient(to right, #F6F6F8 0 252px, var(--line) 252px 253px, var(--bg) 253px); }
+[dir="rtl"] .ct-area .gest { background:linear-gradient(to left, #F6F6F8 0 252px, var(--line) 252px 253px, var(--bg) 253px); }
+@media (max-width:900px) { .ct-area .gest { background:var(--bg); } }
+.ct-info-n { display:inline-flex; align-items:center; gap:4px; font-size:12.5px; color:var(--ink-3); padding:4px 10px; border-radius:999px; background:var(--surface-2); }
+.ct-tw-analisi { overflow-x:auto; border:1px solid var(--line); border-radius:var(--ct-r); background:var(--surface); }
+.ct-tab-analisi { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+.ct-tab-analisi th, .ct-tab-analisi td { padding:7px 10px; border-bottom:1px solid var(--line); white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; vertical-align:top; text-align:start; }
+.ct-tab-analisi th { position:sticky; top:0; background:var(--surface-2); font-weight:600; z-index:1; }
+.ct-tab-analisi th:first-child, .ct-tab-analisi td:first-child { position:sticky; inset-inline-start:0; background:var(--surface); z-index:2; box-shadow:1px 0 0 var(--line); }
+.ct-tab-analisi th:first-child { background:var(--surface-2); z-index:3; }
+.ct-tab-analisi td.c-cliente, .ct-tab-analisi td.c-tipo, .ct-tab-analisi td.c-stadio, .ct-tab-analisi td.c-argomento { max-width:200px; }
+.ct-tab-analisi td.c-quando, .ct-tab-analisi td.c-scadenza, .ct-tab-analisi td.c-richiamato { max-width:118px; font-variant-numeric:tabular-nums; }
+.ct-tab-analisi td:nth-child(2), .ct-tab-analisi td:nth-child(5) { white-space:nowrap; }
+.ct-tab-analisi tr.ct-clic:hover td { background:var(--surface-2); }
+.ct-area .side { background:#F6F6F8; }
+.ct-tab-analisi th, .ct-tab-analisi td { padding:7px 8px; }
+.ct-tab-analisi td.c-quando, .ct-tab-analisi th.c-quando { max-width:112px; }
+.ct-tab-analisi td.c-tipo, .ct-tab-analisi td.c-cliente { max-width:170px; }

@@ -89,7 +89,7 @@ export default function Home() {
             <button className="btn-ghost btn-sm" onClick={() => info('telefono')}>+1 telefonata</button>
             <button className="btn-ghost btn-sm" onClick={() => info('whatsapp')}>+1 WhatsApp</button>
             <button className="btn-ghost btn-sm" onClick={() => info('email')}>+1 email</button>
-            <Cifra id="reg_info" d={data.oggiD} da={data.g} a={data.g} /></div>
+            <span className="ct-info-n">oggi <Cifra id="reg_info" d={data.oggiD} da={data.g} a={data.g} /></span></div>
         </div>}
       </header>
 

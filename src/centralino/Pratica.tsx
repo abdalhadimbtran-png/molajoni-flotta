@@ -137,7 +137,7 @@ export default function Pratica() {
             <dl>
               <dt>Stadio</dt><dd>{nomeStadio(f, p.stato_corrente)}</dd>
               {p.appuntamento_data && <><dt>Appuntamento</dt><dd>{dataLunga(p.appuntamento_data)}, {p.appuntamento_fascia ? FASCE[p.appuntamento_fascia] : ''}</dd></>}
-              <dt>Assegnata a</dt><dd>{p.assegnato_nome || '—'}{p.tecnico_nome ? ` · tecnico ${p.tecnico_nome}` : ''}</dd>
+              <dt>Assegnata a</dt><dd>{p.tecnico_nome || p.commerciale_nome || p.assegnato_nome || '—'}{(p.tecnico_nome || p.commerciale_nome) && p.assegnato_nome ? <span className="sub"> · {p.assegnato_nome}</span> : null}</dd>
               {p.commerciale_nome && <><dt>Commerciale</dt><dd>{p.commerciale_nome}</dd></>}
               {p.importo_stimato != null && <><dt>Importo stimato</dt><dd>{fmtEuro(p.importo_stimato)}</dd></>}
               {p.tipo === 'manutenzione' && <><dt>Alert Taylor</dt><dd>{p.alert_taylor ? `Inviato${p.documento_intervento ? ` · doc. ${p.documento_intervento}` : ''}` : 'No'}</dd></>}

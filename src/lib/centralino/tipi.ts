@@ -31,7 +31,7 @@ export interface Trasferimento {
   id: number; pratica_id: number | null; cliente_codice: string | null; cliente_nome: string | null; telefono: string | null;
   destinatario_nome: string; destinatario_ruolo: string | null; destinatario_user: string | null; argomento: string | null; tipo_argomento: string | null;
   esito: EsitoTrasf; modalita: 'trasferita' | 'richiamo'; entro_testo: string | null; cliente_email: string | null;
-  esito_richiamo: string | null; email_riepilogo_at: string | null; email_non_disponibile: string | null; richiamo_scadenza: string | null; richiamato_at: string | null; richiamato_da: string | null; autore_nome: string | null; at: string;
+  esito_richiamo: string | null; email_riepilogo_at: string | null; email_referente_inviata_at: string | null; email_cliente_inviata_at: string | null; referente_email: string | null; stato_cliente: StatoCliente | null; email_non_disponibile: string | null; richiamo_scadenza: string | null; richiamato_at: string | null; richiamato_da: string | null; autore_nome: string | null; at: string;
 }
 export interface Destinatario { nome: string; ruolo: string; email: string; nota?: string }
 export interface Commerciale { nome: string; email: string | null; account: boolean; assente: boolean; occupato: boolean; disponibile: boolean }
@@ -98,4 +98,6 @@ export const prossimoStadio = (f: Flusso | undefined, p: Pratica) => {
 export const richiedeAppuntamento = (t: string) => t === 'manutenzione' || t === 'sopralluogo';
 
 /** Chiamata trasferita senza email di riepilogo (né motivo): segnale rosso. */
-export const senzaRiepilogo = (t: Trasferimento) => !t.email_riepilogo_at && !t.email_non_disponibile;
+export const senzaCliente = (t: Trasferimento) => !t.email_cliente_inviata_at && !t.email_riepilogo_at && !t.email_non_disponibile;
+export const senzaReferente = (t: Trasferimento) => !t.email_referente_inviata_at;
+export const senzaRiepilogo = (t: Trasferimento) => senzaCliente(t) || senzaReferente(t);

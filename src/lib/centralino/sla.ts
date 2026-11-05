@@ -96,3 +96,65 @@ export function testoResiduo(scadenza: string | Date | null, ora = new Date()): 
 
 /** Data di Roma (AAAA-MM-GG) di un istante. */
 export const giornoRoma = (d: string | Date) => { const p = partiRoma(new Date(d)); return iso(p.y, p.m, p.g); };
+
+/** Se ora è fuori orario d'ufficio: quando riapre (altrimenti null). Il conto alla rovescia è «in pausa» fino ad allora. */
+export function riapertura(ora: Date, festivi: Set<string>, orario: Orario = ORARIO_DEFAULT): Date | null {
+  const p = partiRoma(ora);
+  const d = iso(p.y, p.m, p.g), t = p.h * 60 + p.mi, hi = minuti(orario.inizio), hf = minuti(orario.fine);
+  if (lavorativo(d, festivi) && t >= hi && t < hf) return null;
+  if (lavorativo(d, festivi) && t < hi) return istante(d, hi);
+  return istante(prossimoLavorativo(d, festivi), hi);
+}
+
+/** Secondi d'ufficio tra due istanti (lun–ven, festività escluse, solo nell'orario). */
+export function secondiUfficio(da: Date, a: Date, festivi: Set<string>, orario: Orario = ORARIO_DEFAULT): number {
+  if (a <= da) return 0;
+  const hi = minuti(orario.inizio), hf = minuti(orario.fine);
+  let tot = 0;
+  const pd = partiRoma(da); let d = iso(pd.y, pd.m, pd.g);
+  const pa = partiRoma(a); const fine = iso(pa.y, pa.m, pa.g);
+  for (let i = 0; i < 400 && d <= fine; i++) {
+    if (lavorativo(d, festivi)) {
+      const ap = istante(d, hi).getTime(), ch = istante(d, hf).getTime();
+      const x = Math.max(ap, da.getTime()), y = Math.min(ch, a.getTime());
+      if (y > x) tot += (y - x) / 1000;
+    }
+    d = piuGiorno(d);
+  }
+  return Math.round(tot);
+}
+
+/** «entro 60 min», «entro 2 ore», «in giornata», «entro il giorno lavorativo dopo», «entro 2 giorni lav.». */
+export function testoRegola(r: RegolaSla | null | undefined): string {
+  if (!r) return '';
+  const n = r.valore ?? 0;
+  if (r.tipo === 'minuti') return `entro ${n} min`;
+  if (r.tipo === 'ore') return `entro ${n} ${n === 1 ? 'ora' : 'ore'}`;
+  if (r.tipo === 'stesso_giorno') return 'in giornata';
+  return n === 1 ? 'entro il giorno lavorativo dopo' : `entro ${n} giorni lavorativi`;
+}
+
+const due = (n: number) => String(Math.floor(n)).padStart(2, '0');
+/** «47:12» / «1:05:09» (sotto le 24 h) oppure «1 g 03 h». */
+export function orologio(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  if (s >= 86400) return `${Math.floor(s / 86400)} g ${due((s % 86400) / 3600)} h`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h ? `${h}:${due(m)}:${due(x)}` : `${due(m)}:${due(x)}`;
+}
+
+export interface StatoConto { testo: string; colore: Semaforo; pausa: string | null; scaduto: boolean }
+/**
+ * Conto alla rovescia della procedura. Il tempo residuo è in ore d'ufficio (si ferma fuori orario e nei festivi);
+ * dopo la scadenza conta il ritardo («in ritardo da 00:18»).
+ */
+export function conto(inizio: string | Date, scadenza: string | Date | null, ora: Date, festivi: Set<string>, orario: Orario = ORARIO_DEFAULT, soglia = 0.25): StatoConto | null {
+  if (!scadenza) return null;
+  const s = new Date(scadenza), i = new Date(inizio);
+  if (ora > s) { const sec = (ora.getTime() - s.getTime()) / 1000; return { testo: `in ritardo da ${sec >= 86400 ? orologio(sec) : `${due(sec / 3600)}:${due((sec % 3600) / 60)}`}`, colore: 'rosso', pausa: null, scaduto: true }; }
+  const resto = secondiUfficio(ora, s, festivi, orario), tot = Math.max(1, secondiUfficio(i, s, festivi, orario));
+  const r = riapertura(ora, festivi, orario);
+  const g = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+  const pausa = r ? (() => { const p = partiRoma(r); const dow = new Date(Date.UTC(p.y, p.m - 1, p.g)).getUTCDay(); return `in pausa fino a ${giornoRoma(r) === giornoRoma(ora) ? 'oggi' : g[dow].slice(0, 3)} ${due(p.h)}:${due(p.mi)}`; })() : null;
+  return { testo: `mancano ${orologio(resto)}`, colore: resto / tot < soglia ? 'arancio' : 'verde', pausa, scaduto: false };
+}

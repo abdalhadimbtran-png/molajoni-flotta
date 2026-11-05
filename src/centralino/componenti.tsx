@@ -1,8 +1,9 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { fmtOra } from '../lib/format';
-import { semaforo, testoResiduo } from '../lib/centralino/sla';
-import { ESITI, FASCE, NOME_TIPO, nomeCanale, prossimoStadio, stadioDi, type Evento, type Flusso, type Pratica } from '../lib/centralino/tipi';
+import { conto, orologio, semaforo, testoRegola } from '../lib/centralino/sla';
+import { useAdesso, useConfig } from './comune';
+import { ESITI, FASCE, NOME_TIPO, STATI_CLIENTE, nomeCanale, prossimoStadio, stadioDi, type Evento, type Flusso, type Pratica } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 
 /** Icone del centralino (canali e tipi di richiesta), tratto 1.75. */
@@ -32,11 +33,36 @@ export const Ic = ({ n, size = 20 }: { n: string; size?: number }) => (
 export const iconaTipo = (t: string) => (t.startsWith('offerta') ? 'offerta' : t);
 export const iconaCanale = (c: string) => ({ telefono: 'telefono', whatsapp: 'whatsapp', email: 'email', collega: 'collega', tablet_tmq: 'tablet' } as Record<string, string>)[c] ?? 'altro';
 
-export function SlaChip({ p, ora, soglia }: { p: Pick<Pratica, 'created_at' | 'sla_scadenza' | 'esito' | 'sla_rispettato'>; ora: Date; soglia?: number }) {
+/** Conto alla rovescia vivo (ogni secondo): ore d'ufficio, pausa fuori orario, ritardo in rosso. */
+export function Conto({ inizio, scadenza, regola, soglia }: { inizio: string; scadenza: string | null; regola?: string; soglia?: number }) {
+  const ora = useAdesso(1000);
+  const { config } = useConfig();
+  const c = conto(inizio, scadenza, ora, config?.festivi ?? new Set(), config?.impostazioni.orario, soglia ?? Number(config?.impostazioni.soglia_arancio ?? 0.25));
+  if (!c) return <span className="ct-sla nessuno">senza scadenza</span>;
+  return (
+    <span className={`ct-sla ct-conto ${c.colore} ${c.pausa ? 'pausa' : ''}`} title={[regola && `Procedura: ${regola}`, scadenza && `Scadenza ${fmtOra(scadenza)}`, c.pausa].filter(Boolean).join(' · ')}>
+      <i />{c.testo}{c.pausa && <em> · {c.pausa}</em>}
+    </span>
+  );
+}
+
+/** Tempo trascorso dalla ricezione, vivo. */
+export function Trascorso({ da, fino }: { da: string; fino?: string | null }) {
+  const ora = useAdesso(1000);
+  return <span className="ct-trascorso">ricevuta da {orologio(((fino ? new Date(fino) : ora).getTime() - new Date(da).getTime()) / 1000)}</span>;
+}
+
+/** Regola della procedura per il prossimo obiettivo SLA della pratica («Offerta inviata entro 60 min»). */
+export function regolaDi(f: Flusso | undefined, p: Pick<Pratica, 'sottotipo' | 'sla_stadio'>): string {
+  if (!f || !p.sla_stadio) return '';
+  const s = f.stadi.find(x => x.key === p.sla_stadio);
+  const r = f.sla_sottotipi?.[p.sottotipo ?? '']?.[p.sla_stadio] ?? s?.sla;
+  return s ? `${s.nome} ${testoRegola(r)}` : '';
+}
+
+export function SlaChip({ p, soglia, regola }: { p: Pick<Pratica, 'created_at' | 'sla_scadenza' | 'esito' | 'sla_rispettato'>; ora?: Date; soglia?: number; regola?: string }) {
   if (p.esito !== 'aperta') return p.sla_rispettato == null ? null : <span className={`ct-sla ${p.sla_rispettato ? 'verde' : 'rosso'}`}>{p.sla_rispettato ? 'SLA rispettato' : 'SLA mancato'}</span>;
-  const s = semaforo(p.created_at, p.sla_scadenza, ora, soglia);
-  if (s === 'nessuno') return <span className="ct-sla nessuno">senza scadenza</span>;
-  return <span className={`ct-sla ${s}`} title={p.sla_scadenza ? `Scadenza ${fmtOra(p.sla_scadenza)}` : ''}><i />{testoResiduo(p.sla_scadenza, ora)}</span>;
+  return <Conto inizio={p.created_at} scadenza={p.sla_scadenza} regola={regola} soglia={soglia} />;
 }
 
 export const nomeStadio = (f: Flusso | undefined, k: string | null) => stadioDi(f, k)?.nome ?? k ?? '';
@@ -49,9 +75,9 @@ export function CardPratica({ p, f, ora, base, onAvanza, soglia }: { p: Pratica;
       <Link to={`${base}/pratica/${p.id}`} className="ct-card-main">
         <span className="ct-card-ic"><Ic n={urg && p.tipo === 'manutenzione' ? 'allarme' : iconaTipo(p.tipo)} /></span>
         <span className="ct-card-body">
-          <span className="ct-card-top"><b className="ct-card-cli">{p.cliente_nome}</b><SlaChip p={p} ora={ora} soglia={soglia} /></span>
+          <span className="ct-card-top"><b className="ct-card-cli">{p.cliente_nome}</b><SlaChip p={p} soglia={soglia} regola={regolaDi(f, p)} /></span>
           <span className="ct-card-sub">
-            <span className="ct-num">{p.numero}</span> · {NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''}
+            <span className="ct-num">{p.numero}</span> · {NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''}{p.stato_cliente ? <span className={`ct-mini ${p.stato_cliente}`}>{STATI_CLIENTE[p.stato_cliente][1]}</span> : null}
           </span>
           <span className="ct-card-meta">
             <span className="ct-stadio">{nomeStadio(f, p.stato_corrente)}</span>
@@ -98,6 +124,10 @@ const TITOLO_EV: Record<string, string> = {
 const NOMI_CAMPI: Record<string, string> = { cliente_nome: 'Cliente', cliente_codice: 'Codice', sede: 'Sede', contatto_nome: 'Contatto', telefono: 'Telefono', email: 'Email', indirizzo: 'Indirizzo', cap: 'CAP', comune: 'Comune', descrizione: 'Descrizione', priorita: 'Priorità', importo_stimato: 'Importo', tacitazione_tentata: 'Tacitazione tentata', alert_taylor: 'Alert su Taylor' };
 
 export function Timeline({ eventi, f, onApri }: { eventi: Evento[]; f?: Flusso; onApri?: (path: string) => void }) {
+  // tempo passato nella fase precedente (dall'ingresso nel passo precedente a questo avanzamento)
+  const fasi = new Map<number, number>();
+  let prec: Evento | null = null;
+  for (const e of eventi) if (e.tipo === 'creata' || e.tipo === 'stato') { if (prec && e.tipo === 'stato') fasi.set(e.id, (new Date(e.at).getTime() - new Date(prec.at).getTime()) / 1000); prec = e; }
   return (
     <ol className="ct-tl">
       {[...eventi].reverse().map(e => {
@@ -114,7 +144,7 @@ export function Timeline({ eventi, f, onApri }: { eventi: Evento[]; f?: Flusso; 
         return (
           <li key={e.id} className={`ct-tl-i t-${e.tipo}`}>
             <span className="ct-tl-dot" />
-            <div className="ct-tl-h"><b>{TITOLO_EV[e.tipo] ?? e.tipo}</b><span className="sub">{fmtOra(e.at)} · {e.autore_nome ?? 'Sistema'}</span></div>
+            <div className="ct-tl-h"><b>{TITOLO_EV[e.tipo] ?? e.tipo}</b><span className="sub">{fmtOra(e.at)} · {e.autore_nome ?? 'Sistema'}</span>{fasi.has(e.id) && <span className="ct-fase" title="Tempo passato nella fase precedente">⏱ {orologio(fasi.get(e.id)!)} in «{nomeStadio(f, e.da_stato)}»</span>}</div>
             {corpo && <div className="ct-tl-c">{corpo}</div>}
           </li>);
       })}

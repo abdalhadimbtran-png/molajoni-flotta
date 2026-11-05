@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { rpc, testoErrore } from '../lib/supabase';
-import { Banner, Modal } from '../ui';
+import { Banner, Modal, toast } from '../ui';
 import { CANALI, REGOLA_ANAGRAFICA, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, richiedeAppuntamento, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
 import { giornoRoma, lavorativo, prossimoLavorativo, scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla';
 import { salvaAppunti, useConfig } from './comune';
@@ -8,6 +8,7 @@ import Appunti from './Appunti';
 import { Ic, iconaCanale } from './componenti';
 
 interface Cliente { codice: string | null; nome: string; stato_cliente?: StatoCliente | null; sedi?: number; fonte: 'taylor' | 'pratiche'; contatto?: string | null; telefono?: string | null; email?: string | null; indirizzo?: string | null; cap?: string | null; comune?: string | null }
+interface Contatto { id: number; contatto_nome: string | null; ruolo: string | null; telefono: string | null; cellulare: string | null; email: string | null; preferito: boolean; sede: string | null }
 interface Sede { impianto: string; indirizzo: string; cap: string | null; comune: string | null }
 
 /** Primo obiettivo SLA del flusso (per l'anteprima nel modulo). */
@@ -30,6 +31,9 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
   const [sugg, setSugg] = useState<Cliente[]>([]);
   const [sedi, setSedi] = useState<Sede[]>([]);
   const [sede, setSede] = useState('');
+  const [contatti, setContatti] = useState<Contatto[]>([]);
+  const [contattoId, setContattoId] = useState<number | null>(null);
+  const [aggiornaRubrica, setAggiornaRubrica] = useState(true);
   const [f, setF] = useState({ contatto_nome: '', telefono: '', email: '', indirizzo: '', cap: '', comune: '', descrizione: '', commerciale: '' });
   const [data, setData] = useState('');
   const [fascia, setFascia] = useState<'' | 'mattina' | 'pomeriggio'>('');
@@ -81,7 +85,17 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
     setCli(c); setQ(c.nome); setSugg([]); setSede('');
     setF(x => ({ ...x, contatto_nome: x.contatto_nome || c.contatto || '', telefono: x.telefono || c.telefono || '', email: x.email || c.email || '', indirizzo: c.indirizzo || x.indirizzo, cap: c.cap || x.cap, comune: c.comune || x.comune }));
     if (c.codice && c.fonte === 'taylor') rpc<Sede[]>('centralino_sedi', { p_codice: c.codice }).then(setSedi, () => setSedi([])); else setSedi([]);
+    // rubrica: preferito o più recente subito nei campi
+    rpc<Contatto[]>('centralino_contatti', { p_codice: c.codice, p_nome: c.nome }).then(l => { setContatti(l); if (l[0]) usaContatto(l[0]); else setContattoId(null); }, () => setContatti([]));
   }
+  function usaContatto(k: Contatto | undefined) {
+    if (!k) { setContattoId(null); return; }
+    setContattoId(k.id);
+    setF(x => ({ ...x, contatto_nome: k.contatto_nome ?? '', telefono: k.cellulare ?? k.telefono ?? '', email: k.email ?? '' }));
+  }
+  const scelto = contatti.find(k => k.id === contattoId);
+  const norm = (t: string) => t.replace(/[^0-9]/g, '').replace(/^(0039|39)(?=\d{6,})/, '');
+  const cambiato = !!scelto && (norm(f.telefono) !== norm(scelto.cellulare ?? scelto.telefono ?? '') || f.email.trim().toLowerCase() !== (scelto.email ?? '') || f.contatto_nome.trim() !== (scelto.contatto_nome ?? ''));
   function scegliSede(imp: string) {
     setSede(imp);
     const s = sedi.find(x => x.impianto === imp);
@@ -112,6 +126,7 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
         commerciale_nome: tipo === 'offerta_grande' ? f.commerciale || null : null, nessuno_disponibile: tipo === 'offerta_grande' && nessunoEff,
         stato_cliente: statoMan ? stato : null,
       } });
+      if (cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
       if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
       // > 1.000 €: commerciale disponibile → trasferisci la chiamata; nessuno → email di presa in carico (richiamo 2 ore già creato)
       onCreata(r.id, tipo === 'offerta_grande' ? (nessunoEff ? 'email=presa_offerta_grande' : 'trasferisci=1') : trasf ? 'trasferisci=1' : '');
@@ -186,10 +201,16 @@ export default function NuovoContatto({ onClose, onCreata }: { onClose: () => vo
                 {sedi.map(s => <option key={s.impianto} value={s.impianto}>{[s.indirizzo, s.comune].filter(Boolean).join(', ')} · {s.impianto}</option>)}
               </select></div>)}
           <div className="ct-griglia">
+            {contatti.length > 0 && <div className="field"><label htmlFor="ct-rub">Contatto in rubrica</label>
+              <select id="ct-rub" value={contattoId ?? ''} onChange={e => { const k = contatti.find(x => x.id === Number(e.target.value)); if (k) usaContatto(k); else { setContattoId(null); setF({ ...f, contatto_nome: '', telefono: '', email: '' }); } }}>
+                {contatti.map(k => <option key={k.id} value={k.id}>{[k.contatto_nome || 'Senza nome', k.ruolo, k.cellulare || k.telefono, k.preferito ? '★' : ''].filter(Boolean).join(' · ')}</option>)}
+                <option value="">+ Nuovo contatto per questo cliente</option>
+              </select></div>}
             <div className="field"><label htmlFor="ct-con">Persona di contatto</label><input id="ct-con" value={f.contatto_nome} onChange={e => setF({ ...f, contatto_nome: e.target.value })} /></div>
             <div className="field"><label htmlFor="ct-tel">Telefono</label><input id="ct-tel" type="tel" value={f.telefono} onChange={e => setF({ ...f, telefono: e.target.value })} /></div>
             <div className="field"><label htmlFor="ct-em">Email</label><input id="ct-em" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
           </div>
+          {cambiato && <label className="check ct-agg-rub"><input type="checkbox" checked={aggiornaRubrica} onChange={e => setAggiornaRubrica(e.target.checked)} /> Aggiorna anche nell'anagrafica del cliente? (resta nella storia e conta come aggiornamento anagrafica)</label>}
           {!sede && (tipo === 'manutenzione' || tipo === 'sopralluogo') && (
             <div className="ct-griglia">
               <div className="field"><label htmlFor="ct-ind">Indirizzo</label><input id="ct-ind" value={f.indirizzo} onChange={e => setF({ ...f, indirizzo: e.target.value })} /></div>

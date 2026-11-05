@@ -6,10 +6,11 @@ import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui'
 import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 import { ESTENSIONI, apriAllegato, caricaAllegato, pratica, useAdesso, useAggiornamento, useConfig } from './comune';
-import { Ic, SlaChip, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
+import { Ic, SlaChip, Trascorso, regolaDi, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
 import Avanza, { avanzaDiretto, prossimoDi } from './Avanza';
 import Appunti from './Appunti';
 import ModaleEmail from './ModaleEmail';
+import EmailTrasferimento from './EmailTrasferimento';
 import { ModaleTrasferimento, RigaTrasf, segnaRichiamato, trasferimenti } from './Trasferimento';
 import { useCtx } from './ShellCentralino';
 
@@ -82,7 +83,8 @@ export default function Pratica() {
         <span className="ct-testa-ic"><Ic n={p.priorita === 'urgente' && p.tipo === 'manutenzione' ? 'allarme' : iconaTipo(p.tipo)} size={26} /></span>
         <div className="ct-testa-c">
           <div className="ct-testa-r"><span className="ct-num">{p.numero}</span><Pill s={ESITI[p.esito][0] as 'ok'}>{ESITI[p.esito][1]}</Pill>
-            {p.priorita === 'urgente' && <span className="ct-sla rosso">urgente</span>}<SlaChip p={p} ora={ora} soglia={Number(config.impostazioni.soglia_arancio)} /></div>
+            {p.priorita === 'urgente' && <span className="ct-sla rosso">urgente</span>}<SlaChip p={p} regola={regolaDi(f, p)} /><Trascorso da={p.created_at} fino={p.closed_at} /></div>
+          {aperta && regolaDi(f, p) && <div className="sub ct-regola">Procedura: {regolaDi(f, p)}</div>}
           <h1>{p.cliente_nome}</h1>
           <div className="sub">{NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''} · <Ic n={iconaCanale(p.canale)} size={14} /> {nomeCanale(p.canale)} · {fmtOra(p.created_at)}</div>
         </div>
@@ -159,7 +161,7 @@ export default function Pratica() {
       {modale === 'dati' && <ModaleDati p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'chiudi' && <ModaleChiudi p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'trasf' && <ModaleTrasferimento pratica={p} onClose={() => setModale('')} onFatto={fatto} />}
-      {riep && <ModaleEmail trasf={riep} pratica={p} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
+      {riep && <EmailTrasferimento trasf={riep} pratica={p} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
     </div>
   );
 }

@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { ESITI_TRASF, NOME_TIPO, senzaRiepilogo, type Commerciale, type EsitoTrasf, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
+import { ESITI_TRASF, NOME_TIPO, senzaCliente, senzaReferente, senzaRiepilogo, type Commerciale, type EsitoTrasf, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
 import { daRoma, giornoRoma, partiRoma, prossimoLavorativo, scadenzaSla, semaforo, testoResiduo } from '../lib/centralino/sla';
 import { useAdesso, useAggiornamento, useConfig } from './comune';
-import ModaleEmail from './ModaleEmail';
+import EmailTrasferimento from './EmailTrasferimento';
 import { useCtx } from './ShellCentralino';
+import { Conto } from './componenti';
 
 const ARGOMENTI = ['Offerta ≤ 1.000 €', 'Offerta > 1.000 €', 'Sopralluogo', 'Manutenzione / guasto', 'Fatture / amministrazione', 'Fornitori', 'Reclamo', 'Informazione'];
 type Entro = '30m' | '1h' | '2h' | 'pom' | 'dom' | 'scelta';
@@ -45,7 +46,7 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
   const [tipo, setTipo] = useState(pratica ? NOME_TIPO[pratica.tipo] : '');
   const [arg, setArg] = useState('');
   const [esito, setEsito] = useState<EsitoTrasf | ''>('');
-  const [entro, setEntro] = useState<Entro | ''>('');
+  const [entro, setEntro] = useState<Entro | ''>('2h');
   const [scelta, setScelta] = useState('');
   const [cli, setCli] = useState({ nome: pratica?.cliente_nome ?? '', telefono: pratica?.telefono ?? '', email: pratica?.email ?? '' });
   const [err, setErr] = useState<string | null>(null); const [invio, setInvio] = useState(false);
@@ -70,7 +71,7 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
       setRiepilogo(data as Trasferimento); // email di riepilogo obbligatoria
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
-  if (riepilogo) return <ModaleEmail trasf={riepilogo} pratica={pratica} onClose={onFatto} onFatto={onFatto} />;
+  if (riepilogo) return <EmailTrasferimento trasf={riepilogo} pratica={pratica} onClose={onFatto} onFatto={onFatto} />;
   return (
     <Modal titolo="Chiamata per un responsabile" onClose={onClose}>
       <form className="form" onSubmit={salva}>
@@ -127,8 +128,8 @@ export function RigaTrasf({ t, ora, onRichiamato, onRiepilogo, base }: { t: Tras
       </div>
       <div className="ct-trasf-dx">
         <Pill s={t.modalita === 'richiamo' ? 'info' : t.esito === 'risposto' ? 'ok' : 'warn'}>{t.modalita === 'richiamo' ? 'Non disponibile' : ESITI_TRASF[t.esito]}</Pill>
-        {senzaRiepilogo(t) && (onRiepilogo ? <button className="ct-flag-email" onClick={() => onRiepilogo(t)}>Email di riepilogo non inviata</button> : <span className="ct-flag-email">Email di riepilogo non inviata</span>)}
-        {aperto && <span className={`ct-sla ${s}`}><i />{testoResiduo(t.richiamo_scadenza, ora)}</span>}
+        {senzaRiepilogo(t) && (() => { const txt = [senzaReferente(t) && 'al referente', senzaCliente(t) && 'al cliente'].filter(Boolean).join(' e '); return onRiepilogo ? <button className="ct-flag-email" onClick={() => onRiepilogo(t)}>Email {txt} non inviata</button> : <span className="ct-flag-email">Email {txt} non inviata</span>; })()}
+        {aperto && <Conto inizio={t.at} scadenza={t.richiamo_scadenza} regola={t.modalita === 'richiamo' ? `richiamo promesso ${t.entro_testo ?? ''}` : 'richiamo entro 2 ore'} />}
         {t.richiamato_at && <span className="sub">richiamato {fmtOra(t.richiamato_at)}{t.richiamato_da ? ` · ${t.richiamato_da}` : ''}</span>}
         {aperto && onRichiamato && <button className="btn-ghost btn-sm" onClick={() => onRichiamato(t)}>Richiamato</button>}
       </div>
@@ -168,7 +169,7 @@ export default function Trasferimenti() {
       <h2 className="section-title">Tutte</h2>
       {data.filter(t => !aperti.includes(t) && !senza.includes(t)).map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} />)}
       {nuovo && <ModaleTrasferimento onClose={() => setNuovo(false)} onFatto={() => { setNuovo(false); reload(); }} />}
-      {riep && <ModaleEmail trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
+      {riep && <EmailTrasferimento trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daRoma, giornoRoma, scadenzaSla, semaforo, testoResiduo } from './sla';
+import { conto, daRoma, giornoRoma, orologio, riapertura, scadenzaSla, secondiUfficio, semaforo, testoRegola, testoResiduo } from './sla';
 import { compila, segnaposto } from './modelli';
 import { calcolaKpi, calcolaTrasf } from './kpi';
 
@@ -99,5 +99,28 @@ describe('kpi trasferimenti', () => {
     expect(k.scaduti).toBe(1);
     expect(k.senzaEmail).toBe(1);
     expect(k.perDestinatario.A.tot).toBe(2);
+  });
+});
+
+describe('conto alla rovescia', () => {
+  it('formati', () => {
+    expect(orologio(47 * 60 + 12)).toBe('47:12');
+    expect(orologio(3 * 3600 + 5)).toBe('3:00:05');
+    expect(orologio(86400 + 3 * 3600)).toBe('1 g 03 h');
+    expect(testoRegola({ tipo: 'minuti', valore: 60 })).toBe('entro 60 min');
+    expect(testoRegola({ tipo: 'stesso_giorno' })).toBe('in giornata');
+  });
+  it('si ferma fuori orario e nel weekend', () => {
+    // venerdì 17:00 → lunedì 09:00: 30 min venerdì + 30 lunedì = 3600 s
+    expect(secondiUfficio(R(2026, 11, 6, 17), R(2026, 11, 9, 9), FEST)).toBe(3600);
+    expect(riapertura(R(2026, 11, 7, 11), FEST)).toEqual(R(2026, 11, 9, 8, 30));
+    expect(riapertura(R(2026, 11, 5, 10), FEST)).toBeNull();
+    const c = conto(R(2026, 11, 6, 17), R(2026, 11, 9, 9), R(2026, 11, 7, 11), FEST)!;
+    expect(c.testo).toBe('mancano 30:00');
+    expect(c.pausa).toBe('in pausa fino a lun 08:30');
+  });
+  it('dopo la scadenza conta il ritardo in rosso', () => {
+    const c = conto(R(2026, 11, 5, 9), R(2026, 11, 5, 10), R(2026, 11, 5, 10, 18), FEST)!;
+    expect(c).toMatchObject({ testo: 'in ritardo da 00:18', colore: 'rosso', scaduto: true });
   });
 });

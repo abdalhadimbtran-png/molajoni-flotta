@@ -2,29 +2,38 @@ import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
-import { Caricamento, Errore, useLoad } from '../ui';
+import { Errore, useLoad } from '../ui';
 import { useT } from '../lib/i18n';
 import { NOME_TIPO, STATI_CLIENTE, nomeCanale, type Evento, type Pratica, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
-import { calcolaKpi, calcolaTrasf, durata } from '../lib/centralino/kpi';
+import { linkAnalisi } from '../lib/centralino/registro';
+import { calcolaKpi, durata } from '../lib/centralino/kpi';
+import { Scheletro } from './Scheletro';
+import type { Dataset } from '../lib/centralino/registro';
+import { Tessera } from './Tessera';
+import KpiTrasferimenti from './KpiTrasferimenti';
 import { semaforo, testoResiduo } from '../lib/centralino/sla';
 import { CAMPI_PRATICA, useAdesso, useAggiornamento, useConfig } from './comune';
 import { nomeStadio } from './componenti';
-import { RigaTrasf, daRichiamare } from './Trasferimento';
+import { trasferimenti } from './Trasferimento';
 import { useCtx } from './ShellCentralino';
 
-export interface DatiPeriodo { pratiche: Pratica[]; eventi: (Evento & { pratiche?: { numero: string; cliente_nome: string } | null })[]; aperte: Pratica[]; trasf: Trasferimento[] }
+export interface DatiPeriodo extends Dataset { pratiche: Pratica[]; eventi: (Evento & { pratiche?: { numero: string; cliente_nome: string } | null })[]; aperte: Pratica[]; trasf: Trasferimento[]; chiuse: Pratica[] }
 
-/** Pratiche create nel periodo + eventi + tutte le aperte + trasferimenti (base di KPI e report). */
+/** Pratiche create nel periodo + chiuse nel periodo + eventi + tutte le aperte + trasferimenti + contatti informativi: base di KPI, dettagli e report. */
 export async function datiPeriodo(da: string, a: string): Promise<DatiPeriodo> {
   const fine = `${a}T23:59:59`, ini = `${da}T00:00:00`;
-  const [p, e, ap, t] = await Promise.all([
+  const [p, e, ap, t, inf, ch, ag] = await Promise.all([
     supabase.from('pratiche').select(CAMPI_PRATICA).gte('created_at', ini).lte('created_at', fine).limit(5000),
     supabase.from('pratiche_eventi').select('*, pratiche(numero,cliente_nome)').gte('at', ini).lte('at', fine).order('at', { ascending: false }).limit(5000),
     supabase.from('pratiche').select(CAMPI_PRATICA).eq('esito', 'aperta').limit(2000),
     supabase.from('chiamate_trasferite').select('*').gte('at', ini).lte('at', fine).order('at', { ascending: false }).limit(5000),
+    supabase.from('centralino_chiamate_info').select('*').gte('at', ini).lte('at', fine).limit(5000),
+    supabase.from('pratiche').select(CAMPI_PRATICA).gte('closed_at', ini).lte('closed_at', fine).limit(5000),
+    supabase.from('clienti_contatti_storia').select('contatto_id,at,campo,a,autore_nome').gte('at', ini).lte('at', fine).neq('campo', 'nuovo').limit(5000),
   ]);
-  const err = p.error || e.error || ap.error || t.error; if (err) throw err;
-  return { pratiche: (p.data ?? []) as Pratica[], eventi: (e.data ?? []) as DatiPeriodo['eventi'], aperte: (ap.data ?? []) as Pratica[], trasf: (t.data ?? []) as Trasferimento[] };
+  const err = p.error || e.error || ap.error || t.error || inf.error || ch.error || ag.error; if (err) throw err;
+  return { pratiche: (p.data ?? []) as Pratica[], eventi: (e.data ?? []) as DatiPeriodo['eventi'], aperte: (ap.data ?? []) as Pratica[], trasf: (t.data ?? []) as Trasferimento[],
+    info: (inf.data ?? []) as Dataset['info'], chiuse: (ch.data ?? []) as Pratica[], agg: (ag.data ?? []) as Dataset['agg'] };
 }
 const pc = (n: number | null) => (n == null ? '—' : `${n}%`);
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -41,12 +50,11 @@ export default function Direzione() {
     if (per === 'mese') return [iso(new Date(o.getFullYear(), o.getMonth(), 1)), iso(o)];
     return [iso(new Date(Date.now() - (Number(per) - 1) * 864e5)), iso(o)];
   }, [per]);
-  const { data, errore, reload } = useLoad(() => datiPeriodo(da, a), [da, a]);
+  const { data, errore, reload } = useLoad(async () => ({ ...(await datiPeriodo(da, a)), trend: await trasferimenti(new Date(Date.now() - 30 * 864e5).toISOString()) }), [da, a, ctx.versione]);
   const r = useCallback(() => { reload(); }, [reload]); useAggiornamento(r);
   const k = useMemo(() => (data ? calcolaKpi(data.pratiche, data.eventi) : null), [data]);
-  const kt = useMemo(() => (data ? calcolaTrasf(data.trasf, ora) : null), [data, ora]);
   if (errore) return <Errore testo={errore} onRetry={reload} />;
-  if (!data || !k || !kt || !config) return <Caricamento />;
+  if (!data || !k || !config) return <Scheletro tessere={6} righe={8} />;
   const fl = (t: string) => config.flussi.find(f => f.tipo === t);
   const scadute = data.aperte.filter(p => semaforo(p.created_at, p.sla_scadenza, ora) === 'rosso').sort((x, y) => (x.sla_scadenza ?? '').localeCompare(y.sla_scadenza ?? ''));
   const stadi = [...new Set(config.flussi.flatMap(f => f.stadi.slice(1).map(s => s.key)))];
@@ -61,21 +69,19 @@ export default function Direzione() {
         </div></div>
 
       <div className="kpis">
-        <div className="kpi"><div className="num">{k.totale}</div><div className="lbl">Contatti (pratiche)</div><div className="sub">{k.aperte} aperte · {k.chiuse} chiuse</div></div>
-        <div className={`kpi ${k.slaPct != null && k.slaPct < 80 ? 'warn' : 'ok'}`}><div className="num">{pc(k.slaPct)}</div><div className="lbl">SLA rispettati</div></div>
-        <div className="kpi"><div className="num">{pc(k.offerte60Pct)}</div><div className="lbl">Offerte ≤ 1.000 € inviate entro 60 min</div></div>
-        <div className="kpi"><div className="num">{pc(k.sopralluoghi2ggPct)}</div><div className="lbl">Sopralluoghi entro 2 giorni lav.</div></div>
-        <div className="kpi"><div className="num">{pc(k.allarmiPct)}</div><div className="lbl">Allarmi gestiti in giornata</div></div>
-        <div className={`kpi ${scadute.length ? 'ko' : 'ok'}`}><div className="num">{scadute.length}</div><div className="lbl">Pratiche in ritardo ora</div></div>
-        <div className="kpi"><div className="num">{pc(kt.rispostiPct)}</div><div className="lbl">Trasferimenti risposti</div><div className="sub">{kt.totale} chiamate per responsabili</div></div>
-        <div className={`kpi ${kt.scaduti ? 'ko' : ''}`}><div className="num">{pc(kt.richiamatiInTempoPct)}</div><div className="lbl">Richiamati entro la scadenza</div><div className="sub">{kt.aperti} da richiamare · {kt.scaduti} scaduti</div></div>
-        <div className={`kpi ${kt.senzaEmail ? 'warn' : 'ok'}`}><div className="num">{pc(kt.emailPct)}</div><div className="lbl">Chiamate con email di riepilogo</div><div className="sub">{kt.senzaEmail} senza</div></div>
+        <Tessera id="pratiche" d={data} da={da} a={a} sub={<>{k.aperte} aperte · {k.chiuse} chiuse</>} />
+        <Tessera id="sla" d={data} da={da} a={a} soglia={80} />
+        <Tessera id="offerte60" d={data} da={da} a={a} />
+        <Tessera id="sopralluoghi2" d={data} da={da} a={a} />
+        <Tessera id="allarmi" d={data} da={da} a={a} />
+        <Tessera id="in_ritardo" d={data} da={da} a={a} rossoSe />
       </div>
+      <KpiTrasferimenti d={data} da={da} a={a} base={ctx.base} trend={data.trend} />
 
       <div className="ct-dir-g">
-        <section className="ct-blocco"><h2>Per canale</h2><Barre v={Object.entries(k.perCanale).map(([x, n]) => [nomeCanale(x), n])} /></section>
-        <section className="ct-blocco"><h2>Per tipo</h2><Barre v={Object.entries(k.perTipo).map(([x, n]) => [NOME_TIPO[x as 'manutenzione'] ?? x, n])} /></section>
-        <section className="ct-blocco"><h2>Per stato del cliente</h2><Barre v={(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(x => [STATI_CLIENTE[x][1], k.perStatoCliente[x] ?? 0])} /></section>
+        <section className="ct-blocco"><h2>Per canale</h2><Barre v={Object.entries(k.perCanale).map(([x, n]) => [nomeCanale(x), n, linkAnalisi(ctx.base, 'pratiche', da, a, { canale: x })])} /></section>
+        <section className="ct-blocco"><h2>Per tipo</h2><Barre v={Object.entries(k.perTipo).map(([x, n]) => [NOME_TIPO[x as 'manutenzione'] ?? x, n, linkAnalisi(ctx.base, 'pratiche', da, a, { tipo: x })])} /></section>
+        <section className="ct-blocco"><h2>Per stato del cliente</h2><Barre v={(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(x => [STATI_CLIENTE[x][1], k.perStatoCliente[x] ?? 0, linkAnalisi(ctx.base, 'pratiche', da, a, { stato: x })])} /></section>
         <section className="ct-blocco"><h2>Tempi medi per passo</h2>
           <table className="ct-tab"><tbody>{stadi.filter(s => k.tempiMedi[s] != null).map(s => <tr key={s}><td>{nomeSt(s)}</td><td className="num">{durata(k.tempiMedi[s])}</td></tr>)}</tbody></table>
           {!stadi.some(s => k.tempiMedi[s] != null) && <p className="ct-vuoto">Nessun dato nel periodo.</p>}</section>
@@ -83,12 +89,12 @@ export default function Direzione() {
 
       <section className="ct-blocco"><h2>Funnel offerte</h2>
         <div className="ct-funnel">
-          {([['Richieste', F.richieste], ['Inviate', F.inviate], ['Accettate', F.accettate], ['Contratti', F.contratti]] as const).map(([l, n]) => (
-            <div key={l} className="ct-funnel-r"><span>{l}</span><span className="ct-funnel-b"><i style={{ width: `${(n / maxF) * 100}%` }} /></span><b>{n}</b></div>))}
+          {([['Richieste', F.richieste, 'off_richieste'], ['Inviate', F.inviate, 'off_inviate'], ['Accettate', F.accettate, 'off_accettate'], ['Contratti', F.contratti, 'off_contratti']] as const).map(([l, n, id]) => (
+            <Link key={l} to={linkAnalisi(ctx.base, id, da, a)} className="ct-funnel-r ct-clic"><span>{l}</span><span className="ct-funnel-b"><i style={{ width: `${(n / maxF) * 100}%` }} /></span><b>{n}</b></Link>))}
         </div>
         <p className="sub">Conversione (accettate / inviate): <b>{pc(F.conversionePct)}</b> · Valore richiesto {fmtEuro(F.valoreRichieste)} · accettato {fmtEuro(F.valoreAccettate)}</p>
         <table className="ct-tab"><thead><tr><th>Cliente</th><th>Richieste</th><th>Inviate</th><th>Accettate</th><th>Valore</th></tr></thead>
-          <tbody>{(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(s => { const x = k.funnelPerStato[s]; return <tr key={s}><td>{STATI_CLIENTE[s][1]}</td><td>{x.richieste}</td><td>{x.inviate}</td><td>{x.accettate}</td><td>{fmtEuro(x.valore)}</td></tr>; })}</tbody></table>
+          <tbody>{(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(s => { const x = k.funnelPerStato[s]; const L = (id: string, n: number) => <Link to={linkAnalisi(ctx.base, id, da, a, { stato: s })}>{n}</Link>; return <tr key={s}><td>{STATI_CLIENTE[s][1]}</td><td>{L('off_richieste', x.richieste)}</td><td>{L('off_inviate', x.inviate)}</td><td>{L('off_accettate', x.accettate)}</td><td>{fmtEuro(x.valore)}</td></tr>; })}</tbody></table>
       </section>
 
       <div className="ct-dir-g">
@@ -97,11 +103,6 @@ export default function Direzione() {
             {scadute.map(p => <tr key={p.id}><td><Link to={`${ctx.base}/pratica/${p.id}`}><b>{p.cliente_nome}</b></Link><div className="sub">{p.numero} · {NOME_TIPO[p.tipo]}</div></td>
               <td>{nomeStadio(fl(p.tipo), p.sla_stadio)}<div className="sub">ora: {nomeStadio(fl(p.tipo), p.stato_corrente)}</div></td><td className="ko-t">{testoResiduo(p.sla_scadenza, ora)}</td><td>{p.assegnato_nome ?? '—'}</td></tr>)}
           </tbody></table> : <p className="ct-vuoto">Nessuna pratica in ritardo.</p>}</section>
-        <section className="ct-blocco"><h2>Trasferimenti per destinatario</h2>
-          <table className="ct-tab"><thead><tr><th>Destinatario</th><th>Chiamate</th><th>Risposti</th><th>Richiamati in tempo</th><th>Aperti</th></tr></thead>
-            <tbody>{Object.entries(kt.perDestinatario).sort((x, y) => y[1].tot - x[1].tot).map(([n, d]) => <tr key={n}><td>{n}</td><td>{d.tot}</td><td>{d.risposti}</td><td>{d.richiami ? `${d.inTempo}/${d.richiami}` : '—'}</td><td className={d.aperti ? 'ko-t' : ''}>{d.aperti}</td></tr>)}</tbody></table>
-          {daRichiamare(data.trasf).length > 0 && <><h3 className="sub">Non richiamati</h3>{daRichiamare(data.trasf).map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} />)}</>}
-        </section>
       </div>
 
       <section className="ct-blocco"><h2>Ultimi movimenti</h2>
@@ -114,10 +115,13 @@ export default function Direzione() {
   );
 }
 
-function Barre({ v }: { v: [string, number][] }) {
+export function Barre({ v }: { v: [string, number, string?][] }) {
   const max = Math.max(1, ...v.map(x => x[1]));
   if (!v.length) return <p className="ct-vuoto">Nessun dato.</p>;
-  return <div className="ct-barre">{v.sort((a, b) => b[1] - a[1]).map(([l, n]) => <div key={l} className="ct-barra"><span>{l}</span><span className="ct-funnel-b"><i style={{ width: `${(n / max) * 100}%` }} /></span><b>{n}</b></div>)}</div>;
+  return <div className="ct-barre">{[...v].sort((a, b) => b[1] - a[1]).map(([l, n, to]) => {
+    const r = <><span>{l}</span><span className="ct-funnel-b"><i style={{ width: `${(n / max) * 100}%` }} /></span><b>{n}</b></>;
+    return to ? <Link key={l} to={to} className="ct-barra ct-clic">{r}</Link> : <div key={l} className="ct-barra">{r}</div>;
+  })}</div>;
 }
 
 /** Scheda nella panoramica dell'amministratore. */

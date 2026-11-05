@@ -4,12 +4,13 @@ import { Banner, Caricamento, Errore, toast, useLoad } from '../ui';
 import type { Flusso } from '../lib/centralino/tipi';
 import { config as ricaricaConfig } from './comune';
 import { useCtx } from './ShellCentralino';
+import ImportaClienti from './ImportaClienti';
 
 interface Riga { chiave: string; valore: unknown; descrizione: string | null }
 const NOMI: Record<string, string> = {
   orario: 'Orario d\'ufficio', soglia_arancio: 'Soglia arancio', cc_offerte_grandi: 'Copia per offerte > 1.000 €', amministrazione: 'Amministrazione', fornitori: 'Fornitori',
   commerciali: 'Commerciali', responsabili_info: 'Responsabili (informazioni)', firma: 'Firma email', sostituto: 'Sostituto del centralino',
-  mesi_cliente_attivo: 'Mesi per «cliente attivo»', trasferimento_sla: 'Tempo per richiamare (trasferimenti)', destinatari_trasferimento: 'Destinatari dei trasferimenti',
+  mesi_cliente_attivo: 'Mesi per «cliente attivo»', commerciali_offerte_grandi: 'Commerciali per offerte > 1.000 € (email = account)', motivi_annullamento: 'Motivi di annullamento', motivi_senza_email: 'Motivi «email non disponibile»', motivi_spostamento: 'Motivi di spostamento', trasferimento_sla: 'Tempo per richiamare (trasferimenti)', destinatari_trasferimento: 'Destinatari dei trasferimenti',
 };
 const DESC_SLA = 'sla: {"tipo":"minuti|ore|stesso_giorno|giorni_lav","valore":N,"da":"creazione|ingresso"}';
 
@@ -27,8 +28,9 @@ export default function Impostazioni() {
   return (
     <>
       <div className="page-hero"><div><h1>Flussi e impostazioni</h1><p className="sub">Le modifiche valgono per le pratiche nuove e per i prossimi passi di quelle aperte.</p></div></div>
+      <ImportaClienti scrive={ctx.scrive} mappaSalvata={(data.imp.find(r => r.chiave === 'mappa_import_clienti')?.valore ?? {}) as Record<string, string>} />
       <h2 className="section-title">Impostazioni</h2>
-      <div className="ct-imp">{data.imp.map(r => <Voce key={r.chiave} titolo={NOMI[r.chiave] ?? r.chiave} desc={r.descrizione} valore={r.valore} scrive={ctx.scrive}
+      <div className="ct-imp">{data.imp.filter(r => r.chiave !== 'mappa_import_clienti').map(r => <Voce key={r.chiave} titolo={NOMI[r.chiave] ?? r.chiave} desc={r.descrizione} valore={r.valore} scrive={ctx.scrive}
         salva={async v => { const x = await supabase.from('centralino_impostazioni').update({ valore: v }).eq('chiave', r.chiave); if (x.error) throw x.error; fatto(); }} />)}</div>
       <h2 className="section-title">Flussi (stadi e SLA)</h2>
       <p className="hint">{DESC_SLA}. «azione»: appuntamento | taylor | esito. «template»: codice del modello email suggerito. Non cambiare le chiavi degli stadi già usati.</p>

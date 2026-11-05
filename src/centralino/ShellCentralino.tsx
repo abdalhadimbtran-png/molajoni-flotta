@@ -8,6 +8,19 @@ import { Campanella } from '../formazione/ShellFormazione';
 import { NOME_TIPO, type Pratica } from '../lib/centralino/tipi';
 import { cerca } from './comune';
 import { Ic } from './componenti';
+import { toast } from '../ui';
+
+const SUONO = 'ct_suono_avvisi';
+export const suonoAttivo = () => { try { return localStorage.getItem(SUONO) === '1'; } catch { return false; } };
+/** Suono discreto (due note brevi), solo se attivato dall'utente. */
+export function bip() {
+  try {
+    const C = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext); const a = new C();
+    [660, 880].forEach((f, i) => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0.0001, a.currentTime + i * 0.16);
+      g.gain.exponentialRampToValueAtTime(0.08, a.currentTime + i * 0.16 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + i * 0.16 + 0.14);
+      o.connect(g).connect(a.destination); o.start(a.currentTime + i * 0.16); o.stop(a.currentTime + i * 0.16 + 0.15); });
+  } catch { /* nessun audio */ }
+}
 import NuovoContatto from './NuovoContatto';
 import './centralino.css';
 
@@ -29,6 +42,24 @@ export default function ShellCentralino() {
   // controllo SLA all'apertura (c'è anche il controllo automatico ogni 5 minuti)
   useEffect(() => { if (s.centralino || s.direzione) supabase.rpc('centralino_controlla_sla').then(() => undefined); }, [s.centralino, s.direzione]);
   const scrive = s.centralino && !direzione;
+  const [suono, setSuono] = useState(suonoAttivo);
+  // tempo reale: pratiche, storia, trasferimenti → le pagine si aggiornano da sole; campanella → avviso (e suono se attivo)
+  useEffect(() => {
+    if (!s.sessione || !(s.centralino || s.direzione)) return;
+    let k = 0;
+    const agg = () => { window.clearTimeout(k); k = window.setTimeout(() => setVersione(v => v + 1), 400); };
+    const uid = s.sessione.user.id;
+    const ch = supabase.channel('centralino-vivo')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pratiche' }, agg)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pratiche_eventi' }, agg)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chiamate_trasferite' }, agg)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifiche', filter: `user_id=eq.${uid}` }, msg => {
+        const d = (msg.new as { dati?: { titolo?: string; categoria?: string } }).dati;
+        if (d?.categoria === 'centralino') { toast(d.titolo ?? 'Nuovo avviso'); if (suonoAttivo()) bip(); }
+      })
+      .subscribe();
+    return () => { window.clearTimeout(k); supabase.removeChannel(ch); };
+  }, [s.sessione, s.centralino, s.direzione]);
   // N = nuovo contatto (fuori dai campi di testo)
   useEffect(() => {
     if (!scrive) return;
@@ -76,6 +107,7 @@ export default function ShellCentralino() {
           <Campanella />
         </>}
         menuUtente={<>
+          <button onClick={() => { const n = !suono; setSuono(n); try { localStorage.setItem(SUONO, n ? '1' : '0'); } catch { /* */ } if (n) bip(); }}><Icona n="avvisi" />Suono degli avvisi: {suono ? 'sì' : 'no'}</button>
           {s.admin && <NavLink to="/admin"><Icona n="sicurezza" />Amministrazione</NavLink>}
           <button onClick={() => supabase.auth.signOut()}><Icona n="ritorno" />Esci</button>
         </>}>
@@ -93,6 +125,11 @@ function Ricerca({ base }: { base: string }) {
   const [r, setR] = useState<Pratica[] | null>(null);
   const [sel, setSel] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const inp = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { const t = e.target as HTMLElement; if (e.key === '/' && !t.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); inp.current?.focus(); } };
+    document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
+  }, []);
   useEffect(() => {
     if (q.trim().length < 2) { setR(null); return; }
     const k = window.setTimeout(() => { cerca(q).then(x => { setR(x); setSel(0); }, () => setR([])); }, 220);
@@ -106,7 +143,7 @@ function Ricerca({ base }: { base: string }) {
   return (
     <div className="ct-cerca" ref={box}>
       <Ic n="cerca" size={17} />
-      <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Cliente, telefono, CT-…" aria-label="Cerca pratiche"
+      <input ref={inp} type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca  /  cliente, telefono, CT-…" aria-label="Cerca pratiche"
         onKeyDown={e => {
           if (!r?.length) return;
           if (e.key === 'ArrowDown') { e.preventDefault(); setSel(Math.min(sel + 1, r.length - 1)); }

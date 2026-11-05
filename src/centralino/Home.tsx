@@ -1,18 +1,21 @@
-import { DragEvent, useCallback, useMemo, useState } from 'react';
+import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
-import { Banner, Caricamento, Errore, toast, useLoad } from '../ui';
+import { Banner, Errore, toast, useLoad } from '../ui';
 import { NOME_TIPO, SCRIPT_TELEFONO, indiceStadio, prossimoStadio, type Pratica, type Stadio, type TipoPratica } from '../lib/centralino/tipi';
 import { giornoRoma, semaforo } from '../lib/centralino/sla';
 import { praticheAperte, praticheChiuseDal, useAdesso, useAggiornamento, useConfig } from './comune';
 import { CardPratica, Ic, Vuoto } from './componenti';
 import Avanza, { avanzaDiretto } from './Avanza';
 import { ModaleTrasferimento, RigaTrasf, daRichiamare, segnaRichiamato, trasferimenti } from './Trasferimento';
-import ModaleEmail from './ModaleEmail';
+import EmailTrasferimento from './EmailTrasferimento';
 import { senzaRiepilogo, type Trasferimento } from '../lib/centralino/tipi';
-import { useCtx } from './ShellCentralino';
+import { bip, suonoAttivo, useCtx } from './ShellCentralino';
+import { datiPeriodo } from './Direzione';
+import { Cifra, Tessera } from './Tessera';
+import KpiTrasferimenti from './KpiTrasferimenti';
+import { Scheletro } from './Scheletro';
 
-interface Registro { telefonate: number; whatsapp: number; email: number; offerte_tablet: number; offerte_whatsapp: number; offerte_cliente: number; aggiornamenti_anagrafica: number; chiamate_info: number; pratiche: number; chiuse: number }
 
 const PESO: Record<string, number> = { rosso: 0, arancio: 1, verde: 2, nessuno: 3 };
 
@@ -24,11 +27,12 @@ export default function Home() {
   const { config } = useConfig();
   const inizioGiorno = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); }, []);
   const { data, errore, reload } = useLoad(async () => {
-    const [aperte, chiuse, reg, cop, tr] = await Promise.all([
-      praticheAperte(), praticheChiuseDal(inizioGiorno), rpc<Registro>('centralino_registro_giorno', { p_data: null }),
-      rpc<{ assenti: string[]; sostituto: string }>('centralino_copertura', {}).catch(() => null), trasferimenti(new Date(Date.now() - 7 * 864e5).toISOString()),
+    const g = giornoRoma(new Date());
+    const [aperte, chiuse, oggiD, cop, tr] = await Promise.all([
+      praticheAperte(), praticheChiuseDal(inizioGiorno), datiPeriodo(g, g),
+      rpc<{ assenti: string[]; sostituto: string }>('centralino_copertura', {}).catch(() => null), trasferimenti(new Date(Date.now() - 30 * 864e5).toISOString()),
     ]);
-    return { aperte, chiuse, reg, cop, tr };
+    return { aperte, chiuse, oggiD, cop, tr, g };
   }, [ctx.versione]);
   const ricarica = useCallback(() => { reload(); }, [reload]);
   useAggiornamento(ricarica);
@@ -37,9 +41,21 @@ export default function Home() {
   const [riep, setRiep] = useState<Trasferimento | null>(null);
   const [tipoK, setTipoK] = useState<TipoPratica>('manutenzione');
   const [trascina, setTrascina] = useState<number | null>(null);
+  // avviso quando una pratica diventa rossa mentre la pagina è aperta
+  const rosse = useRef<Set<number> | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    const ora2 = new Date();
+    const ora_rosse = new Set(data.aperte.filter(p => p.sla_scadenza && new Date(p.sla_scadenza) < ora2).map(p => p.id));
+    if (rosse.current) for (const id of ora_rosse) if (!rosse.current.has(id)) {
+      const p = data.aperte.find(x => x.id === id)!; toast(`In ritardo: ${p.cliente_nome} (${p.numero})`);
+      if (suonoAttivo()) bip();
+    }
+    rosse.current = ora_rosse;
+  }, [data, ora]);
 
   if (errore) return <Errore testo={errore} onRetry={reload} />;
-  if (!data || !config) return <Caricamento />;
+  if (!data || !config) return <Scheletro tessere={8} righe={8} />;
   const fl = (t: string) => config.flussi.find(f => f.tipo === t);
   const soglia = Number(config.impostazioni.soglia_arancio) || 0.25;
   const oggi = giornoRoma(ora);
@@ -72,7 +88,6 @@ export default function Home() {
     if (indiceStadio(flK, s.key) !== indiceStadio(flK, p.stato_corrente) + 1) { toast(`Un passo alla volta: il prossimo è «${prossimoStadio(flK, p)?.nome ?? ''}».`); return; }
     avanzaUno(p);
   }
-  const R = data.reg;
 
   return (
     <div className="ct-home">
@@ -86,16 +101,15 @@ export default function Home() {
       </div>
 
       <section className="ct-registro" aria-label="Il mio registro di oggi">
-        <div className="ct-reg-h"><b>Il mio registro di oggi</b><span className="sub">si compila da solo dalle pratiche</span></div>
-        <div className="ct-reg-n">
-          {[['Telefonate', R.telefonate], ['WhatsApp', R.whatsapp], ['Email', R.email], ['Offerte da tablet', R.offerte_tablet], ['Offerte da WA', R.offerte_whatsapp], ['Offerte da cliente', R.offerte_cliente], ['Aggiorn. anagrafica', R.aggiornamenti_anagrafica], ['Chiuse oggi', R.chiuse]].map(([l, n]) => (
-            <div key={l as string}><span className="num">{n}</span><span className="lbl">{l}</span></div>))}
+        <div className="ct-reg-h"><b>Il mio registro di oggi</b><span className="sub">si compila da solo · clic su un numero per l'elenco</span></div>
+        <div className="kpis ct-reg-k">
+          {['reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_tablet', 'reg_wa_offerte', 'reg_cliente', 'reg_anagrafica', 'reg_chiuse'].map(id => <Tessera key={id} id={id} d={data.oggiD} da={data.g} a={data.g} />)}
         </div>
         {ctx.scrive && <div className="ct-reg-q"><span className="sub">Solo informazioni, senza pratica:</span>
           <button className="btn-ghost btn-sm" onClick={() => info('telefono')}>+1 chiamata informativa</button>
           <button className="btn-ghost btn-sm" onClick={() => info('whatsapp')}>+1 WhatsApp</button>
           <button className="btn-ghost btn-sm" onClick={() => info('email')}>+1 email</button>
-          <span className="sub">({R.chiamate_info} oggi)</span></div>}
+          <Cifra id="reg_info" d={data.oggiD} da={data.g} a={data.g} /> <span className="sub">oggi</span></div>}
       </section>
 
       <div className="ct-colonne">
@@ -147,6 +161,8 @@ export default function Home() {
         {ctx.scrive && <p className="hint">Trascina una scheda nella colonna successiva o usa «Prossimo»: un passo alla volta, con i dati che ogni passo richiede.</p>}
       </section>
 
+      <KpiTrasferimenti d={data.oggiD} da={data.g} a={data.g} base={ctx.base} trend={data.tr} />
+
       <section className="ct-blocco ct-altro">
         <h2>Altre attività</h2>
         <div className="row-flex">
@@ -161,7 +177,7 @@ export default function Home() {
       </section>
 
       {avanza && fl(avanza.p.tipo) && <Avanza p={avanza.p} f={fl(avanza.p.tipo)!} onClose={() => setAvanza(null)} onFatto={() => { setAvanza(null); reload(); }} onEmail={t => nav(`${ctx.base}/pratica/${avanza.p.id}${t ? `?email=${t}` : '?email=1'}`)} />}
-      {riep && <ModaleEmail trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
+      {riep && <EmailTrasferimento trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
       {trasf && <ModaleTrasferimento onClose={() => setTrasf(false)} onFatto={() => { setTrasf(false); reload(); }} />}
     </div>
   );

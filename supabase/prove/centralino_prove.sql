@@ -202,3 +202,71 @@ begin
 
   raise exception 'PROVE CENTRALINO OK: %', log;
 end $$;
+
+-- Prove aggiuntive (trasferimenti, email al referente e al cliente, rubrica contatti, anagrafica clienti).
+-- Esito atteso: ERROR «PROVE TRASFERIMENTI OK».
+do $$
+declare
+  c uuid := gen_random_uuid(); d uuid := gen_random_uuid(); r jsonb; tid bigint; pid bigint; n int; cid bigint;
+begin
+  insert into auth.users (instance_id, id, aud, role, email) values
+    ('00000000-0000-0000-0000-000000000000', c, 'authenticated', 'authenticated', 'zz_ct2_c@prova.invalid'),
+    ('00000000-0000-0000-0000-000000000000', d, 'authenticated', 'authenticated', 'zz_ct2_d@prova.invalid');
+  insert into public.responsabili (user_id, nome, email, ruolo, area, attivo, centralino, direzione) values
+    (c, 'ZZ Centralino 2', 'zz_ct2_c@prova.invalid', 'responsabile', 'flotta', true, true, false),
+    (d, 'ZZ Direzione 2', 'zz_ct2_d@prova.invalid', 'responsabile', 'flotta', true, false, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+
+  -- «responsabile non disponibile»: richiamo con scadenza promessa
+  r := public.centralino_trasferisci(jsonb_build_object('cliente_nome', 'ZZ Cliente', 'telefono', '06 1234567', 'destinatario_nome', 'L. Esposito',
+         'modalita', 'richiamo', 'tipo_argomento', 'Offerta > 1.000 €', 'scadenza', now() + interval '2 hours', 'entro_testo', 'entro 2 ore'));
+  tid := (r->>'id')::bigint;
+  if (select richiamo_scadenza is null or esito <> 'richiamera' from public.chiamate_trasferite where id = tid) then raise exception 'Richiamo non registrato'; end if;
+  -- email al referente: senza indirizzo bloccata con messaggio chiaro
+  begin perform public.centralino_trasf_email_referente(tid, '', 'Ogg', '<p>x</p>', 'x', 'resend'); raise exception 'email referente senza indirizzo permessa';
+  exception when others then if sqlerrm not like 'Aggiungi l''email di L. Esposito%' then raise; end if; end;
+  perform public.centralino_trasf_email_referente(tid, 'esposito@prova.invalid', 'Chiamata trasferita', '<p>x</p>', 'x', 'copia');
+  perform public.centralino_trasf_email(tid, 'riepilogo_richiamo', 'cliente@prova.invalid', '{}', 'Presa in carico', '<p>x</p>', 'x', 'copia');
+  if (select email_referente_inviata_at is null or email_cliente_inviata_at is null from public.chiamate_trasferite where id = tid) then raise exception 'Email del trasferimento non registrate'; end if;
+  -- richiamato
+  perform public.centralino_richiamato(tid, 'Fissato sopralluogo');
+  if (select richiamato_at is null or esito_richiamo <> 'Fissato sopralluogo' from public.chiamate_trasferite where id = tid) then raise exception 'Richiamato non registrato'; end if;
+
+  -- rubrica: nuovo contatto da pratica, telefono +39, modifica con storia
+  r := public.centralino_crea('{"canale":"telefono","tipo":"informazione","cliente_nome":"ZZ Rubrica Srl","contatto_nome":"Sig.ra Neri","telefono":"06 555 1234","email":"neri@prova.invalid"}');
+  pid := (r->>'id')::bigint;
+  select id into cid from public.clienti_contatti where cliente_nome = 'ZZ Rubrica Srl';
+  if cid is null or (select telefono from public.clienti_contatti where id = cid) <> '+39065551234' then raise exception 'Contatto non salvato/normalizzato'; end if;
+  perform public.centralino_salva_contatto(jsonb_build_object('id', cid, 'telefono', '333 111 2222', 'motivo', 'Cambiato numero', 'pratica_id', pid));
+  if not exists (select 1 from public.clienti_contatti_storia where contatto_id = cid and campo = 'telefono' and a = '+393331112222') then raise exception 'Storia contatto mancante'; end if;
+  begin perform public.centralino_salva_contatto('{"cliente_nome":"X","email":"non-valida"}'); raise exception 'email non valida accettata';
+  exception when others then if sqlerrm not like 'Email non valida%' then raise; end if; end;
+  if (public.centralino_registro_giorno(null)->>'contatti_aggiornati')::int < 1 then raise exception 'Aggiornamento anagrafica non contato'; end if;
+
+  -- anagrafica clienti: prova senza scrivere, poi import, protezione delle modifiche manuali
+  r := public.centralino_importa_clienti('[{"cod_cliente":"ZZ001","nome":"ZZ Import Spa","telefono":"06 999 0000"},{"cod_cliente":"","nome":"senza codice"}]', 'prova.xlsx', true, false);
+  if (r->>'nuovi')::int <> 1 or (r->>'errori')::int <> 1 or exists (select 1 from public.clienti where cod_cliente = 'ZZ001') then raise exception 'Prova import errata: %', r; end if;
+  r := public.centralino_importa_clienti('[{"cod_cliente":"ZZ001","nome":"ZZ Import Spa","telefono":"06 999 0000"}]', 'vero.xlsx', false, false);
+  perform public.centralino_aggiorna_cliente('ZZ001', '{"email":"manuale@prova.invalid"}', 'telefonata');
+  r := public.centralino_importa_clienti('[{"cod_cliente":"ZZ001","nome":"ZZ Import Spa","email":"file@prova.invalid"}]', 'vecchio.xlsx', false, false);
+  if (r->>'protetti')::int <> 1 or (select email from public.clienti where cod_cliente = 'ZZ001') <> 'manuale@prova.invalid' then raise exception 'Modifica manuale sovrascritta: %', r; end if;
+  execute 'reset role';
+
+  -- direzione legge, non scrive
+  perform set_config('request.jwt.claims', json_build_object('sub', d, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  select count(*) into n from public.clienti_contatti where cliente_nome = 'ZZ Rubrica Srl'; if n = 0 then raise exception 'Direzione non legge la rubrica'; end if;
+  begin perform public.centralino_salva_contatto('{"cliente_nome":"X","telefono":"061234567"}'); raise exception 'Direzione scrive la rubrica';
+  exception when insufficient_privilege then null; end;
+  begin perform public.centralino_trasf_email_referente(tid, 'a@b.it', 'x', 'x', 'x', 'copia'); raise exception 'Direzione invia email';
+  exception when insufficient_privilege then null; end;
+  execute 'reset role';
+  -- anon nulla
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  execute 'set local role anon';
+  begin select count(*) into n from public.clienti_contatti; if n > 0 then raise exception 'Anon legge la rubrica'; end if;
+  exception when insufficient_privilege then null; end;
+  execute 'reset role';
+  raise exception 'PROVE TRASFERIMENTI OK';
+end $$;

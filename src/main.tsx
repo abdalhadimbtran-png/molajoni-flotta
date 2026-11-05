@@ -60,6 +60,7 @@ import ImpostazioniCentralino from './centralino/Impostazioni';
 import ReportCentralino from './centralino/Report';
 import Trasferimenti from './centralino/Trasferimento';
 import DirezioneCentralino from './centralino/Direzione';
+import AnalisiCentralino from './centralino/Analisi';
 
 function App() {
   if (!configurato) return <div className="wrap"><div className="banner ko">Configurazione mancante: VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.</div></div>;
@@ -109,9 +110,11 @@ function App() {
           <Route path="/centralino/modelli" element={<ModelliCentralino />} />
           <Route path="/centralino/impostazioni" element={<ImpostazioniCentralino />} />
           <Route path="/centralino/report" element={<ReportCentralino />} />
+          <Route path="/centralino/analisi" element={<AnalisiCentralino />} />
           <Route path="/centralino/*" element={<Navigate to="/centralino" replace />} />
           <Route path="/direzione/centralino" element={<DirezioneCentralino />} />
           <Route path="/direzione/centralino/pratica/:id" element={<PraticaCentralino />} />
+          <Route path="/direzione/centralino/analisi" element={<AnalisiCentralino />} />
           <Route path="/direzione/*" element={<Navigate to="/direzione/centralino" replace />} />
         </Route>
         <Route element={<Shell />}>

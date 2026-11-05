@@ -1,6 +1,6 @@
 # Centralino (front office) e monitoraggio Direzione
 
-Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0048` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte > 1.000 €).
+Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0051` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte > 1.000 €).
 
 ## Pagine
 | Percorso | Chi | Cosa |
@@ -80,6 +80,22 @@ Tabella `chiamate_trasferite` (anche senza pratica). Due esiti:
 Campanella al destinatario se la sua email (`destinatari_trasferimento`) corrisponde a un account; promemoria 15 minuti prima; se scade: escalation a centralino + direzione. «Richiamato» (con breve esito) dal centralino o dal destinatario. Ogni trasferimento è anche un evento `chiamata` nella storia della pratica.
 **Email di riepilogo obbligatoria**: dopo il salvataggio si apre il compositore con «Riepilogo telefonata – trasferita al referente» o «… vi ricontatteremo entro {entro}». Senza email: «Email non disponibile» con motivo. Finché manca: segnale rosso «Email di riepilogo non inviata» e KPI «% chiamate con email di riepilogo».
 
+## Due email per ogni trasferimento (0049)
+Dopo «Trasferita» o «Responsabile non disponibile» si apre il compositore con **due email in anteprima modificabile**: al referente (chi ha chiamato, stato cliente, contatti, sede, canale, argomento, richiesta — mai gli appunti —, importo, cosa deve fare ed entro quando, link alla pratica) e al cliente (presa in carico «la contatterà entro … (entro le hh:mm di …)» oppure riepilogo se la chiamata è passata). «Invia entrambe»; per ognuna «Apri in Outlook» / «Copia testo». Email del referente mancante → «Aggiungi l'email di … in Impostazioni» (il trasferimento resta registrato). Cliente senza email → motivo dall'elenco. Colonne `email_referente_inviata_at`, `email_cliente_inviata_at`; segnale rosso finché ne manca una. Scadenza predefinita del richiamo: 2 ore d'ufficio (`ct_sla`).
+
+## Numeri cliccabili e dettaglio (`/centralino/analisi`)
+Ogni tessera, barra, contatore e cifra viene dal **registro KPI** (`src/lib/centralino/registro.ts`): la pagina `/centralino/analisi?kpi=…&da=…&a=…&dest=…&arg=…&stato=…&tipo=…&canale=…` (o `/direzione/centralino/analisi`) usa la stessa funzione `valuta()` → numero ed elenco coincidono (test `registro.test.ts`). Mostra spiegazione (numeratore/denominatore), filtri modificabili, riepilogo, elenco completo (clic → pratica), PDF/Excel dell'elenco.
+
+## Conti alla rovescia
+Ovunque compare una pratica o un richiamo: «mancano 47:12» / «mancano 1 g 03 h», «in ritardo da 00:18» in rosso; ore d'ufficio e festività, «in pausa fino a lun 08:30» fuori orario; regola mostrata («Procedura: Offerta inviata entro 60 min»); tempo totale «ricevuta da …»; nella storia il tempo passato in ogni fase.
+
+## Tempo reale
+Supabase Realtime su `pratiche`, `pratiche_eventi`, `chiamate_trasferite`, `notifiche` (RLS valida): le pagine si aggiornano da sole; avviso a comparsa (e suono, spento di default: menu utente) per scadenze e richiami. Scorciatoie: **N** nuovo contatto, **/** ricerca, **Esc** chiude.
+
+## Rubrica contatti e anagrafica clienti (0050–0051)
+`clienti_contatti` (più contatti per cliente/sede, preferito) con storia `clienti_contatti_storia` (solo in aggiunta). Scelto un cliente, il contatto preferito/più recente riempie i campi; menu per cambiarlo. Telefono normalizzato +39, email controllata. Se Jennifer cambia telefono/email: «Aggiorna anche nell'anagrafica del cliente?» (sì di default) → storia + conta come «aggiornamento anagrafica». Una pratica nuova aggiunge solo contatti nuovi.
+**Impostazioni › Anagrafica clienti – Importa da Taylor**: Excel/CSV, colonne riconosciute per nome (mappa ricordata), **prova senza scrivere** (nuovi / aggiornati / invariati / protetti / errori + differenze), conferma; upsert per `cod_cliente` in `clienti` + contatto in rubrica; le modifiche manuali non si sovrascrivono senza «Sovrascrivi»; registro `clienti_importazioni` con rapporto errori scaricabile.
+
 ## Email ai clienti
 Modelli `email_template` (13 di base). Segnaposto: `{cliente} {contatto} {numero_pratica} {data_appuntamento} {fascia} {commerciale} {tecnico} {firma} {argomento} {referente} {entro}`. Testo modificabile prima dell'invio. Invio: coda `email_in_uscita` (nuove colonne `cc`, `pratica_id`) → Edge Function `notifica-email` (ora con CC) → Resend; ogni invio = evento `email_inviata` con copia del testo. Finché Resend è in prova: **Copia testo** o **Apri in Outlook** (mailto), registrati comunque. «Segna anche … come fatto» avanza lo stadio collegato al modello.
 Da compilare in Impostazioni: email di L. Esposito, A. Chiaradonna, A. Querini (`cc_offerte_grandi`), commerciali, Simona, Roberta, destinatari dei trasferimenti, firma.
@@ -95,4 +111,5 @@ Da compilare in Impostazioni: email di L. Esposito, A. Chiaradonna, A. Querini (
 
 ## Prove
 - `npm test` → `src/lib/centralino/sla.test.ts` (SLA con weekend, festività, orario, ora legale; semaforo; modelli; KPI; trasferimenti).
-- `supabase/prove/centralino_prove.sql`: blocco DO annullato (RLS per ruolo incl. anon, storia solo in aggiunta, SLA, contatori, SLA scaduto, **ordine rigido dei passi**, requisiti Taylor/email, annullo, spostamento, **appunti solo dell'autore**, **offerte > 1.000 €** con richiamo 2 ore). Da eseguire in SQL editor: risultato atteso `PROVE CENTRALINO OK`. Il calcolo SLA è stato verificato sul database con 8 casi (tutti ok).
+- `supabase/prove/centralino_prove.sql`: blocco DO annullato (RLS per ruolo incl. anon, storia solo in aggiunta, SLA, contatori, SLA scaduto, **ordine rigido dei passi**, requisiti Taylor/email, annullo, spostamento, **appunti solo dell'autore**, **offerte > 1.000 €** con richiamo 2 ore) + secondo blocco «PROVE TRASFERIMENTI OK» (richiamo, email al referente/cliente, richiamato, rubrica con storia e +39, import clienti con prova e protezione, permessi direzione/anon).
+- QA visivo: Playwright con dati finti a 1440, 1280 e 1024 px (home, pratica, direzione, dettaglio, trasferimenti, impostazioni, nuovo contatto, email doppia): nessun elemento fuori larghezza. Da eseguire in SQL editor: risultato atteso `PROVE CENTRALINO OK`. Il calcolo SLA è stato verificato sul database con 8 casi (tutti ok).

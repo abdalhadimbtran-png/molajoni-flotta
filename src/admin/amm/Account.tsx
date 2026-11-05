@@ -6,9 +6,9 @@ import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../../
 import { chiamaAccount } from './AreaAdmin';
 
 /** Ruolo come lo vede l'amministratore. 'hr' = responsabile con area «hr» (ufficio personale). */
-type Ruolo = 'admin' | 'responsabile' | 'hr' | 'formazione';
+type Ruolo = 'admin' | 'responsabile' | 'hr' | 'formazione' | 'centralino' | 'direzione';
 interface AccServer { user_id: string; nome: string; email: string; ruolo: 'admin' | 'responsabile'; attivo: boolean; creato_il: string; ultimo_accesso: string | null; io: boolean }
-interface Acc extends AccServer { tipo: Ruolo; dipendente_id: number | null }
+interface Acc extends AccServer { tipo: Ruolo; dipendente_id: number | null; centralino: boolean }
 interface Dip { id: number; nome: string; cognome: string; codice: string; categoria: string; attivo: boolean }
 
 const generaPassword = () => {
@@ -21,6 +21,8 @@ const RUOLI: { v: Ruolo; l: string; d: string; pill: 'info' | 'na' }[] = [
   { v: 'responsabile', l: 'Responsabile flotta', d: 'Piano, veicoli, tecnici, segnalazioni, avvisi, multe, carburante.', pill: 'na' },
   { v: 'hr', l: 'Ufficio personale', d: 'Ferie e permessi, dipendenti, saldi, festività, report del personale.', pill: 'na' },
   { v: 'formazione', l: 'Responsabile formazione', d: 'Corsi e attestati dei dipendenti, scadenze, report della formazione.', pill: 'na' },
+  { v: 'centralino', l: 'Centralino', d: 'Front office: contatti dei clienti, pratiche, email ai clienti, registro del giorno.', pill: 'na' },
+  { v: 'direzione', l: 'Direzione', d: 'Sola lettura: monitoraggio del centralino, KPI, offerte, pratiche in ritardo.', pill: 'na' },
 ];
 const ruoloDi = (v: Ruolo) => RUOLI.find(r => r.v === v)!;
 
@@ -30,15 +32,15 @@ export default function Account() {
   const { data, errore, reload } = useLoad(async () => {
     const [el, rs, dp] = await Promise.all([
       chiamaAccount<{ account: AccServer[] }>({ azione: 'elenco' }),
-      supabase.from('responsabili').select('user_id,ruolo,area,formazione,dipendente_id'),
+      supabase.from('responsabili').select('user_id,ruolo,area,formazione,centralino,direzione,dipendente_id'),
       supabase.from('dipendenti').select('id,nome,cognome,codice,categoria,attivo').order('cognome'),
     ]);
     if (rs.error) throw rs.error;
-    const extra = new Map(((rs.data ?? []) as { user_id: string; ruolo: string; area: string | null; formazione: boolean | null; dipendente_id: number | null }[]).map(r => [r.user_id, r]));
+    const extra = new Map(((rs.data ?? []) as { user_id: string; ruolo: string; area: string | null; formazione: boolean | null; centralino: boolean | null; direzione: boolean | null; dipendente_id: number | null }[]).map(r => [r.user_id, r]));
     const account: Acc[] = el.account.map(a => {
       const x = extra.get(a.user_id);
-      const tipo: Ruolo = a.ruolo === 'admin' ? 'admin' : x?.area === 'hr' ? 'hr' : x?.formazione ? 'formazione' : 'responsabile';
-      return { ...a, tipo, dipendente_id: x?.dipendente_id ?? null };
+      const tipo: Ruolo = a.ruolo === 'admin' ? 'admin' : x?.area === 'hr' ? 'hr' : x?.formazione ? 'formazione' : x?.centralino ? 'centralino' : x?.direzione ? 'direzione' : 'responsabile';
+      return { ...a, tipo, dipendente_id: x?.dipendente_id ?? null, centralino: !!x?.centralino };
     });
     return { account, dipendenti: (dp.data ?? []) as Dip[] };
   });
@@ -139,6 +141,7 @@ function SceltaDipendente({ valore, onChange, dipendenti, collegati, io }: { val
 function ModaleRuolo({ a, dipendenti, collegati, onClose, onSalvato }: { a: Acc; dipendenti: Dip[]; collegati: Acc[]; onClose: () => void; onSalvato: () => void }) {
   const { t, tm } = useT();
   const [r, setR] = useState<Ruolo>(a.tipo);
+  const [extraCt, setExtraCt] = useState(a.centralino && a.tipo === 'hr');
   const [d, setD] = useState(a.dipendente_id ? String(a.dipendente_id) : '');
   const [err, setErr] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
@@ -146,6 +149,7 @@ function ModaleRuolo({ a, dipendenti, collegati, onClose, onSalvato }: { a: Acc;
     e.preventDefault(); setErr(null); setInvio(true);
     try {
       if (!a.io && r !== a.tipo) await rpc('admin_imposta_responsabile', { p_user: a.user_id, p_ruolo: r, p_attivo: a.attivo });
+      if (!a.io && r === 'hr' && extraCt !== (a.centralino && a.tipo === 'hr')) await rpc('admin_imposta_centralino', { p_user: a.user_id, p_attivo: extraCt });
       const nuovo = d ? Number(d) : null;
       if (nuovo !== a.dipendente_id) await rpc('admin_collega_dipendente', { p_user: a.user_id, p_dipendente: nuovo });
       toast(t('Account aggiornato')); onSalvato();
@@ -156,6 +160,7 @@ function ModaleRuolo({ a, dipendenti, collegati, onClose, onSalvato }: { a: Acc;
       <form className="form" onSubmit={salva}>
         {a.io ? <p className="hint">{t('Non puoi cambiare il ruolo del tuo account: chiedi a un altro amministratore.')}</p>
           : <SceltaRuolo valore={r} onChange={setR} nome="ruolo-mod" />}
+        {!a.io && r === 'hr' && <label className="check"><input type="checkbox" checked={extraCt} onChange={e => setExtraCt(e.target.checked)} /> {t('Anche centralino (sostituta quando il front office è assente)')}</label>}
         <SceltaDipendente valore={d} onChange={setD} dipendenti={dipendenti} collegati={collegati} io={a.user_id} />
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex"><button className="btn" disabled={invio}>{a.io ? t('Salva') : t('Salva ruolo')}</button><button type="button" className="btn-ghost" onClick={onClose}>{t('Annulla')}</button></div>
@@ -177,11 +182,11 @@ function NuovoAccount({ dipendenti, collegati, onClose, onSalvato }: { dipendent
       // la funzione server crea admin o responsabile flotta; l'ufficio personale e il collegamento si impostano subito dopo
       await chiamaAccount({ azione: 'crea', nome: f.nome, email: f.email, password: f.password, ruolo: f.ruolo === 'admin' ? 'admin' : 'responsabile' });
       setFatto(true);
-      if (f.ruolo === 'hr' || f.ruolo === 'formazione' || f.dipendente) {
+      if (f.ruolo === 'hr' || f.ruolo === 'formazione' || f.ruolo === 'centralino' || f.ruolo === 'direzione' || f.dipendente) {
         try {
           const { data: r } = await supabase.from('responsabili').select('user_id').ilike('email', f.email.trim()).maybeSingle();
           if (!r) throw new Error('Account non trovato');
-          if (f.ruolo === 'hr' || f.ruolo === 'formazione') await rpc('admin_imposta_responsabile', { p_user: r.user_id, p_ruolo: f.ruolo, p_attivo: true });
+          if (f.ruolo === 'hr' || f.ruolo === 'formazione' || f.ruolo === 'centralino' || f.ruolo === 'direzione') await rpc('admin_imposta_responsabile', { p_user: r.user_id, p_ruolo: f.ruolo, p_attivo: true });
           if (f.dipendente) await rpc('admin_collega_dipendente', { p_user: r.user_id, p_dipendente: Number(f.dipendente) });
         } catch (x) { setAvviso(t("Account creato, ma il ruolo o il collegamento non sono stati salvati ({e}). Usa «Cambia ruolo» nell'elenco.", { e: tm(testoErrore(x)) })); }
       }

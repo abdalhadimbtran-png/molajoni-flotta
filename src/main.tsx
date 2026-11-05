@@ -51,6 +51,15 @@ import DipendentiFormazione from './formazione/Dipendenti';
 import RegistraFormazione from './formazione/Registra';
 import ReportFormazione from './formazione/Report';
 import ArchivioFormazione from './formazione/Archivio';
+import ShellCentralino from './centralino/ShellCentralino';
+import HomeCentralino from './centralino/Home';
+import PraticaCentralino from './centralino/Pratica';
+import PraticheCentralino from './centralino/Pratiche';
+import ModelliCentralino from './centralino/Modelli';
+import ImpostazioniCentralino from './centralino/Impostazioni';
+import ReportCentralino from './centralino/Report';
+import Trasferimenti from './centralino/Trasferimento';
+import DirezioneCentralino from './centralino/Direzione';
 
 function App() {
   if (!configurato) return <div className="wrap"><div className="banner ko">Configurazione mancante: VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.</div></div>;
@@ -91,6 +100,19 @@ function App() {
           <Route path="/formazione/report" element={<ReportFormazione />} />
           <Route path="/formazione/archivio" element={<ArchivioFormazione />} />
           <Route path="/formazione/*" element={<Navigate to="/formazione" replace />} />
+        </Route>
+        <Route element={<ShellCentralino />}>
+          <Route path="/centralino" element={<HomeCentralino />} />
+          <Route path="/centralino/pratiche" element={<PraticheCentralino />} />
+          <Route path="/centralino/pratica/:id" element={<PraticaCentralino />} />
+          <Route path="/centralino/trasferimenti" element={<Trasferimenti />} />
+          <Route path="/centralino/modelli" element={<ModelliCentralino />} />
+          <Route path="/centralino/impostazioni" element={<ImpostazioniCentralino />} />
+          <Route path="/centralino/report" element={<ReportCentralino />} />
+          <Route path="/centralino/*" element={<Navigate to="/centralino" replace />} />
+          <Route path="/direzione/centralino" element={<DirezioneCentralino />} />
+          <Route path="/direzione/centralino/pratica/:id" element={<PraticaCentralino />} />
+          <Route path="/direzione/*" element={<Navigate to="/direzione/centralino" replace />} />
         </Route>
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />

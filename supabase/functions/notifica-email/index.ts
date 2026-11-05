@@ -69,7 +69,7 @@ Deno.serve(async req => {
   if (ok !== true) return json({ errore: 'Non autorizzato' }, 401);
 
   const { data: righeCoda, error } = await db.from('email_in_uscita')
-    .select('id,destinatario,oggetto,html,testo,dati,tentativi,stato')
+    .select('id,destinatario,cc,oggetto,html,testo,dati,tentativi,stato')
     .or(`stato.in.(in_coda,in_attesa_configurazione),and(stato.eq.errore,tentativi.lt.${MAX_TENTATIVI})`)
     .not('destinatario', 'is', null).order('id').limit(20);
   if (error) return json({ errore: error.message }, 500);
@@ -90,7 +90,7 @@ Deno.serve(async req => {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${chiave}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: mittente, to: [r.destinatario], subject: r.oggetto, html: c.html, text: c.testo }),
+        body: JSON.stringify({ from: mittente, to: [r.destinatario], ...(Array.isArray(r.cc) && r.cc.length ? { cc: r.cc } : {}), subject: r.oggetto, html: c.html, text: c.testo }),
       });
       if (res.ok) {
         await db.from('email_in_uscita').update({ stato: 'inviata', html: c.html, testo: c.testo, inviato_il: new Date().toISOString(), errore: null, tentativi: r.tentativi + 1 }).eq('id', r.id);

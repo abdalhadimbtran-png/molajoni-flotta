@@ -46,7 +46,7 @@ export default function ShellFormazione() {
 }
 
 interface N { id: number; dati: { titolo?: string; testo?: string }; link: string | null; creato_il: string; letta_il: string | null }
-function Campanella() {
+export function Campanella() {
   const nav = useNavigate();
   const [l, setL] = useState<N[]>([]);
   const [aperta, setAperta] = useState(false);

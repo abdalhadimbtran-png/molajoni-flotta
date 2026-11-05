@@ -1,0 +1,103 @@
+import { describe, expect, it } from 'vitest';
+import { daRoma, giornoRoma, scadenzaSla, semaforo, testoResiduo } from './sla';
+import { compila, segnaposto } from './modelli';
+import { calcolaKpi, calcolaTrasf } from './kpi';
+
+// stesse prove di supabase/prove/centralino_prove.sql
+const FEST = new Set(['2026-12-08', '2026-12-25', '2026-12-26', '2027-01-01']);
+const R = (y: number, m: number, g: number, h: number, mi = 0) => daRoma(y, m, g, h, mi);
+
+describe('scadenzaSla', () => {
+  it('minuti oltre la chiusura del venerdì continuano lunedì', () => {
+    expect(scadenzaSla(R(2026, 11, 6, 17), { tipo: 'minuti', valore: 60 }, FEST)).toEqual(R(2026, 11, 9, 9));
+  });
+  it('60 minuti in orario', () => {
+    expect(scadenzaSla(R(2026, 11, 5, 10, 15), { tipo: 'minuti', valore: 60 }, FEST)).toEqual(R(2026, 11, 5, 11, 15));
+  });
+  it('ore prima dell\'apertura partono alle 08:30', () => {
+    expect(scadenzaSla(R(2026, 11, 9, 8), { tipo: 'ore', valore: 2 }, FEST)).toEqual(R(2026, 11, 9, 10, 30));
+  });
+  it('giorno lavorativo successivo salta il weekend', () => {
+    expect(scadenzaSla(R(2026, 11, 6, 11), { tipo: 'giorni_lav', valore: 1 }, FEST)).toEqual(R(2026, 11, 9, 17, 30));
+  });
+  it('salta le festività', () => {
+    expect(scadenzaSla(R(2026, 12, 7, 10), { tipo: 'giorni_lav', valore: 1 }, FEST)).toEqual(R(2026, 12, 9, 17, 30));
+    expect(scadenzaSla(R(2026, 12, 24, 10), { tipo: 'giorni_lav', valore: 2 }, FEST)).toEqual(R(2026, 12, 29, 17, 30));
+  });
+  it('stesso giorno: sabato o dopo la chiusura → giorno lavorativo dopo', () => {
+    expect(scadenzaSla(R(2026, 11, 7, 10), { tipo: 'stesso_giorno' }, FEST)).toEqual(R(2026, 11, 9, 17, 30));
+    expect(scadenzaSla(R(2026, 11, 6, 18), { tipo: 'stesso_giorno' }, FEST)).toEqual(R(2026, 11, 9, 17, 30));
+    expect(scadenzaSla(R(2026, 11, 5, 9), { tipo: 'stesso_giorno' }, FEST)).toEqual(R(2026, 11, 5, 17, 30));
+  });
+  it('orario d\'ufficio configurabile', () => {
+    expect(scadenzaSla(R(2026, 11, 5, 17, 30), { tipo: 'minuti', valore: 30 }, FEST, { inizio: '09:00', fine: '18:00' })).toEqual(R(2026, 11, 5, 18));
+    expect(scadenzaSla(R(2026, 11, 5, 17, 45), { tipo: 'minuti', valore: 30 }, FEST, { inizio: '09:00', fine: '18:00' })).toEqual(R(2026, 11, 6, 9, 15));
+  });
+  it('ora legale/solare: fine ottobre', () => {
+    expect(scadenzaSla(R(2026, 10, 23, 17, 0), { tipo: 'ore', valore: 1 }, FEST)).toEqual(R(2026, 10, 26, 9));
+  });
+});
+
+describe('semaforo e testi', () => {
+  const i = R(2026, 11, 5, 9), s = R(2026, 11, 5, 10);
+  it('verde, arancio sotto il 25%, rosso scaduto', () => {
+    expect(semaforo(i, s, R(2026, 11, 5, 9, 10))).toBe('verde');
+    expect(semaforo(i, s, R(2026, 11, 5, 9, 50))).toBe('arancio');
+    expect(semaforo(i, s, R(2026, 11, 5, 10, 1))).toBe('rosso');
+    expect(semaforo(i, null)).toBe('nessuno');
+  });
+  it('testo residuo', () => {
+    expect(testoResiduo(s, R(2026, 11, 5, 9, 18))).toBe('tra 42 min');
+    expect(testoResiduo(s, R(2026, 11, 5, 12))).toBe('scaduta da 2 h');
+    expect(testoResiduo(R(2026, 11, 6, 17, 30), R(2026, 11, 5, 8))).toBe('domani 17:30');
+  });
+  it('giorno di Roma', () => { expect(giornoRoma(R(2026, 11, 5, 0, 30))).toBe('2026-11-05'); });
+});
+
+describe('modelli email', () => {
+  it('sostituisce i segnaposto ed esegue l\'escape', () => {
+    const v = segnaposto({ numero: 'CT-2026-000001', cliente_nome: 'Bar <Roma>', contatto_nome: null, appuntamento_data: '2026-11-10', appuntamento_fascia: 'mattina', commerciale_nome: null, tecnico_nome: null }, 'Jennifer\nFront Office');
+    const c = compila('<p>Gentile {contatto}, {cliente} il {data_appuntamento} {fascia}</p>{firma}', v);
+    expect(c).toContain('Bar &lt;Roma&gt;');
+    expect(c).toContain('Gentile Cliente');
+    expect(c).toContain('martedì 10/11/2026');
+    expect(c).toContain('mattina (8:30–13:00)');
+    expect(c).toContain('Jennifer<br>Front Office');
+  });
+});
+
+describe('kpi', () => {
+  it('percentuali SLA e funnel offerte', () => {
+    const base = { canale: 'telefono', sottotipo: null, importo_stimato: 500, esito_offerta: null, closed_at: null, sla_rispettato: null, stato_corrente: 'ricevuta', created_at: '2026-11-05T08:00:00Z' };
+    const k = calcolaKpi([
+      { ...base, id: 1, tipo: 'offerta_piccola', esito: 'chiusa_ok', esito_offerta: 'accettata', sla_rispettato: true, stato_corrente: 'contratto' },
+      { ...base, id: 2, tipo: 'offerta_piccola', esito: 'aperta', stato_corrente: 'offerta' },
+      { ...base, id: 3, tipo: 'manutenzione', sottotipo: 'Allarme sonoro attivo', esito: 'chiusa_ok', sla_rispettato: false },
+    ], [
+      { pratica_id: 1, tipo: 'stato', a_stato: 'offerta', dati: { sla_stadio: 'offerta', sla_rispettato: true }, at: '2026-11-05T08:30:00Z' },
+      { pratica_id: 2, tipo: 'stato', a_stato: 'offerta', dati: { sla_stadio: 'offerta', sla_rispettato: false }, at: '2026-11-05T09:30:00Z' },
+    ]);
+    expect(k.totale).toBe(3);
+    expect(k.slaPct).toBe(50);
+    expect(k.funnel.richieste).toBe(2);
+    expect(k.funnel.inviate).toBe(2);
+    expect(k.funnel.accettate).toBe(1);
+    expect(k.offerte60Pct).toBe(50);
+    expect(k.allarmiPct).toBe(0);
+  });
+});
+
+describe('kpi trasferimenti', () => {
+  it('risposti, richiamati in tempo, email', () => {
+    const k = calcolaTrasf([
+      { destinatario_nome: 'A', esito: 'risposto', richiamo_scadenza: null, richiamato_at: null, email_riepilogo_at: '2026-11-05T09:00:00Z' },
+      { destinatario_nome: 'A', esito: 'non_risposto', richiamo_scadenza: '2026-11-05T11:00:00Z', richiamato_at: '2026-11-05T10:00:00Z' },
+      { destinatario_nome: 'B', esito: 'richiamera', modalita: 'richiamo', richiamo_scadenza: '2026-11-05T11:00:00Z', richiamato_at: null, email_non_disponibile: 'nessuna' },
+    ], new Date('2026-11-05T12:00:00Z'));
+    expect(k.rispostiPct).toBe(50);
+    expect(k.richiamatiInTempoPct).toBe(50);
+    expect(k.scaduti).toBe(1);
+    expect(k.senzaEmail).toBe(1);
+    expect(k.perDestinatario.A.tot).toBe(2);
+  });
+});

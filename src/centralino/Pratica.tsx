@@ -1,0 +1,242 @@
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { rpc, testoErrore } from '../lib/supabase';
+import { fmtEuro, fmtOra } from '../lib/format';
+import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
+import { ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
+import { dataLunga } from '../lib/centralino/modelli';
+import { ESTENSIONI, apriAllegato, caricaAllegato, pratica, useAdesso, useAggiornamento, useConfig } from './comune';
+import { Ic, SlaChip, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
+import Avanza, { avanzaDiretto } from './Avanza';
+import ModaleEmail from './ModaleEmail';
+import { ModaleTrasferimento, RigaTrasf, segnaRichiamato, trasferimenti } from './Trasferimento';
+import { useCtx } from './ShellCentralino';
+
+/** Scheda pratica: intestazione, avanzamento, storia completa, azioni (sola lettura per la direzione). */
+export default function Pratica() {
+  const { id } = useParams();
+  const ctx = useCtx();
+  const ora = useAdesso();
+  const [qs, setQs] = useSearchParams();
+  const { config } = useConfig();
+  const { data, errore, reload } = useLoad(async () => {
+    const [d, tr] = await Promise.all([pratica(Number(id)), trasferimenti(undefined, Number(id))]);
+    return { ...d, tr };
+  }, [id, ctx.versione]);
+  const r = useCallback(() => { reload(); }, [reload]); useAggiornamento(r);
+  const [modale, setModale] = useState<'' | 'avanza' | 'nota' | 'chiamata' | 'email' | 'dati' | 'chiudi' | 'trasf'>('');
+  const [riep, setRiep] = useState<Trasferimento | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+  const nuova = qs.get('nuova') === '1';
+  useEffect(() => { if (qs.get('trasferisci') === '1' && ctx.scrive) { setModale('trasf'); qs.delete('trasferisci'); setQs(qs, { replace: true }); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (errore) return <Errore testo={errore} onRetry={reload} />;
+  if (!data || !config) return <Caricamento />;
+  const p = data.pratica;
+  const f = config.flussi.find(x => x.tipo === p.tipo);
+  const prossimo = prossimoStadio(f, p);
+  const aperta = p.esito === 'aperta';
+  const scrive = ctx.scrive && aperta;
+  const fatto = () => { setModale(''); reload(); ctx.aggiorna(); };
+
+  async function avanzaUno() {
+    if (!prossimo) return;
+    if (!avanzaDiretto(prossimo)) { setModale('avanza'); return; }
+    try { await rpc('centralino_avanza', { p_id: p.id, p_stadio: prossimo.key, p_dati: {}, p_testo: null }); toast(prossimo.nome); fatto(); } catch (e) { toast(testoErrore(e)); }
+  }
+  async function carica(l: FileList | null) {
+    if (!l) return;
+    for (const x of Array.from(l)) { try { await caricaAllegato(p.id, x); toast(`Allegato: ${x.name}`); } catch (e) { toast(testoErrore(e)); } }
+    if (file.current) file.current.value = ''; reload();
+  }
+  async function statoCliente(v: string) {
+    try { await rpc('centralino_imposta_stato_cliente', { p_id: p.id, p_stato: v || null }); reload(); } catch (e) { toast(testoErrore(e)); }
+  }
+  const apri = (path: string) => apriAllegato(path).catch(e => toast(testoErrore(e)));
+  const senzaEmail = data.tr.filter(senzaRiepilogo);
+
+  return (
+    <div className="ct-pratica">
+      <Link to={ctx.base} className="ct-indietro">← {ctx.scrive ? 'Da fare' : 'Monitoraggio'}</Link>
+      {nuova && aperta && ctx.scrive && (
+        <div className="ct-dopo">
+          <div><b>Pratica {p.numero} aperta.</b> {prossimo ? <>Prossimo passo: <b>{prossimo.nome}</b>.</> : null}</div>
+          <div className="row-flex">
+            {prossimo && <button className="btn btn-sm" onClick={avanzaUno}>Fatto: {prossimo.nome}</button>}
+            <button className="btn-ghost btn-sm" onClick={() => setModale('email')}>Invia email al cliente</button>
+            <button className="btn-ghost btn-sm" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
+            <button className="btn-ghost btn-sm" onClick={() => { qs.delete('nuova'); setQs(qs); }}>Chiudi</button>
+          </div>
+        </div>)}
+      {senzaEmail.length > 0 && <div className="ct-flag-bar">Email di riepilogo non inviata per {senzaEmail.length === 1 ? 'la chiamata trasferita' : `${senzaEmail.length} chiamate trasferite`}.
+        {ctx.scrive && <button className="btn btn-sm" onClick={() => setRiep(senzaEmail[0])}>Scrivi il riepilogo</button>}</div>}
+
+      <header className={`ct-testa ${p.priorita === 'urgente' ? 'urgente' : ''}`}>
+        <span className="ct-testa-ic"><Ic n={p.priorita === 'urgente' && p.tipo === 'manutenzione' ? 'allarme' : iconaTipo(p.tipo)} size={26} /></span>
+        <div className="ct-testa-c">
+          <div className="ct-testa-r"><span className="ct-num">{p.numero}</span><Pill s={ESITI[p.esito][0] as 'ok'}>{ESITI[p.esito][1]}</Pill>
+            {p.priorita === 'urgente' && <span className="ct-sla rosso">urgente</span>}<SlaChip p={p} ora={ora} soglia={Number(config.impostazioni.soglia_arancio)} /></div>
+          <h1>{p.cliente_nome}</h1>
+          <div className="sub">{NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''} · <Ic n={iconaCanale(p.canale)} size={14} /> {nomeCanale(p.canale)} · {fmtOra(p.created_at)}</div>
+        </div>
+        <div className="ct-stato-sel">
+          {p.stato_cliente && <span className={`pill ${STATI_CLIENTE[p.stato_cliente][0]}`}>{STATI_CLIENTE[p.stato_cliente][1]}</span>}
+          {ctx.scrive && <select aria-label="Stato del cliente" value={p.stato_cliente_manuale ? p.stato_cliente ?? '' : ''} onChange={e => statoCliente(e.target.value)}>
+            <option value="">{p.stato_cliente_manuale ? 'Torna a proposta automatica' : 'Proposta automatica'}</option>
+            {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
+          </select>}
+        </div>
+      </header>
+
+      <Stepper f={f} p={p} eventi={data.eventi} />
+
+      {ctx.scrive && (
+        <div className="ct-azioni">
+          {aperta && prossimo && <button className="btn" onClick={avanzaUno}>Avanza: {prossimo.nome}</button>}
+          {aperta && prossimo && <button className="btn-ghost" onClick={() => setModale('avanza')}>Avanza a…</button>}
+          <button className="btn-ghost" onClick={() => setModale('email')}><Ic n="email" size={16} /> Invia email</button>
+          <button className="btn-ghost" onClick={() => setModale('chiamata')}><Ic n="telefono" size={16} /> Registra chiamata</button>
+          <button className="btn-ghost" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
+          <button className="btn-ghost" onClick={() => setModale('nota')}>Aggiungi nota</button>
+          <button className="btn-ghost" onClick={() => setModale('dati')}>Dati e assegnazione</button>
+          <button className="btn-ghost" onClick={() => file.current?.click()}>Allegati</button>
+          <input ref={file} type="file" hidden multiple accept={ESTENSIONI} onChange={e => carica(e.target.files)} />
+          {scrive && <button className="btn-ghost ct-chiudi" onClick={() => setModale('chiudi')}>Chiudi pratica</button>}
+        </div>)}
+
+      <div className="ct-dett">
+        <section className="ct-blocco">
+          <h2>Storia</h2>
+          <Timeline eventi={data.eventi} f={f} onApri={apri} />
+        </section>
+        <aside>
+          <section className="ct-blocco ct-dati">
+            <h2>Cliente</h2>
+            <dl>
+              {p.cliente_codice && <><dt>Codice</dt><dd>{p.cliente_codice}</dd></>}
+              {p.sede && <><dt>Impianto</dt><dd>{p.sede}</dd></>}
+              <dt>Contatto</dt><dd>{p.contatto_nome || '—'}</dd>
+              <dt>Telefono</dt><dd>{p.telefono ? <a href={`tel:${p.telefono}`}>{p.telefono}</a> : '—'}</dd>
+              <dt>Email</dt><dd>{p.email ? <a href={`mailto:${p.email}`}>{p.email}</a> : '—'}</dd>
+              {(p.indirizzo || p.comune) && <><dt>Indirizzo</dt><dd>{[p.indirizzo, [p.cap, p.comune].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</dd></>}
+            </dl>
+          </section>
+          <section className="ct-blocco ct-dati">
+            <h2>Lavoro</h2>
+            <dl>
+              <dt>Stadio</dt><dd>{nomeStadio(f, p.stato_corrente)}</dd>
+              {p.appuntamento_data && <><dt>Appuntamento</dt><dd>{dataLunga(p.appuntamento_data)}, {p.appuntamento_fascia ? FASCE[p.appuntamento_fascia] : ''}</dd></>}
+              <dt>Assegnata a</dt><dd>{p.assegnato_nome || '—'}{p.tecnico_nome ? ` · tecnico ${p.tecnico_nome}` : ''}</dd>
+              {p.commerciale_nome && <><dt>Commerciale</dt><dd>{p.commerciale_nome}</dd></>}
+              {p.importo_stimato != null && <><dt>Importo stimato</dt><dd>{fmtEuro(p.importo_stimato)}</dd></>}
+              {p.tipo === 'manutenzione' && <><dt>Alert Taylor</dt><dd>{p.alert_taylor ? 'Inviato' : 'No'}</dd></>}
+              {p.sottotipo === 'Allarme sonoro attivo' && <><dt>Tacitazione</dt><dd>{p.tacitazione_tentata ? 'Tentata al telefono' : 'Non tentata'}</dd></>}
+              {p.esito_offerta && <><dt>Esito offerta</dt><dd>{p.esito_offerta.replace('_', ' ')}</dd></>}
+              {p.descrizione && <><dt>Richiesta</dt><dd>{p.descrizione}</dd></>}
+            </dl>
+            {f?.nota_procedura && <p className="ct-proc">{f.nota_procedura}</p>}
+          </section>
+          {data.tr.length > 0 && <section className="ct-blocco"><h2>Chiamate per responsabili</h2>
+            {data.tr.map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRiepilogo={ctx.scrive ? setRiep : undefined} onRichiamato={ctx.scrive ? async x => { if (await segnaRichiamato(x)) reload(); } : undefined} />)}</section>}
+          {data.allegati.length > 0 && <section className="ct-blocco"><h2>Allegati</h2>
+            <ul className="ct-allegati">{data.allegati.map(a => <li key={a.id}><button className="ct-link" onClick={() => apri(a.path)}>{a.nome_file ?? 'file'}</button><span className="sub"> · {fmtOra(a.created_at)}</span></li>)}</ul></section>}
+        </aside>
+      </div>
+
+      {modale === 'avanza' && f && <Avanza p={p} f={f} stadio={prossimo} onClose={() => setModale('')} onFatto={fatto} />}
+      {(modale === 'nota' || modale === 'chiamata') && <ModaleNota p={p} tipo={modale} onClose={() => setModale('')} onFatto={fatto} />}
+      {modale === 'email' && <ModaleEmail pratica={p} onClose={() => setModale('')} onFatto={fatto} />}
+      {modale === 'dati' && <ModaleDati p={p} onClose={() => setModale('')} onFatto={fatto} />}
+      {modale === 'chiudi' && <ModaleChiudi p={p} onClose={() => setModale('')} onFatto={fatto} />}
+      {modale === 'trasf' && <ModaleTrasferimento pratica={p} onClose={() => setModale('')} onFatto={fatto} />}
+      {riep && <ModaleEmail trasf={riep} pratica={p} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
+    </div>
+  );
+}
+
+function ModaleNota({ p, tipo, onClose, onFatto }: { p: P; tipo: 'nota' | 'chiamata'; onClose: () => void; onFatto: () => void }) {
+  const [t, setT] = useState(''); const [dir, setDir] = useState<'uscita' | 'entrata'>('uscita'); const [err, setErr] = useState<string | null>(null);
+  async function salva(e: FormEvent) {
+    e.preventDefault();
+    try { await rpc('centralino_nota', { p_id: p.id, p_tipo: tipo, p_testo: t, p_dati: tipo === 'chiamata' ? { direzione: dir } : {} }); toast('Registrata'); onFatto(); } catch (x) { setErr(testoErrore(x)); }
+  }
+  return (
+    <Modal titolo={tipo === 'nota' ? 'Aggiungi nota' : 'Registra chiamata'} onClose={onClose}>
+      <form className="form" onSubmit={salva}>
+        {tipo === 'chiamata' && <div className="segmented" role="group"><button type="button" className={dir === 'uscita' ? 'on' : ''} onClick={() => setDir('uscita')}>Ho chiamato io</button><button type="button" className={dir === 'entrata' ? 'on' : ''} onClick={() => setDir('entrata')}>Ha chiamato il cliente</button></div>}
+        <textarea rows={4} autoFocus value={t} onChange={e => setT(e.target.value)} aria-label="Testo" placeholder={tipo === 'chiamata' ? 'Cosa vi siete detti' : 'Nota'} />
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn">Salva</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+function ModaleDati({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatto: () => void }) {
+  const { config } = useConfig();
+  const [f, setF] = useState({
+    cliente_nome: p.cliente_nome, contatto_nome: p.contatto_nome ?? '', telefono: p.telefono ?? '', email: p.email ?? '', indirizzo: p.indirizzo ?? '', cap: p.cap ?? '', comune: p.comune ?? '',
+    descrizione: p.descrizione ?? '', priorita: p.priorita, importo_stimato: p.importo_stimato == null ? '' : String(p.importo_stimato),
+    assegnato_ruolo: p.assegnato_ruolo ?? '', assegnato_nome: p.assegnato_nome ?? '', tecnico_nome: p.tecnico_nome ?? '', commerciale_nome: p.commerciale_nome ?? '', commerciale_email: p.commerciale_email ?? '',
+    appuntamento_data: p.appuntamento_data ?? '', appuntamento_fascia: p.appuntamento_fascia ?? '', nota: '',
+  });
+  const [err, setErr] = useState<string | null>(null);
+  const comm = config?.impostazioni.commerciali ?? [];
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  async function salva(e: FormEvent) {
+    e.preventDefault(); setErr(null);
+    try { await rpc('centralino_aggiorna', { p_id: p.id, p: f }); toast('Pratica aggiornata'); onFatto(); } catch (x) { setErr(testoErrore(x)); }
+  }
+  return (
+    <Modal titolo="Dati e assegnazione" onClose={onClose}>
+      <form className="form" onSubmit={salva}>
+        <div className="ct-griglia">
+          <div className="field"><label htmlFor="d-cli">Cliente</label><input id="d-cli" value={f.cliente_nome} onChange={set('cliente_nome')} /></div>
+          <div className="field"><label htmlFor="d-con">Contatto</label><input id="d-con" value={f.contatto_nome} onChange={set('contatto_nome')} /></div>
+          <div className="field"><label htmlFor="d-tel">Telefono</label><input id="d-tel" value={f.telefono} onChange={set('telefono')} /></div>
+          <div className="field"><label htmlFor="d-em">Email</label><input id="d-em" type="email" value={f.email} onChange={set('email')} /></div>
+          <div className="field"><label htmlFor="d-ind">Indirizzo</label><input id="d-ind" value={f.indirizzo} onChange={set('indirizzo')} /></div>
+          <div className="field"><label htmlFor="d-com">Comune</label><input id="d-com" value={f.comune} onChange={set('comune')} /></div>
+        </div>
+        <div className="ct-griglia">
+          <div className="field"><label htmlFor="d-ruolo">Assegnata a (ruolo)</label>
+            <select id="d-ruolo" value={f.assegnato_ruolo} onChange={set('assegnato_ruolo')}><option value="">—</option>{RUOLI_ASSEGNA.map(r => <option key={r.v} value={r.v}>{r.l}</option>)}</select></div>
+          <div className="field"><label htmlFor="d-nome">Persona</label><input id="d-nome" value={f.assegnato_nome} onChange={set('assegnato_nome')} /></div>
+          <div className="field"><label htmlFor="d-tec">Tecnico</label><input id="d-tec" value={f.tecnico_nome} onChange={set('tecnico_nome')} /></div>
+          <div className="field"><label htmlFor="d-cm">Commerciale</label>
+            <input id="d-cm" list="d-comm" value={f.commerciale_nome} onChange={e => { const c = comm.find(x => x.nome === e.target.value); setF({ ...f, commerciale_nome: e.target.value, commerciale_email: c?.email ?? f.commerciale_email }); }} />
+            <datalist id="d-comm">{comm.map(c => <option key={c.nome} value={c.nome} />)}</datalist></div>
+          <div className="field"><label htmlFor="d-cme">Email commerciale</label><input id="d-cme" type="email" value={f.commerciale_email} onChange={set('commerciale_email')} /></div>
+          <div className="field"><label htmlFor="d-imp">Importo stimato €</label><input id="d-imp" inputMode="decimal" value={f.importo_stimato} onChange={set('importo_stimato')} /></div>
+        </div>
+        <div className="ct-riga">
+          <input type="date" aria-label="Appuntamento" value={f.appuntamento_data} onChange={set('appuntamento_data')} />
+          <select aria-label="Fascia" value={f.appuntamento_fascia} onChange={set('appuntamento_fascia')}><option value="">—</option><option value="mattina">Mattina</option><option value="pomeriggio">Pomeriggio</option></select>
+          <select aria-label="Priorità" value={f.priorita} onChange={set('priorita')}><option value="normale">Normale</option><option value="urgente">Urgente</option></select>
+        </div>
+        <div className="field"><label htmlFor="d-desc">Richiesta</label><textarea id="d-desc" rows={2} value={f.descrizione} onChange={set('descrizione')} /></div>
+        <div className="field"><label htmlFor="d-nota">Motivo del cambio (facoltativo)</label><input id="d-nota" value={f.nota} onChange={set('nota')} /></div>
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn">Salva</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+function ModaleChiudi({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatto: () => void }) {
+  const [e, setE] = useState<'chiusa_ok' | 'chiusa_ko' | 'annullata'>('chiusa_ok'); const [t, setT] = useState(''); const [err, setErr] = useState<string | null>(null);
+  async function salva(x: FormEvent) {
+    x.preventDefault();
+    try { await rpc('centralino_chiudi', { p_id: p.id, p_esito: e, p_testo: t || null }); toast('Pratica chiusa'); onFatto(); } catch (y) { setErr(testoErrore(y)); }
+  }
+  return (
+    <Modal titolo={`Chiudi ${p.numero}`} onClose={onClose}>
+      <form className="form" onSubmit={salva}>
+        <div className="ct-chips">{([['chiusa_ok', 'Risolta / positiva'], ['chiusa_ko', 'Negativa'], ['annullata', 'Annullata']] as const).map(([v, l]) => <button type="button" key={v} className={e === v ? 'on' : ''} onClick={() => setE(v)}>{l}</button>)}</div>
+        <div className="field"><label htmlFor="ch-t">{e === 'annullata' ? 'Motivo (obbligatorio)' : 'Nota (facoltativa)'}</label><input id="ch-t" value={t} onChange={x => setT(x.target.value)} /></div>
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn">Chiudi pratica</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
+      </form>
+    </Modal>
+  );
+}

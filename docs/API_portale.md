@@ -72,3 +72,6 @@ Attestato dal dipendente solo su richiesta: `formazione_chiedi_attestato(p_regis
 
 ## Variazioni della giornata e notifiche del piano
 Vedi `docs/VARIAZIONI_giornata.md`: `tecnico_giornata`, `tecnico_segnala_ritardo`, `tecnico_giornata_finita`, `tecnico_urgenza_letta` (token); `variazioni_*`, `pubblica_piano`, `piano_modifiche_pendenti`, `report_variazioni` (responsabile). `conferma_piano` usa ora `privato.piano_pubblica`.
+
+## Centralino — `authenticated` + `is_centralino()` (scrive) / `is_direzione()` (legge)
+Vedi `docs/CENTRALINO.md`: `centralino_crea`, `centralino_avanza`, `centralino_chiudi`, `centralino_nota`, `centralino_aggiorna`, `centralino_invia_email`, `centralino_allegato`, `centralino_trasferisci`, `centralino_richiamato`, `centralino_trasf_email`, `centralino_trasf_senza_email`, `centralino_registro_giorno`, `centralino_clienti`, `centralino_sedi`, `centralino_copertura`, `centralino_controlla_sla`. Ruolo: `admin_imposta_responsabile(p_user, 'centralino'|'direzione', p_attivo)`, `admin_imposta_centralino(p_user, p_attivo)` (solo ufficio personale).

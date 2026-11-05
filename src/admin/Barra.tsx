@@ -22,6 +22,11 @@ const P: Record<string, ReactNode> = {
   ritorno: <><path d="M10 6 4 12l6 6" /><path d="M4.5 12H15a5 5 0 0 1 5 5v1" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   chiudi: <path d="M6 6l12 12M18 6 6 18" />,
+  // area Centralino
+  telefono: <path d="M5 3.5h3.5l1.5 4.5-2.2 1.4a11 11 0 0 0 4.8 4.8l1.4-2.2 4.5 1.5V17a2 2 0 0 1-2 2A15.5 15.5 0 0 1 3 5.5a2 2 0 0 1 2-2Z" />,
+  email: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3.5 6.5 8.5 7 8.5-7" /></>,
+  pratiche: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
+  impostazioni: <><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></>,
   // area Ufficio personale
   'hr-richieste': <><path d="M3 13.5h4.5l1.5 3h6l1.5-3H21" /><path d="M5 13.5 7 5h10l2 8.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19v-5.5Z" /><path d="m9.5 9.5 2 2 3.5-3.5" /></>,
   'hr-saldi': <><path d="M6.5 3h11M6.5 21h11" /><path d="M7.5 3v3.5a4.5 4.5 0 0 0 9 0V3M7.5 21v-3.5a4.5 4.5 0 0 1 9 0V21" /></>,

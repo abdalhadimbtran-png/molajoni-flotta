@@ -1,0 +1,3 @@
+-- Correzione: in centralino_importa_clienti la variabile "errori" era ambigua con la colonna
+-- clienti_importazioni.errori (ogni import reale falliva con 42702). Rinominata v_errori.
+-- Applicata come migrazione fix_importa_clienti_errori.

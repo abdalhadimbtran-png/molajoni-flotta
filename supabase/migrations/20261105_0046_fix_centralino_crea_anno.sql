@@ -1,0 +1,2 @@
+-- Correzione: in centralino_crea la variabile "anno" era ambigua con la colonna di privato.pratiche_contatori
+-- (ogni nuova pratica falliva con 42702). Variabile rinominata in v_anno. Applicata come fix_centralino_crea_anno.

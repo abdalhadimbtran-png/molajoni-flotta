@@ -7,6 +7,9 @@ import { leggiFile, type Lettura } from '../../lib/interventi/importa';
 import { baricentri, suggerisci, type Suggerimento } from '../../lib/interventi/suggerimenti';
 import { geocodificaPrimo } from '../../lib/percorsi/routing';
 import MappaInterventi from './MappaInterventi';
+import Cestino, { ModaleElimina, eliminaInterventi } from './Cestino';
+import { useSessione } from '../Shell';
+import { rpc } from '../../lib/supabase';
 import { geocodificaTutto, type Avanzamento } from '../../lib/interventi/geocodificaBrowser';
 import { CAMPI, QUALITA, STATI, coloreTecnico, daVerificare, etichettaSede, indirizzoBreve, linkGoogle, type Intervento } from './tipi';
 import { esportaPunti } from '../../lib/interventi/esporta';
@@ -36,7 +39,7 @@ function BottoniEsporta({ righe, nome }: { righe: Intervento[]; nome: string }) 
 
 interface Sigla { sigla: string; dipendente_id: number | null; attiva: boolean }
 interface Tec { id: number; nome: string; cognome: string; codice: string | null }
-type Vista = 'mappa' | 'tabella' | 'clienti' | 'senza' | 'verifica' | 'qualita' | 'sigle' | 'importa';
+type Vista = 'mappa' | 'tabella' | 'cestino' | 'clienti' | 'senza' | 'verifica' | 'qualita' | 'sigle' | 'importa';
 
 const fineMese = (m: string) => { const [a, b] = m.split('-').map(Number); return new Date(Date.UTC(a, b, 0)).toISOString().slice(0, 10); };
 const nomeMese = (m: string) => new Date(`${m}-15T12:00`).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
@@ -45,11 +48,11 @@ const nomeMese = (m: string) => new Date(`${m}-15T12:00`).toLocaleDateString('it
 export function RiepilogoInterventi() {
   const { t } = useT();
   const { data, caricamento } = useLoad(async () => {
-    const im = await supabase.from('importazioni').select('mese').not('mese', 'is', null).order('mese', { ascending: false }).limit(1);
+    const im = await supabase.from('importazioni').select('mese').is('eliminato_at', null).not('mese', 'is', null).order('mese', { ascending: false }).limit(1);
     const mese = (im.data?.[0]?.mese as string | undefined)?.slice(0, 7);
     if (!mese) return null;
     const l = await tutteLeRighe<Pick<Intervento, 'tecnico_sigla' | 'geo_qualita' | 'geo_dubbio' | 'lat' | 'fuori_lazio'>>((da, a) => supabase.from('interventi_importati')
-      .select('tecnico_sigla,geo_qualita,geo_dubbio,lat,fuori_lazio').eq('fuori_lazio', false)
+      .select('tecnico_sigla,geo_qualita,geo_dubbio,lat,fuori_lazio').eq('fuori_lazio', false).is('eliminato_at', null)
       .gte('data_riferimento', `${mese}-01`).lte('data_riferimento', fineMese(mese)).order('id').range(da, a));
     return { mese, tot: l.length, senza: l.filter(x => !x.tecnico_sigla).length, verifica: l.filter(x => daVerificare(x as Intervento)).length };
   }, []);
@@ -74,7 +77,7 @@ export default function Interventi() {
 
   const base = useLoad(async () => {
     const [im, sg, tc, cz] = await Promise.all([
-      supabase.from('importazioni').select('id,file_nome,mese,righe,nuovi,aggiornati,scartati,fuori_lazio,created_at').order('created_at', { ascending: false }).limit(50),
+      supabase.from('importazioni').select('id,file_nome,mese,righe,nuovi,aggiornati,scartati,fuori_lazio,created_at').is('eliminato_at', null).order('created_at', { ascending: false }).limit(50),
       supabase.from('tecnici_sigle').select('sigla,dipendente_id,attiva').order('sigla'),
       supabase.from('tecnici').select('id,nome,cognome,codice').eq('attivo', true).order('cognome'),
       supabase.from('cap_zone').select('cap,tecnico_sigla'),
@@ -86,10 +89,12 @@ export default function Interventi() {
   const mese = meseScelto ?? base.data?.mesi[0] ?? null;
   const dati = useLoad(async () => {
     if (!mese) return [] as Intervento[];
-    return tutteLeRighe<Intervento>((da, a) => supabase.from('interventi_importati').select(CAMPI)
+    return tutteLeRighe<Intervento>((da, a) => supabase.from('interventi_importati').select(CAMPI).is('eliminato_at', null)
       .gte('data_riferimento', `${mese}-01`).lte('data_riferimento', fineMese(mese)).order('id').range(da, a));
   }, [mese]);
   const ricarica = () => { base.reload(); dati.reload(); };
+  const { admin } = useSessione();
+  const [daEliminare, setDaEliminare] = useState<number[] | null>(null);
   const [geo, setGeo] = useState<Avanzamento | null>(null);
   const [geoAttiva, setGeoAttiva] = useState(false);
   const [geoErr, setGeoErr] = useState<string | null>(null);
@@ -178,7 +183,7 @@ export default function Interventi() {
       </div>}
 
       <div className="segmented" role="tablist" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-        {([['mappa', 'Mappa'], ['tabella', 'Tabella'], ['clienti', 'Sedi del cliente'], ['senza', `Senza tecnico (${senza.length})`], ['verifica', `Da verificare (${verifica.length})`], ['qualita', 'Controllo qualità'], ['sigle', 'Sigle tecnici'], ['importa', 'Importa']] as [Vista, string][])
+        {([['mappa', 'Mappa'], ['tabella', 'Tabella'], ['clienti', 'Sedi del cliente'], ['cestino', 'Cestino'], ['senza', `Senza tecnico (${senza.length})`], ['verifica', `Da verificare (${verifica.length})`], ['qualita', 'Controllo qualità'], ['sigle', 'Sigle tecnici'], ['importa', 'Importa']] as [Vista, string][])
           .map(([v, l]) => <button key={v} className={vista === v ? 'on' : ''} onClick={() => setVista(v)}>{t(l)}</button>)}
       </div>
 
@@ -195,7 +200,7 @@ export default function Interventi() {
         {geoErr && <div style={{ width: '100%' }}><Banner s="ko">{geoErr}</Banner></div>}
       </div>}
       {dati.errore && <Errore testo={dati.errore} onRetry={dati.reload} />}
-      {vista === 'importa' && <Importa onFatto={ricarica} onGeo={avviaGeo} storico={base.data.importazioni} />}
+      {vista === 'importa' && <Importa onFatto={ricarica} onGeo={avviaGeo} onRicarica={ricarica} storico={base.data.importazioni} />}
       {vista === 'sigle' && <Sigle sigle={base.data.sigle} tecnici={base.data.tecnici} onSalvato={ricarica} />}
       {nessuno && vista !== 'importa' && vista !== 'sigle' && <Banner s="warn">{t('Nessun file importato. Usa «Importa file Excel» con il Listato interventi esportato da Taylor.')}</Banner>}
       {!nessuno && (vista === 'mappa' || vista === 'tabella') && <>
@@ -212,14 +217,19 @@ export default function Interventi() {
           <BottoniEsporta righe={filtrati} nome={`interventi_${mese}${f.tecnico ? `_${f.tecnico}` : ''}${f.cliente ? `_cliente_${f.cliente}` : ''}`} />
         </div>
         {vista === 'mappa' ? <>
-          <MappaInterventi interventi={filtrati} alta />
+          <MappaInterventi interventi={filtrati} alta onElimina={id => setDaEliminare([id])} />
           <Legenda sigle={[...perTec.keys()].sort()} />
-        </> : <Tabella righe={filtrati} />}
+        </> : <Tabella righe={filtrati} onElimina={setDaEliminare} />}
       </>}
+      {vista === 'cestino' && <Cestino admin={admin} onCambiato={ricarica} />}
+      {daEliminare && <ModaleElimina titolo={daEliminare.length === 1 ? t('Elimina intervento') : t('Elimina {n} interventi', { n: daEliminare.length })}
+        testo={daEliminare.length === 1 ? (() => { const i = tutti.find(x => x.id === daEliminare[0]); return i ? `N. ${i.numero ?? ''} · ${etichettaSede(i)}` : ''; })() : t('{n} interventi selezionati.', { n: daEliminare.length })}
+        onClose={() => setDaEliminare(null)}
+        onConferma={async s => { const n = await eliminaInterventi(daEliminare, s); toast(t('{n} interventi nel cestino', { n })); dati.reload(); }} />}
       {!nessuno && vista === 'clienti' && <SediCliente righe={visibili} mese={mese ?? ''} onSposta={sposta} />}
       {!nessuno && vista === 'qualita' && <Qualita righe={lazio} />}
       {!nessuno && vista === 'senza' && <SenzaTecnico righe={senza} sugg={sugg} sigle={[...attive]} onAssegna={assegna} onAccettaTutti={accettaTutti} />}
-      {!nessuno && vista === 'verifica' && <DaVerificare righe={verifica} tutti={lazio} onSposta={sposta} onRiprova={async ids => {
+      {!nessuno && vista === 'verifica' && <DaVerificare righe={verifica} tutti={lazio} onSposta={sposta} onElimina={id => setDaEliminare([id])} onRiprova={async ids => {
         const r = await supabase.from('interventi_importati').update({ geo_tentato_at: null }).in('id', ids).is('lat', null);
         if (r.error) toast(testoErrore(r.error)); else await avviaGeo();
       }} />}
@@ -241,15 +251,23 @@ function Legenda({ sigle }: { sigle: string[] }) {
   );
 }
 
-function Tabella({ righe }: { righe: Intervento[] }) {
+function Tabella({ righe, onElimina }: { righe: Intervento[]; onElimina: (ids: number[]) => void }) {
   const { t } = useT();
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const tog = (id: number) => setSel(x => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [pag, setPag] = useState(0);
   const PAG = 100; const pagine = Math.max(1, Math.ceil(righe.length / PAG)); const p = Math.min(pag, pagine - 1);
+  const pagina = righe.slice(p * PAG, p * PAG + PAG);
+  const tuttiPag = pagina.length > 0 && pagina.every(i => sel.has(i.id));
   return (<>
+    {sel.size > 0 && <div className="row-flex" style={{ gap: 8, marginBottom: 8 }}><strong>{t('{n} selezionati', { n: sel.size })}</strong>
+      <button className="btn btn-sm brand" onClick={() => { onElimina([...sel]); setSel(new Set()); }}>{t('Elimina selezionati')}</button>
+      <button className="btn-ghost btn-sm" onClick={() => setSel(new Set())}>{t('Deseleziona')}</button></div>}
     <div className="table-wrap"><table>
-      <thead><tr><th>{t('N.')}</th><th>{t('Tecnico')}</th><th>{t('Cliente')}</th><th>{t('Impianto')}</th><th>{t('Indirizzo')}</th><th>{t('Comp.')}</th><th>{t('Famiglie')}</th><th>{t('Tipo')}</th><th>{t('Stato')}</th><th>{t('Posizione')}</th><th>{t('Durata')}</th></tr></thead>
-      <tbody>{righe.slice(p * PAG, p * PAG + PAG).map(i => (
+      <thead><tr><th><input type="checkbox" aria-label={t('Seleziona pagina')} checked={tuttiPag} onChange={() => setSel(x => { const n = new Set(x); pagina.forEach(i => tuttiPag ? n.delete(i.id) : n.add(i.id)); return n; })} /></th><th>{t('N.')}</th><th>{t('Tecnico')}</th><th>{t('Cliente')}</th><th>{t('Impianto')}</th><th>{t('Indirizzo')}</th><th>{t('Comp.')}</th><th>{t('Famiglie')}</th><th>{t('Tipo')}</th><th>{t('Stato')}</th><th>{t('Posizione')}</th><th>{t('Durata')}</th><th /></tr></thead>
+      <tbody>{pagina.map(i => (
         <tr key={i.id}>
+          <td><input type="checkbox" checked={sel.has(i.id)} onChange={() => tog(i.id)} aria-label={t('Seleziona')} /></td>
           <td className="mono">{i.numero}</td>
           <td>{i.tecnico_sigla ? <span><i className="int-dot" style={{ background: coloreTecnico(i.tecnico_sigla) }} />{i.tecnico_sigla}</span> : <Pill s="ko">{t('Senza')}</Pill>}</td>
           <td>{i.cliente}<div className="sub mono">{i.cod_cliente}</div></td>
@@ -261,8 +279,9 @@ function Tabella({ righe }: { righe: Intervento[] }) {
           <td>{t(STATI[i.stato])}</td>
           <td>{i.geo_qualita ? <Pill s={daVerificare(i) ? 'warn' : 'ok'}>{t(QUALITA[i.geo_qualita])}</Pill> : <Pill s="na">{i.fuori_lazio ? t('Fuori Lazio') : t('In attesa')}</Pill>}</td>
           <td className="sub">{i.durata_minuti ? `${i.durata_minuti}′` : t('Durata: da definire')}</td>
+          <td><button className="btn-ghost btn-sm" onClick={() => onElimina([i.id])} title={t('Elimina intervento')}>{t('Elimina')}</button></td>
         </tr>))}
-        {!righe.length && <tr><td colSpan={11} className="sub">{t('Nessun intervento con questi filtri')}</td></tr>}</tbody>
+        {!righe.length && <tr><td colSpan={13} className="sub">{t('Nessun intervento con questi filtri')}</td></tr>}</tbody>
     </table></div>
     <Paginazione p={p} pagine={pagine} tot={righe.length} onPag={setPag} />
   </>);
@@ -294,7 +313,7 @@ function SenzaTecnico({ righe, sugg, sigle, onAssegna, onAccettaTutti }: { righe
   </>);
 }
 
-function DaVerificare({ righe, tutti, onSposta, onRiprova }: { righe: Intervento[]; tutti: Intervento[]; onSposta: (id: number, lat: number, lon: number, ind?: string) => Promise<void>; onRiprova: (ids: number[]) => Promise<void> }) {
+function DaVerificare({ righe, tutti, onSposta, onRiprova, onElimina }: { onElimina: (id: number) => void; righe: Intervento[]; tutti: Intervento[]; onSposta: (id: number, lat: number, lon: number, ind?: string) => Promise<void>; onRiprova: (ids: number[]) => Promise<void> }) {
   const { t } = useT();
   const [sel, setSel] = useState<number | null>(righe[0]?.id ?? null);
   const [testo, setTesto] = useState('');
@@ -328,6 +347,7 @@ function DaVerificare({ righe, tutti, onSposta, onRiprova }: { righe: Intervento
           <div className="row-flex" style={{ marginTop: 8 }}>
             <input value={testo} onChange={e => setTesto(e.target.value)} placeholder={t('Indirizzo corretto, es. Via Roma 10')} onKeyDown={e => e.key === 'Enter' && cerca()} style={{ flex: 1 }} />
             <button className="btn btn-sm" disabled={occ} onClick={cerca}>{t('Cerca e salva')}</button>
+            <button className="btn-ghost btn-sm" onClick={() => onElimina(i.id)}>{t('Elimina intervento')}</button>
           </div>
           <p className="hint">{i.lat == null ? t('Nessuna posizione: scrivi un indirizzo migliore.') : t('Oppure trascina il segnaposto sulla mappa nel punto giusto.')}</p>
         </div>}
@@ -359,15 +379,21 @@ function Sigle({ sigle, tecnici, onSalvato }: { sigle: Sigla[]; tecnici: Tec[]; 
   </>);
 }
 
-interface Anteprima { file: File; l: Lettura; nuovi: number; aggiornati: number; fuori: number; senzaTec: number; verifica: number }
+interface Anteprima { file: File; l: Lettura; eliminati: number; nuovi: number; aggiornati: number; fuori: number; senzaTec: number; verifica: number }
 
-function Importa({ onFatto, onGeo, storico }: { onFatto: () => void; onGeo: () => void; storico: { id: number; file_nome: string; mese: string | null; righe: number; nuovi: number; aggiornati: number; scartati: number; fuori_lazio: number; created_at: string }[] }) {
+function Importa({ onFatto, onGeo, onRicarica, storico }: { onRicarica: () => void; onFatto: () => void; onGeo: () => void; storico: { id: number; file_nome: string; mese: string | null; righe: number; nuovi: number; aggiornati: number; scartati: number; fuori_lazio: number; created_at: string }[] }) {
   const { t } = useT();
   const [ant, setAnt] = useState<Anteprima | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [fase, setFase] = useState<'' | 'lettura' | 'salvataggio'>('');
   const [esito, setEsito] = useState<string | null>(null);
   const [sopra, setSopra] = useState(false);
+  const [ripristinaEl, setRipristinaEl] = useState(false);
+  const [elimImp, setElimImp] = useState<{ id: number; nome: string; totale: number; pianificati: number } | null>(null);
+  async function apriElimina(id: number, nome: string) {
+    try { const a = await rpc<{ totale: number; pianificati: number }>('anteprima_elimina_importazione', { p_importazione: id }); setElimImp({ id, nome, ...a }); }
+    catch (e) { toast(testoErrore(e)); }
+  }
 
   async function scegli(file: File | undefined) {
     if (!file) return;
@@ -377,13 +403,14 @@ function Importa({ onFatto, onGeo, storico }: { onFatto: () => void; onGeo: () =
     try {
       const l = await leggiFile(file);
       if (l.mancanti.length) { setErrore(t('Colonne mancanti: {c}', { c: l.mancanti.join(', ') })); return; }
-      const ids = l.righe.map(r => r.id_intervento); const esistenti = new Set<string>();
+      const ids = l.righe.map(r => r.id_intervento); const esistenti = new Set<string>(); const eliminati = new Set<string>();
       for (let i = 0; i < ids.length; i += 150) {
-        const r = await supabase.from('interventi_importati').select('id_intervento').in('id_intervento', ids.slice(i, i + 150));
-        if (r.error) throw r.error; r.data.forEach(x => esistenti.add(x.id_intervento as string));
+        const r = await supabase.from('interventi_importati').select('id_intervento,eliminato_at').in('id_intervento', ids.slice(i, i + 150));
+        if (r.error) throw r.error; r.data.forEach(x => (x.eliminato_at ? eliminati : esistenti).add(x.id_intervento as string));
       }
+      setRipristinaEl(false);
       const laz = l.righe.filter(r => !r.fuori_lazio);
-      setAnt({ file, l, nuovi: ids.filter(x => !esistenti.has(x)).length, aggiornati: esistenti.size, fuori: l.righe.length - laz.length,
+      setAnt({ file, l, eliminati: eliminati.size, nuovi: ids.filter(x => !esistenti.has(x) && !eliminati.has(x)).length, aggiornati: esistenti.size, fuori: l.righe.length - laz.length,
         senzaTec: laz.filter(r => !r.tecnico_sigla).length, verifica: laz.filter(r => !r.via || !r.civico).length });
     } catch (e) { setErrore(testoErrore(e)); } finally { setFase(''); }
   }
@@ -392,10 +419,12 @@ function Importa({ onFatto, onGeo, storico }: { onFatto: () => void; onGeo: () =
     if (!ant) return;
     setFase('salvataggio');
     try {
-      const { data, error } = await supabase.rpc('importa_interventi', { p_file: ant.file.name, p_mese: ant.l.mese ? `${ant.l.mese}-01` : null, p_scartati: ant.l.scartate.length, p_righe: ant.l.righe });
+      const { data, error } = await supabase.rpc('importa_interventi_v2', { p_file: ant.file.name, p_mese: ant.l.mese ? `${ant.l.mese}-01` : null, p_scartati: ant.l.scartate.length, p_righe: ant.l.righe, p_ripristina: ripristinaEl });
       if (error) throw error;
       const d = data as { nuovi: number; aggiornati: number; scartati: number; fuori_lazio: number };
-      setEsito(t('Salvati: {n} nuovi, {a} aggiornati, {s} scartati, {f} fuori Lazio.', { n: d.nuovi, a: d.aggiornati, s: d.scartati, f: d.fuori_lazio }) + ' ' + t('Posizioni riusate dagli impianti: {r}.', { r: (d as { posizioni_riusate?: number }).posizioni_riusate ?? 0 }));
+      setEsito(t('Salvati: {n} nuovi, {a} aggiornati, {s} scartati, {f} fuori Lazio.', { n: d.nuovi, a: d.aggiornati, s: d.scartati, f: d.fuori_lazio }) + ' ' + t('Posizioni riusate dagli impianti: {r}.', { r: (d as { posizioni_riusate?: number }).posizioni_riusate ?? 0 })
+        + (((d as { eliminati_saltati?: number }).eliminati_saltati ?? 0) ? ' ' + t('{n} eliminati in precedenza: saltati.', { n: (d as { eliminati_saltati?: number }).eliminati_saltati! }) : '')
+        + (((d as { ripristinati?: number }).ripristinati ?? 0) ? ' ' + t('{n} ripristinati dal cestino.', { n: (d as { ripristinati?: number }).ripristinati! }) : ''));
       setAnt(null); onFatto();
       onGeo();
     } catch (e) { setErrore(testoErrore(e)); } finally { setFase(''); }
@@ -423,15 +452,25 @@ function Importa({ onFatto, onGeo, storico }: { onFatto: () => void; onGeo: () =
         <div className={`kpi ${ant.verifica ? 'warn' : 'ok'}`}><div className="lbl">{t('Indirizzo incompleto')}</div><div className="num">{ant.verifica}</div></div>
         <div className={`kpi ${ant.l.scartate.length ? 'warn' : 'ok'}`}><div className="lbl">{t('Scartate')}</div><div className="num">{ant.l.scartate.length}</div></div>
       </div>
+      {ant.eliminati > 0 && <Banner s="warn">{t('{n} interventi di questo file erano stati eliminati in precedenza: per default vengono saltati.', { n: ant.eliminati })}
+        <label className="row-flex" style={{ gap: 6, marginTop: 6 }}><input type="checkbox" checked={ripristinaEl} onChange={e => setRipristinaEl(e.target.checked)} />{t('Ripristina eliminati')}</label></Banner>}
       {ant.l.scartate.length > 0 && <p className="hint">{ant.l.scartate.slice(0, 8).map(s => `${t('riga')} ${s.riga}: ${s.motivo}`).join(' · ')}</p>}
       <div className="row-flex"><button className="btn brand" disabled={!!fase} onClick={conferma}>{fase === 'salvataggio' ? t('Salvataggio…') : t('Conferma e salva')}</button>
         <button className="btn-ghost" onClick={() => setAnt(null)}>{t('Annulla')}</button></div>
     </div>}
     {storico.length > 0 && <>
       <div className="section-title" style={{ marginTop: 24 }}>{t('Importazioni precedenti')}</div>
-      <div className="table-wrap"><table><thead><tr><th>{t('Data')}</th><th>{t('File')}</th><th>{t('Mese')}</th><th>{t('Righe')}</th><th>{t('Nuovi')}</th><th>{t('Aggiornati')}</th><th>{t('Scartati')}</th><th>{t('Fuori Lazio')}</th></tr></thead>
-        <tbody>{storico.map(s => <tr key={s.id}><td className="mono">{new Date(s.created_at).toLocaleString('it-IT')}</td><td>{s.file_nome}</td><td>{s.mese ? nomeMese(s.mese.slice(0, 7)) : '—'}</td><td>{s.righe}</td><td>{s.nuovi}</td><td>{s.aggiornati}</td><td>{s.scartati}</td><td>{s.fuori_lazio}</td></tr>)}</tbody></table></div>
+      <div className="table-wrap"><table><thead><tr><th>{t('Data')}</th><th>{t('File')}</th><th>{t('Mese')}</th><th>{t('Righe')}</th><th>{t('Nuovi')}</th><th>{t('Aggiornati')}</th><th>{t('Scartati')}</th><th>{t('Fuori Lazio')}</th><th /></tr></thead>
+        <tbody>{storico.map(s => <tr key={s.id}><td className="mono">{new Date(s.created_at).toLocaleString('it-IT')}</td><td>{s.file_nome}</td><td>{s.mese ? nomeMese(s.mese.slice(0, 7)) : '—'}</td><td>{s.righe}</td><td>{s.nuovi}</td><td>{s.aggiornati}</td><td>{s.scartati}</td><td>{s.fuori_lazio}</td><td><button className="btn-ghost btn-sm" onClick={() => apriElimina(s.id, s.file_nome)}>{t('Elimina importazione')}</button></td></tr>)}</tbody></table></div>
     </>}
+    {elimImp && <ModaleElimina titolo={t('Elimina importazione')} pianificati={elimImp.pianificati}
+      testo={t('{f}: {n} interventi, di cui {p} già pianificati / con percorso o assegnati a un giorno.', { f: elimImp.nome, n: elimImp.totale, p: elimImp.pianificati })}
+      onClose={() => setElimImp(null)}
+      onConferma={async s => {
+        const r = await rpc<{ eliminati: number; rimasti: number }>('elimina_importazione', { p_importazione: elimImp.id, p_motivo: s.motivo, p_anche_pianificati: s.anchePianificati, p_posizioni: s.posizioni });
+        toast(t('{n} interventi nel cestino', { n: r.eliminati }) + (r.rimasti ? ' · ' + t('{n} pianificati mantenuti', { n: r.rimasti }) : ''));
+        onRicarica();
+      }} />}
   </>);
 }
 

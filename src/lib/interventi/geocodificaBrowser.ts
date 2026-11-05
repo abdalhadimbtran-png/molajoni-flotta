@@ -22,7 +22,7 @@ const cacheRpc: Cache = {
 };
 
 async function contaDaFare(): Promise<number> {
-  const { count } = await supabase.from('interventi_importati').select('id', { count: 'exact', head: true }).eq('fuori_lazio', false).is('lat', null).is('geo_tentato_at', null);
+  const { count } = await supabase.from('interventi_importati').select('id', { count: 'exact', head: true }).eq('fuori_lazio', false).is('eliminato_at', null).is('lat', null).is('geo_tentato_at', null);
   return count ?? 0;
 }
 
@@ -31,7 +31,7 @@ async function dalBrowser(onProg: (a: Avanzamento) => void, base: number, tot: n
   let fatti = base;
   for (;;) {
     const { data, error } = await supabase.from('interventi_importati').select('id,via,civico_geo,cap,comune,prov')
-      .eq('fuori_lazio', false).is('lat', null).is('geo_tentato_at', null).order('id').limit(50);
+      .eq('fuori_lazio', false).is('eliminato_at', null).is('lat', null).is('geo_tentato_at', null).order('id').limit(50);
     if (error) throw error;
     if (!data.length) return { fatti, tot, modo: 'browser' };
     for (const r of data as (RigaGeo & { id: number })[]) {

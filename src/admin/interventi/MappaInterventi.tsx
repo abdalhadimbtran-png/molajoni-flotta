@@ -15,24 +15,30 @@ function popup(i: Intervento): string {
     + r('Indirizzo', [i.via, i.civico].filter(Boolean).join(' ') + ` – ${i.cap ?? ''} ${i.comune ?? ''}`)
     + r('Componenti', i.componenti) + r('Famiglie', i.famiglie.join(', ')) + r('Tipo', i.tipo) + r('Note', i.note)
     + r('Posizione', `${i.geo_qualita ?? '—'}${i.geo_fonte ? ` · ${i.geo_fonte}` : ''}${i.geo_dubbio ? ' (da verificare)' : ''}${i.indirizzo_cambiato ? ' · indirizzo cambiato' : ''}`)
-    + (i.lat != null && i.lon != null ? `<div><a href="${linkGoogle(i.lat, i.lon)}" target="_blank" rel="noopener">Apri in Google Maps</a></div>` : '') + `</div>`;
+    + (i.lat != null && i.lon != null ? `<div><a href="${linkGoogle(i.lat, i.lon)}" target="_blank" rel="noopener">Apri in Google Maps</a></div>` : '')
+    + `<div style="margin-top:6px"><button type="button" class="btn-ghost btn-sm" data-elimina="${i.id}" hidden>Elimina intervento</button></div></div>`;
 }
 
 /** Mappa di tutti gli interventi con raggruppamento; colore = tecnico, forma = qualità della posizione. */
-export default function MappaInterventi({ interventi, trascinabile, onSposta, onScegli, alta = false }: {
+export default function MappaInterventi({ interventi, trascinabile, onSposta, onScegli, onElimina, alta = false }: {
+  onElimina?: (id: number) => void;
   interventi: Intervento[]; trascinabile?: number | null; onSposta?: (id: number, lat: number, lon: number) => void;
   onScegli?: (id: number) => void; alta?: boolean;
 }) {
   const div = useRef<HTMLDivElement>(null);
   const mappa = useRef<L.Map | null>(null);
   const gruppo = useRef<L.MarkerClusterGroup | null>(null);
-  const cb = useRef({ onSposta, onScegli }); cb.current = { onSposta, onScegli };
+  const cb = useRef({ onSposta, onScegli, onElimina }); cb.current = { onSposta, onScegli, onElimina };
   const inquadrato = useRef('');
   useEffect(() => {
     if (!div.current || mappa.current) return;
     const m = L.map(div.current, { scrollWheelZoom: true }).setView([41.9, 12.5], 10);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(m);
     mappa.current = m;
+    m.on('popupopen', e => {
+      const b = e.popup.getElement()?.querySelector<HTMLButtonElement>('button[data-elimina]');
+      if (b) { b.hidden = !cb.current.onElimina; b.onclick = () => { m.closePopup(); cb.current.onElimina?.(Number(b.dataset.elimina)); }; }
+    });
     gruppo.current = L.markerClusterGroup({ chunkedLoading: true, removeOutsideVisibleBounds: true, maxClusterRadius: 45, disableClusteringAtZoom: 17, showCoverageOnHover: false }).addTo(m);
     return () => { m.remove(); mappa.current = null; };
   }, []);

@@ -41,7 +41,7 @@ Deno.serve(async req => {
   if (ok !== true) return json({ errore: "Non autorizzato" }, 403);
 
   const inizio = Date.now();
-  let q = db.from("interventi_importati").select("id,via,civico_geo,cap,comune,prov").eq("fuori_lazio", false).order("id").limit(60);
+  let q = db.from("interventi_importati").select("id,via,civico_geo,cap,comune,prov").eq("fuori_lazio", false).is("eliminato_at", null).order("id").limit(60);
   q = body.ids?.length ? q.in("id", body.ids.slice(0, 200)) : q.is("lat", null).is("geo_tentato_at", null);
   const { data: righe, error } = await q;
   if (error) return json({ errore: error.message }, 500);
@@ -61,6 +61,6 @@ Deno.serve(async req => {
       break;
     }
   }
-  const { count } = await db.from("interventi_importati").select("id", { count: "exact", head: true }).eq("fuori_lazio", false).is("lat", null).is("geo_tentato_at", null);
+  const { count } = await db.from("interventi_importati").select("id", { count: "exact", head: true }).eq("fuori_lazio", false).is("eliminato_at", null).is("lat", null).is("geo_tentato_at", null);
   return json({ fatti, rimanenti: count ?? 0, esiti, errore_servizio });
 });

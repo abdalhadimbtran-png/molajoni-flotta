@@ -49,3 +49,12 @@ Reimportazione: se via/civico/CAP/comune non cambiano la posizione resta; le pos
 
 ## Test
 `npm test` → `src/lib/interventi/interventi.test.ts` (pulizia indirizzi, lettura colonne per nome, Lazio, validazione, punto medio via, suggerimenti) con indirizzi inventati. Il file reale con dati clienti non va mai messo nel repository.
+
+## Eliminazione e cestino (migrazione 0054)
+- Eliminazione **reversibile**: `eliminato_at/eliminato_da/motivo_eliminazione` su `interventi_importati` e `importazioni`; lo stato passa ad `annullato` (il precedente è in `stato_prima_eliminazione` e torna al ripristino). Gli eliminati spariscono da mappa, tabella, KPI, suggerimenti e geocodifica.
+- **Elimina importazione** (storico importazioni): anteprima «N interventi, di cui P già pianificati / con percorso o assegnati a un giorno» (stato pianificato/eseguito o urgenza collegata); scelta «Elimina anche quelli pianificati» / «solo non pianificati»; motivo obbligatorio (File sbagliato / Duplicato / Mese errato / Altro + testo).
+- **Elimina intervento**: popup della mappa, riga della tabella, scheda «Da verificare»; selezione multipla in tabella.
+- «Elimina anche le posizioni salvate» nasconde le posizioni impianto non più usate (`impianti_posizione.eliminato_at`); una nuova coordinata le riattiva.
+- **Cestino** (vista): ripristino per importazione, per gruppo o singolo, entro 30 giorni. Reimportando un file, gli eliminati sono **saltati** e contati, salvo «Ripristina eliminati» nell'anteprima (`importa_interventi_v2`).
+- Registro: `interventi_cestino_log` (elimina / ripristina / ripristina_da_import / svuota).
+- **Svuota cestino** (solo amministratore, cancellazione definitiva): `supabase/da_confermare/svuota_cestino_interventi.sql`, **non ancora applicato** (contiene DELETE, richiede conferma). Il pulsante avvisa finché non è attivo.

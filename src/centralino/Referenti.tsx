@@ -6,8 +6,8 @@ import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
 
 export const RESPONSABILITA: { k: string; l: string; d: string }[] = [
-  { k: 'offerte_grandi', l: 'Offerte > 1.000 €', d: 'Ricevono le offerte oltre 1.000 € (chi è disponibile) e sono in copia nelle prese in carico' },
-  { k: 'offerte_piccole', l: 'Offerte ≤ 1.000 €', d: 'Le prepara e invia il centralino' },
+  { k: 'offerte_grandi', l: 'Offerte da 1.000 €', d: 'Ricevono le offerte da 1.000 € in su (chi è disponibile) e sono in copia nelle prese in carico' },
+  { k: 'offerte_piccole', l: 'Offerte fino a 999,99 €', d: 'Le prepara e invia il centralino' },
   { k: 'sopralluoghi', l: 'Sopralluoghi', d: 'Tecnici commerciali che fanno il sopralluogo (in copia alla conferma)' },
   { k: 'amministrazione', l: 'Fatture / amministrazione', d: 'Tasto 2 del risponditore; al pomeriggio sul cellulare' },
   { k: 'fornitori', l: 'Fornitori', d: 'Tasto 3 del risponditore; lunedì e venerdì' },
@@ -17,7 +17,7 @@ export const RESPONSABILITA: { k: string; l: string; d: string }[] = [
   { k: 'flotta', l: 'Flotta', d: 'Automezzi' },
 ];
 const nomeR = (k: string) => RESPONSABILITA.find(r => r.k === k)?.l ?? k;
-interface Referente { id: number; nome: string; ruolo: string | null; email: string | null; telefono: string | null; cellulare: string | null; attivo: boolean; responsabilita: string[]; note: string | null; ordine: number }
+interface Referente { id: number; nome: string; ruolo: string | null; email: string | null; telefono: string | null; cellulare: string | null; attivo: boolean; responsabilita: string[]; note: string | null; ordine: number; coordina_interventi?: boolean; coordina_sopralluoghi?: boolean }
 interface Avvisi { senza_email: { nome: string; responsabilita: string[] }[]; scoperte: string[] }
 
 /**
@@ -44,13 +44,14 @@ export default function Referenti() {
           {data.avvisi.scoperte.length > 0 && <div className="ct-avviso">Nessun referente per: {data.avvisi.scoperte.map(nomeR).join(', ')}.</div>}
         </div>)}
       <div className="table-wrap"><table className="ct-tab ct-ref">
-        <thead><tr><th>Nome</th><th>Ruolo</th><th>Contatti</th>{RESPONSABILITA.map(r => <th key={r.k} title={r.d} className="ct-ref-r">{r.l}</th>)}<th>Attivo</th></tr></thead>
+        <thead><tr><th>Nome</th><th>Ruolo</th><th>Contatti</th>{RESPONSABILITA.map(r => <th key={r.k} title={r.d} className="ct-ref-r">{r.l}</th>)}<th className="ct-ref-r">Coord. interventi</th><th className="ct-ref-r">Coord. sopralluoghi</th><th>Attivo</th></tr></thead>
         <tbody>{data.lista.map(p => (
           <tr key={p.id} className={`${p.attivo ? '' : 'ct-spento'} ${ctx.scrive ? 'ct-clic' : ''}`} onClick={() => ctx.scrive && setMod(p)}>
             <td><b>{p.nome}</b>{p.note && <div className="sub">{p.note}</div>}</td>
             <td>{p.ruolo ?? '—'}</td>
             <td>{p.email ? <span>{p.email}</span> : <span className="ct-err-email">email mancante</span>}{(p.cellulare || p.telefono) && <div className="sub">{[p.telefono, p.cellulare].filter(Boolean).join(' · ')}</div>}</td>
             {RESPONSABILITA.map(r => <td key={r.k} className="ct-ref-r">{p.responsabilita.includes(r.k) ? <span className="ct-spunta" aria-label="sì">●</span> : ''}</td>)}
+            {([p.coordina_interventi, p.coordina_sopralluoghi]).map((v, i) => <td key={`c${i}`} className="ct-ref-r">{v ? <span className="ct-spunta" aria-label="sì">●</span> : ''}</td>)}
             <td>{p.attivo ? 'Sì' : 'No'}</td>
           </tr>))}</tbody>
       </table></div>
@@ -61,7 +62,7 @@ export default function Referenti() {
 }
 
 function Modale({ r, onClose, onFatto }: { r: Referente | null; onClose: () => void; onFatto: () => void }) {
-  const [f, setF] = useState({ nome: r?.nome ?? '', ruolo: r?.ruolo ?? '', email: r?.email ?? '', telefono: r?.telefono ?? '', cellulare: r?.cellulare ?? '', note: r?.note ?? '', attivo: r?.attivo ?? true, responsabilita: r?.responsabilita ?? [], ordine: r?.ordine ?? 100 });
+  const [f, setF] = useState({ nome: r?.nome ?? '', ruolo: r?.ruolo ?? '', email: r?.email ?? '', telefono: r?.telefono ?? '', cellulare: r?.cellulare ?? '', note: r?.note ?? '', attivo: r?.attivo ?? true, responsabilita: r?.responsabilita ?? [], ordine: r?.ordine ?? 100, coordina_interventi: !!r?.coordina_interventi, coordina_sopralluoghi: !!r?.coordina_sopralluoghi });
   const [err, setErr] = useState<string | null>(null);
   const tog = (k: string) => setF({ ...f, responsabilita: f.responsabilita.includes(k) ? f.responsabilita.filter(x => x !== k) : [...f.responsabilita, k] });
   async function salva(e: FormEvent) {
@@ -85,7 +86,10 @@ function Modale({ r, onClose, onFatto }: { r: Referente | null; onClose: () => v
         </div>
         <fieldset className="ct-resp"><legend>Responsabilità</legend>
           {RESPONSABILITA.map(x => <label key={x.k} className="check"><input type="checkbox" checked={f.responsabilita.includes(x.k)} onChange={() => tog(x.k)} /> <span><b>{x.l}</b> <span className="sub">{x.d}</span></span></label>)}
+          <label className="check"><input type="checkbox" checked={f.coordina_interventi} onChange={e => setF({ ...f, coordina_interventi: e.target.checked })} /> <span><b>Coordinamento interventi</b> <span className="sub">Riceve email + telefonata per ogni intervento (il primo disponibile in ordine)</span></span></label>
+          <label className="check"><input type="checkbox" checked={f.coordina_sopralluoghi} onChange={e => setF({ ...f, coordina_sopralluoghi: e.target.checked })} /> <span><b>Coordinamento sopralluoghi</b> <span className="sub">Riceve email + telefonata per ogni sopralluogo</span></span></label>
         </fieldset>
+        <div className="field"><label htmlFor="rf-or">Ordine (più basso = prima scelta)</label><input id="rf-or" type="number" value={f.ordine} onChange={e => setF({ ...f, ordine: Number(e.target.value) || 0 })} /></div>
         <div className="field"><label htmlFor="rf-no">Nota (es. «al pomeriggio sul cellulare»)</label><input id="rf-no" value={f.note} onChange={e => setF({ ...f, note: e.target.value })} /></div>
         <label className="check"><input type="checkbox" checked={f.attivo} onChange={e => setF({ ...f, attivo: e.target.checked })} /> Attivo</label>
         {err && <Banner s="ko">{err}</Banner>}

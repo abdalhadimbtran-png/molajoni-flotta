@@ -51,7 +51,7 @@ export default function Pratiche() {
             <select aria-label="Tipo" value={tipo} onChange={e => setTipo(e.target.value)}><option value="">Tutti i tipi</option>{Object.entries(NOME_TIPO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             <select aria-label="Canale" value={canale} onChange={e => setCanale(e.target.value)}><option value="">Canali</option>{CANALI.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}</select>
             <select aria-label="Stato cliente" value={stato} onChange={e => setStato(e.target.value)}><option value="">Clienti</option>{Object.entries(STATI_CLIENTE).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>
-            {vista !== 'aperte' && <select aria-label="Esito" value={esito} onChange={e => setEsito(e.target.value)}><option value="">Esiti</option>{Object.entries(ESITI).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>}
+            {vista !== 'aperte' && <select aria-label="Stato" value={esito} onChange={e => setEsito(e.target.value)}><option value="">Stato</option>{Object.entries(ESITI).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>}
           </div>
           <span className="sub">{righe.length} pratiche</span>
         </div>

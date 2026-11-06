@@ -1,6 +1,7 @@
 import { FASCE } from './tipi';
 
-export const SEGNAPOSTO = ['cliente', 'contatto', 'numero_pratica', 'data_appuntamento', 'fascia', 'commerciale', 'tecnico', 'firma', 'argomento', 'referente', 'entro'] as const;
+export const SEGNAPOSTO = ['cliente', 'contatto', 'numero_pratica', 'data_appuntamento', 'fascia', 'commerciale', 'tecnico', 'firma', 'argomento', 'referente', 'entro',
+  'urgenza', 'obiettivo', 'dettaglio', 'descrizione', 'indirizzo', 'telefono', 'email_cliente', 'quando', 'importo', 'stato_cliente', 'scadenza_richiamo'] as const;
 export type Valori = Record<(typeof SEGNAPOSTO)[number], string>;
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -11,14 +12,24 @@ export function dataLunga(iso: string | null | undefined): string {
   return `${GIORNI[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
 }
 
-interface Dati { numero: string; cliente_nome: string; contatto_nome: string | null; appuntamento_data: string | null; appuntamento_fascia: 'mattina' | 'pomeriggio' | null; commerciale_nome: string | null; tecnico_nome: string | null }
+interface Dati { numero: string; cliente_nome: string; contatto_nome: string | null; appuntamento_data: string | null; appuntamento_fascia: 'mattina' | 'pomeriggio' | null; commerciale_nome: string | null; tecnico_nome: string | null;
+  urgenza?: string | null; sottotipo?: string | null; descrizione?: string | null; indirizzo?: string | null; cap?: string | null; comune?: string | null; telefono?: string | null; email?: string | null;
+  tecnico_quando?: string | null; importo_stimato?: number | null; stato_cliente?: string | null; assegnato_nome?: string | null }
+const STATO_C: Record<string, string> = { nuovo: 'nuovo cliente', ex_cliente: 'ex cliente', attivo: 'cliente attivo' };
 /** Valori dei segnaposto per una pratica (testo semplice, non ancora in HTML). */
 export function segnaposto(p: Dati, firma: string): Valori {
   return {
     cliente: p.cliente_nome, contatto: p.contatto_nome || 'Cliente', numero_pratica: p.numero,
     data_appuntamento: dataLunga(p.appuntamento_data) || 'data da concordare', fascia: p.appuntamento_fascia ? FASCE[p.appuntamento_fascia] : 'da concordare',
-    commerciale: p.commerciale_nome || 'il nostro commerciale', tecnico: p.tecnico_nome || 'il nostro tecnico', firma,
+    commerciale: p.commerciale_nome || 'il nostro commerciale', tecnico: p.tecnico_nome || p.assegnato_nome || 'il nostro tecnico', firma,
     argomento: 'la sua richiesta', referente: p.commerciale_nome || 'il nostro referente', entro: 'al più presto',
+    urgenza: p.urgenza === 'urgente' ? 'URGENTE' : p.urgenza === 'ordinario' ? 'ordinario' : '',
+    obiettivo: p.urgenza === 'urgente' ? 'da fare oggi' : p.urgenza === 'ordinario' ? 'entro 2 giorni lavorativi' : 'da pianificare',
+    dettaglio: p.sottotipo || '—', descrizione: p.descrizione || '—',
+    indirizzo: [p.indirizzo, [p.cap, p.comune].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—',
+    telefono: p.telefono || '—', email_cliente: p.email || '—', quando: p.tecnico_quando || 'al più presto',
+    importo: p.importo_stimato != null ? `${p.importo_stimato.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—',
+    stato_cliente: STATO_C[p.stato_cliente ?? ''] ?? 'nuovo cliente', scadenza_richiamo: '2 ore dalla chiamata',
   };
 }
 

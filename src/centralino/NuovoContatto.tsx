@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
-import { CANALI, REGOLA_ANAGRAFICA, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, richiedeAppuntamento, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
-import { giornoRoma, lavorativo, prossimoLavorativo, scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla';
+import { CANALI, REGOLA_ANAGRAFICA, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
+import { scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla';
 import { salvaAppunti, useConfig } from './comune';
 import Appunti from './Appunti';
 import { Ic, iconaCanale } from './componenti';
@@ -35,10 +35,8 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [contattoId, setContattoId] = useState<number | null>(null);
   const [aggiornaRubrica, setAggiornaRubrica] = useState(true);
   const [f, setF] = useState({ contatto_nome: '', telefono: '', email: '', indirizzo: '', cap: '', comune: '', descrizione: '', commerciale: '' });
-  const [data, setData] = useState('');
-  const [fascia, setFascia] = useState<'' | 'mattina' | 'pomeriggio'>('');
   const [tacit, setTacit] = useState(false);
-  const [urgente, setUrgente] = useState(false);
+  const [urgenza, setUrgenza] = useState<'' | 'urgente' | 'ordinario'>('');
   const [err, setErr] = useState<string | null>(null);
   const [appunti, setAppunti] = useState('');
   const [comms, setComms] = useState<Commerciale[]>([]);
@@ -49,21 +47,23 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [trasf, setTrasf] = useState(false);
   const qRef = useRef<HTMLInputElement>(null);
 
-  const tipo: TipoPratica | null = richiesta === 'offerta' ? (grande || Number(importo) > 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
+  const tipo: TipoPratica | null = richiesta === 'offerta' ? (grande || Number(importo) >= 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
   const flusso = config?.flussi.find(x => x.tipo === tipo);
   const allarme = tipo === 'manutenzione' && sottotipo === 'Allarme sonoro attivo';
   const fest = config?.festivi ?? new Set<string>();
-  const oggi = giornoRoma(new Date());
-  const domani = prossimoLavorativo(oggi, fest);
-  const dopodomani = prossimoLavorativo(domani, fest);
   const regola = primoSla(flusso, sottotipo);
   const scad = regola && config ? scadenzaSla(new Date(), regola, fest, config.impostazioni.orario) : null;
   useEffect(() => { if (tipo === 'offerta_grande' && !comms.length) rpc<Commerciale[]>('centralino_commerciali', {}).then(setComms, () => undefined); }, [tipo]); // eslint-disable-line react-hooks/exhaustive-deps
   const disponibili = comms.filter(c => c.disponibile);
   const nessunoEff = nessuno || (comms.length > 0 && !disponibili.length);
 
-  useEffect(() => { if (allarme) { setData(lavorativo(oggi, fest) ? oggi : domani); setUrgente(true); } }, [allarme]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (richiesta === 'offerta' && importo) setGrande(Number(importo) > 1000); }, [importo, richiesta]);
+  const conUrgenza = tipo === 'manutenzione' || tipo === 'sopralluogo';
+  const urgente = urgenza === 'urgente';
+  // urgenza proposta dal sottotipo (allarme sonoro → urgente)
+  useEffect(() => { if (!conUrgenza) { setUrgenza(''); return; } if (allarme || (sottotipo && flusso?.sottotipi_urgenti.includes(sottotipo))) setUrgenza('urgente'); else if (sottotipo) setUrgenza('ordinario'); }, [sottotipo, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (richiesta === 'offerta' && importo) setGrande(Number(importo) >= 1000); }, [importo, richiesta]);
+  // commerciale: il primo disponibile già scelto
+  useEffect(() => { if (tipo === 'offerta_grande' && !f.commerciale && comms.length) setF(x => ({ ...x, commerciale: (comms.find(c => c.disponibile) ?? comms[0]).nome })); }, [comms, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // suggerimenti clienti (Taylor + pratiche già passate dal centralino)
   useEffect(() => {
@@ -109,11 +109,10 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     const l: string[] = [];
     if (!tipo) l.push('cosa chiede');
     if (!q.trim()) l.push('cliente');
-    if (tipo && richiedeAppuntamento(tipo) && !data) l.push('data dell\'appuntamento');
-    if ((data || (tipo && richiedeAppuntamento(tipo))) && !fascia) l.push('mattina o pomeriggio');
+    if (conUrgenza && !urgenza) l.push('urgenza');
     if (tipo === 'offerta_grande' && !f.commerciale) l.push('commerciale');
     return l;
-  }, [tipo, q, data, fascia, f.commerciale]);
+  }, [tipo, q, urgenza, conUrgenza, f.commerciale]);
 
   async function salva(e?: FormEvent) {
     e?.preventDefault(); setErr(null);
@@ -121,18 +120,18 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     setInvio(true);
     try {
       const r = await rpc<{ id: number }>('centralino_crea', { p: {
-        canale, tipo, sottotipo: sottotipo || null, priorita: urgente ? 'urgente' : 'normale',
+        canale, tipo, sottotipo: sottotipo || null, priorita: urgente ? 'urgente' : 'normale', urgenza: conUrgenza ? urgenza : null,
         cliente_codice: cli?.codice ?? null, cliente_nome: q.trim(), sede: sede || null,
         contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, indirizzo: f.indirizzo, cap: f.cap, comune: f.comune, descrizione: f.descrizione,
         importo_stimato: richiesta === 'offerta' && importo ? Number(importo) : null,
-        appuntamento_data: data || null, appuntamento_fascia: data ? fascia || null : null, tacitazione_tentata: tacit,
+        appuntamento_data: null, appuntamento_fascia: null, tacitazione_tentata: tacit,
         commerciale_nome: tipo === 'offerta_grande' ? f.commerciale || null : null, nessuno_disponibile: tipo === 'offerta_grande' && nessunoEff,
         stato_cliente: statoMan ? stato : null,
       } });
       if (cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
       if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
-      // > 1.000 €: commerciale disponibile → trasferisci la chiamata; nessuno → email di presa in carico (richiamo 2 ore già creato)
-      onCreata(r.id, tipo === 'offerta_grande' ? (nessunoEff ? 'email=presa_offerta_grande' : 'trasferisci=1') : trasf ? 'trasferisci=1' : '');
+      // da 1.000 €: subito il passo «email al cliente» (richiamo 2 ore per il commerciale già creato)
+      onCreata(r.id, tipo === 'offerta_grande' ? 'avanza=1' : conUrgenza ? 'avanza=1' : trasf ? 'trasferisci=1' : '');
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
 
@@ -152,7 +151,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta">
           {RICHIESTE.map(r => (
             <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} className={richiesta === r.v ? 'on' : ''}
-              onClick={() => { setRichiesta(r.v); setSottotipo(''); if (r.v !== 'manutenzione') setUrgente(false); }}>
+              onClick={() => { setRichiesta(r.v); setSottotipo(''); }}>
               <Ic n={r.ic} size={22} /><span><b>{r.l}</b><span className="sub">{r.breve}</span></span></button>))}
         </div>
         {flusso && flusso.sottotipi.length > 0 && (
@@ -160,28 +159,35 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             <select id="ct-sotto" value={sottotipo} onChange={e => setSottotipo(e.target.value)}><option value="">— scegli —</option>{flusso.sottotipi.map(st => <option key={st} value={st}>{st}{flusso.sottotipi_urgenti.includes(st) ? ' (urgente: in giornata)' : ''}</option>)}</select></div>)}
         {allarme && (
           <div className="ct-allarme">
-            <b>Allarme sonoro attivo: intervento in giornata.</b>
+            <b>Allarme sonoro attivo: urgente, intervento in giornata.</b>
+            <span className="sub">Prova la tacitazione con il cliente (tasto «tacitazione» sulla centrale, poi reset).</span>
             <label className="check"><input type="checkbox" checked={tacit} onChange={e => setTacit(e.target.checked)} /> Tacitazione tentata al telefono</label>
           </div>)}
+        {conUrgenza && (<>
+          <div className="field"><label htmlFor="ct-urg">Urgenza</label>
+            <select id="ct-urg" value={urgenza} onChange={e => setUrgenza(e.target.value as '' | 'urgente' | 'ordinario')}>
+              <option value="">— scegli —</option><option value="urgente">Urgente (oggi)</option><option value="ordinario">Ordinario (entro 2 gg lav.)</option></select></div>
+          <p className="ct-script">Nessun appuntamento ora. Di' al cliente: «Entro 1 ora la ricontattiamo per confermarle l'appuntamento».</p>
+        </>)}
         {richiesta === 'offerta' && (
           <div className="ct-riga">
             <div className="segmented" role="group" aria-label="Valore">
-              <button type="button" className={!grande ? 'on' : ''} onClick={() => { setGrande(false); if (Number(importo) > 1000) setImporto(''); }}>Fino a 1.000 €</button>
-              <button type="button" className={grande ? 'on' : ''} onClick={() => setGrande(true)}>Oltre 1.000 €</button>
+              <button type="button" className={!grande ? 'on' : ''} onClick={() => { setGrande(false); if (Number(importo) >= 1000) setImporto(''); }}>Fino a 999,99 €</button>
+              <button type="button" className={grande ? 'on' : ''} onClick={() => setGrande(true)}>Da 1.000 €</button>
             </div>
             <div className="field ct-importo"><label htmlFor="ct-imp">Importo stimato (facoltativo)</label>
               <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>
           </div>)}
         {tipo === 'offerta_grande' && (
           <div className="ct-allarme ct-grande">
-            <b>Oltre 1.000 €: l'offerta la fa un Tecnico Commerciale.</b>
+            <b>Da 1.000 €: l'offerta la fa un Tecnico Commerciale.</b>
             <div className="field"><label htmlFor="ct-com">Assegna a</label>
               <select id="ct-com" value={f.commerciale} onChange={e => setF({ ...f, commerciale: e.target.value })}>
                 <option value="">— scegli —</option>
                 {comms.map(c => <option key={c.nome} value={c.nome} disabled={!nessunoEff && !c.disponibile}>{c.nome} · {c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : !c.account && c.email ? 'senza account' : 'occupato'}</option>)}
               </select></div>
             <label className="check"><input type="checkbox" checked={nessunoEff} disabled={comms.length > 0 && !disponibili.length} onChange={e => setNessuno(e.target.checked)} /> Nessuno disponibile ora</label>
-            <span className="sub">{nessunoEff ? 'Di\' al cliente: «un nostro Tecnico Commerciale la contatterà entro 2 ore». Dopo il salvataggio: email di presa in carico (cc commerciale + Esposito, Chiaradonna, Querini) e richiamo entro 2 ore.' : 'Dopo il salvataggio registri il trasferimento della chiamata al commerciale.'}</span>
+            <span className="sub">Di' al cliente: «Entro 2 ore la contatterà il nostro Tecnico Commerciale». Dopo il salvataggio: email al cliente, email di riepilogo al commerciale, richiamo entro 2 ore.</span>
           </div>)}
 
         <div className="ct-sez"><span className="ct-sez-n">3</span><b>Cliente</b><span className="sub">dati minimi: nome e telefono bastano</span></div>
@@ -222,22 +228,6 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             </div>)}
         </div>
 
-        {tipo && richiedeAppuntamento(tipo) && (<>
-          <div className="ct-sez"><span className="ct-sez-n">4</span><b>Appuntamento</b></div>
-          {(!data || !fascia) && <div className="ct-promemoria">Dai subito data e fascia al cliente: senza non si salva.</div>}
-          <div className="ct-riga">
-            <div className="ct-chips">
-              {[[oggi, 'Oggi'], [domani, 'Prossimo giorno lav.'], [dopodomani, 'Tra 2 giorni lav.']].map(([d, l]) => (
-                <button type="button" key={l} className={data === d ? 'on' : ''} onClick={() => setData(d)} disabled={!lavorativo(d, fest)}>{l}</button>))}
-            </div>
-            <input type="date" aria-label="Data appuntamento" value={data} min={oggi} onChange={e => setData(e.target.value)} />
-            <div className="segmented" role="group" aria-label="Fascia">
-              <button type="button" className={fascia === 'mattina' ? 'on' : ''} onClick={() => setFascia('mattina')}>Mattina</button>
-              <button type="button" className={fascia === 'pomeriggio' ? 'on' : ''} onClick={() => setFascia('pomeriggio')}>Pomeriggio</button>
-            </div>
-          </div>
-          {tipo === 'sopralluogo' && data && data > dopodomani && <Banner s="warn">La procedura chiede il sopralluogo entro 2 giorni lavorativi.</Banner>}
-        </>)}
 
         {q.trim().length >= 3 && <div className="field"><label htmlFor="ct-stato">Il cliente è</label>
           <select id="ct-stato" value={stato ?? ''} onChange={e => { setStato((e.target.value || null) as StatoCliente | null); setStatoMan(!!e.target.value); }}>
@@ -245,7 +235,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
           </select></div>}
 
-        <div className="ct-sez"><span className="ct-sez-n">{tipo && richiedeAppuntamento(tipo) ? 5 : 4}</span><b>Nota</b></div>
+        <div className="ct-sez"><span className="ct-sez-n">4</span><b>Nota</b></div>
         <textarea rows={3} value={f.descrizione} onChange={e => setF({ ...f, descrizione: e.target.value })} placeholder="Cosa ha detto il cliente, in breve" aria-label="Nota" />
 
         <Appunti chiave="bozza" righe={4} onTesto={setAppunti} />
@@ -256,7 +246,6 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         <div className="ct-salva">
           <div className="sub">
             {scad && <>Prima scadenza: <b>{testoResiduo(scad)}</b> · </>}
-            {tipo === 'manutenzione' && !urgente && <button type="button" className="ct-link" onClick={() => setUrgente(true)}>segna urgente</button>}
             {urgente && <span className="ct-sla rosso">urgente</span>}
             <span className="ct-kbd-h"> · Ctrl+Invio per salvare</span>
           </div>

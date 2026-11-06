@@ -34,7 +34,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   const valori: Valori | null = useMemo(() => {
     if (!config) return null;
     const firma = String(config.impostazioni.firma ?? '');
-    const base = pratica ? segnaposto(pratica, firma) : segnaposto({ numero: '', cliente_nome: trasf?.cliente_nome || 'Cliente', contatto_nome: trasf?.cliente_nome ?? null, appuntamento_data: null, appuntamento_fascia: null, commerciale_nome: null, tecnico_nome: null }, firma);
+    const base = pratica ? segnaposto(pratica, firma) : segnaposto({ numero: '', cliente_nome: trasf?.cliente_nome || 'Cliente', contatto_nome: trasf?.cliente_nome ?? null, appuntamento_data: null, appuntamento_fascia: null, commerciale_nome: null, tecnico_nome: null, telefono: trasf?.telefono, email: trasf?.cliente_email }, firma);
     return {
       ...base,
       numero_pratica: pratica ? `Riferimento: ${pratica.numero}` : '',

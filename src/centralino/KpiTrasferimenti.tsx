@@ -21,14 +21,13 @@ export default function KpiTrasferimenti({ d, da, a, base, trend }: { d: Dataset
   }, [trend, d.trasf]);
   const max = Math.max(1, ...giorni.map(g => g[1]));
   const riga = (nome: string, f: { dest?: string; arg?: string; stato?: string }, g: { tot: number; minuti: number; fatti: number }) => (
-    <tr key={nome}><td>{nome}</td><td><Cifra id="trasferite" d={d} da={da} a={a} f={f} /></td><td><Cifra id="trasf_risposte" d={d} da={da} a={a} f={f} pct /></td>
+    <tr key={nome}><td>{nome}</td><td><Cifra id="trasferite" d={d} da={da} a={a} f={f} /></td>
       <td><Cifra id="trasf_in_tempo" d={d} da={da} a={a} f={f} pct /></td><td>{g.fatti ? orologio((g.minuti / g.fatti) * 60) : '—'}</td><td><Cifra id="trasf_da_richiamare" d={d} da={da} a={a} f={f} /></td></tr>);
   return (
     <section className="ct-blocco ct-kt">
       <h2>Chiamate trasferite</h2>
       <div className="kpis">
         <Tessera id="trasferite" d={d} da={da} a={a} />
-        <Tessera id="trasf_risposte" d={d} da={da} a={a} />
         <Tessera id="trasf_in_tempo" d={d} da={da} a={a} soglia={90} />
         <Tessera id="trasf_da_richiamare" d={d} da={da} a={a} sub={k.tempoMedioRichiamo != null ? `tempo medio di richiamo ${orologio(k.tempoMedioRichiamo * 60)}` : undefined} />
         <Tessera id="trasf_scadute" d={d} da={da} a={a} rossoSe />
@@ -47,11 +46,11 @@ export default function KpiTrasferimenti({ d, da, a, base, trend }: { d: Dataset
         </div>)}
       <div className="ct-dir-g">
         <div><h3 className="ct-h3">Per destinatario</h3>
-          <table className="ct-tab"><thead><tr><th>Destinatario</th><th>Chiamate</th><th>Risposte subito</th><th>Richiamati in tempo</th><th>Tempo medio richiamo</th><th>Da richiamare</th></tr></thead>
+          <table className="ct-tab"><thead><tr><th>Destinatario</th><th>Chiamate</th><th>Richiamati in tempo</th><th>Tempo medio richiamo</th><th>Da richiamare</th></tr></thead>
             <tbody>{Object.entries(k.perDestinatario).sort((x, y) => y[1].tot - x[1].tot).map(([n, g]) => riga(n, { dest: n }, g))}</tbody></table>
           {!Object.keys(k.perDestinatario).length && <p className="ct-vuoto">Nessuna chiamata trasferita nel periodo.</p>}</div>
         <div><h3 className="ct-h3">Per argomento</h3>
-          <table className="ct-tab"><thead><tr><th>Argomento</th><th>Chiamate</th><th>Risposte</th><th>In tempo</th><th>Medio</th><th>Aperti</th></tr></thead>
+          <table className="ct-tab"><thead><tr><th>Argomento</th><th>Chiamate</th><th>In tempo</th><th>Medio</th><th>Aperti</th></tr></thead>
             <tbody>{Object.entries(k.perArgomento).sort((x, y) => y[1].tot - x[1].tot).map(([n, g]) => riga(n, { arg: n }, g))}</tbody></table>
           <h3 className="ct-h3">Per stato del cliente</h3>
           <table className="ct-tab"><tbody>{Object.entries(k.perStatoCliente).map(([n, g]) => riga(STATI_CLIENTE[n as 'nuovo']?.[1] ?? 'Non indicato', { stato: n }, g))}</tbody></table></div>

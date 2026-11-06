@@ -360,3 +360,10 @@ tr.ct-spento td { opacity:.5; }
 .ct-tab-analisi th, .ct-tab-analisi td { padding:7px 8px; }
 .ct-tab-analisi td.c-quando, .ct-tab-analisi th.c-quando { max-width:112px; }
 .ct-tab-analisi td.c-tipo, .ct-tab-analisi td.c-cliente { max-width:170px; }
+
+/* procedura rev2: passi rapidi */
+.ct-toggle { align-self: flex-start; min-height: 40px; padding: 8px 16px; border-radius: 10px; }
+.ct-toggle.on { background: #E8F7EE; color: #1B7F3B; border-color: #1B7F3B; font-weight: 600; }
+.segmented.ct-chips { flex-wrap: wrap; gap: 6px; }
+.ct-anteprima-box summary { cursor: pointer; font-size: 14px; }
+.ct-anteprima-box[open] { display: grid; gap: 8px; }

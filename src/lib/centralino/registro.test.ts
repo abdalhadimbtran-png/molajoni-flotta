@@ -43,8 +43,7 @@ describe('registro KPI: tessera = elenco di dettaglio', () => {
     expect(v('offerte60').pct).toBe(k.offerte60Pct);
     expect(v('off_richieste').n).toBe(k.funnel.richieste);
     expect(v('off_inviate').n).toBe(k.funnel.inviate);
-    expect(v('off_accettate').n).toBe(k.funnel.accettate);
-    expect(v('trasf_risposte').pct).toBe(t.rispostiPct);
+    expect(v('interventi1h').pct).toBe(k.interventi1hPct);
     expect(v('trasf_in_tempo').pct).toBe(t.richiamatiInTempoPct);
     expect(v('trasf_scadute').n).toBe(t.scaduti);
     expect(v('trasf_email_ref').pct).toBe(t.referentePct);

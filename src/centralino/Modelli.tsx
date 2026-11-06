@@ -26,7 +26,7 @@ export default function Modelli() {
       <div className="ct-modelli">
         {data.map(t => (
           <button key={t.id} className={`ct-modello ${t.attivo ? '' : 'spento'}`} onClick={() => setMod(t)}>
-            <b>{t.nome}</b><span className="sub">{t.tipo_pratica ? TIPI[t.tipo_pratica] ?? t.tipo_pratica : 'Tutti i tipi'}{t.cc_offerte_grandi ? ' · CC offerte > 1.000 €' : ''}{t.attivo ? '' : ' · disattivato'}</span>
+            <b>{t.nome}</b><span className="sub">{t.tipo_pratica ? TIPI[t.tipo_pratica] ?? t.tipo_pratica : 'Tutti i tipi'}{t.cc_offerte_grandi ? ' · CC offerte da 1.000 €' : ''}{t.attivo ? '' : ' · disattivato'}</span>
             <span className="ct-modello-ogg">{t.oggetto}</span>
           </button>))}
       </div>

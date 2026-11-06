@@ -34,9 +34,8 @@ export interface Def {
 const P = (r: Rec) => r as RecPratica;
 const T = (r: Rec) => r as RecTrasf;
 const offerta = (t: string) => t === 'offerta_piccola' || t === 'offerta_grande';
-const inviata = (p: RecPratica) => ['offerta', 'followup', 'esito', 'contratto'].includes(p.stato_corrente) || p.esito_offerta != null;
-const accettata = (p: RecPratica) => p.esito_offerta === 'accettata' || p.stato_corrente === 'contratto';
-const allarme = (p: RecPratica) => p.tipo === 'manutenzione' && p.sottotipo === 'Allarme sonoro attivo' && p.esito !== 'annullata';
+/** offerta ≤ 999,99 inviata dal centralino; offerta da 1.000 € passata al commerciale (email al cliente fatta) */
+const inviata = (p: RecPratica) => ['offerta', 'email_cliente', 'riepilogo'].includes(p.stato_corrente) || (p.esito === 'chiusa_ok');
 const conCliente = (t: RecTrasf) => !!(t.email_cliente_inviata_at || t.email_riepilogo_at);
 const richiamoValutabile = (t: RecTrasf, ora: Date) => !!t.richiamo_scadenza && (!!t.richiamato_at || new Date(t.richiamo_scadenza) < ora);
 const inTempo = (t: RecTrasf) => !!t.richiamato_at && !!t.richiamo_scadenza && new Date(t.richiamato_at) <= new Date(t.richiamo_scadenza);
@@ -46,20 +45,18 @@ export const KPI: Def[] = [
   // pratiche del periodo
   { id: 'pratiche', titolo: 'Contatti (pratiche)', spiegazione: 'Pratiche aperte nel periodo, qualunque esito.', fonte: 'pratiche', num: tutto },
   { id: 'aperte_periodo', titolo: 'Ancora aperte', spiegazione: 'Pratiche del periodo non ancora chiuse né annullate.', fonte: 'pratiche', num: r => P(r).esito === 'aperta' },
-  { id: 'chiuse', titolo: 'Chiuse', spiegazione: 'Pratiche del periodo chiuse (positive o negative), annullate escluse.', fonte: 'pratiche', num: r => P(r).esito === 'chiusa_ok' || P(r).esito === 'chiusa_ko' },
+  { id: 'chiuse', titolo: 'Chiuse', spiegazione: 'Pratiche del periodo chiuse (tutti i passi fatti), annullate escluse.', fonte: 'pratiche', num: r => P(r).esito === 'chiusa_ok' || P(r).esito === 'chiusa_ko' },
   { id: 'sla', titolo: 'SLA rispettati', spiegazione: 'Numeratore: pratiche con SLA rispettato. Denominatore: pratiche con SLA già valutato (chiuse o con una scadenza superata).', fonte: 'pratiche', num: r => P(r).sla_rispettato === true, den: r => P(r).sla_rispettato != null },
   { id: 'sla_mancati', titolo: 'SLA mancati', spiegazione: 'Pratiche del periodo con almeno una scadenza non rispettata.', fonte: 'pratiche', num: r => P(r).sla_rispettato === false },
   { id: 'offerte60', titolo: 'Offerte ≤ 1.000 € entro 60 min', spiegazione: 'Numeratore: offerte ≤ 1.000 € con il passo «Offerta inviata» fatto entro 60 minuti dalla richiesta. Denominatore: offerte ≤ 1.000 € già inviate.', fonte: 'pratiche',
     num: (r, c) => P(r).tipo === 'offerta_piccola' && c.slaEv(P(r).id, 'offerta')?.dati?.sla_rispettato === true, den: (r, c) => P(r).tipo === 'offerta_piccola' && !!c.slaEv(P(r).id, 'offerta') },
-  { id: 'sopralluoghi2', titolo: 'Sopralluoghi entro 2 giorni lav.', spiegazione: 'Numeratore: sopralluoghi eseguiti entro 2 giorni lavorativi. Denominatore: sopralluoghi già eseguiti.', fonte: 'pratiche',
-    num: (r, c) => P(r).tipo === 'sopralluogo' && c.slaEv(P(r).id, 'eseguito')?.dati?.sla_rispettato === true, den: (r, c) => P(r).tipo === 'sopralluogo' && !!c.slaEv(P(r).id, 'eseguito') },
-  { id: 'allarmi', titolo: 'Allarmi gestiti in giornata', spiegazione: 'Numeratore: allarmi sonori con intervento eseguito in giornata. Denominatore: allarmi eseguiti o con scadenza già superata.', fonte: 'pratiche',
-    num: (r, c) => allarme(P(r)) && (P(r).sla_rispettato === true || c.slaEv(P(r).id, 'eseguito')?.dati?.sla_rispettato === true),
-    den: (r, c) => allarme(P(r)) && (P(r).sla_rispettato != null || !!c.slaEv(P(r).id, 'eseguito')) },
+  { id: 'interventi1h', titolo: 'Interventi: cliente informato entro 1 ora', spiegazione: 'Numeratore: interventi con il passo «Cliente informato» fatto entro 60 minuti dalla chiamata. Denominatore: interventi con il cliente già informato.', fonte: 'pratiche',
+    num: (r, c) => P(r).tipo === 'manutenzione' && c.slaEv(P(r).id, 'cliente')?.dati?.sla_rispettato === true, den: (r, c) => P(r).tipo === 'manutenzione' && !!c.slaEv(P(r).id, 'cliente') },
+  { id: 'sopralluoghi1h', titolo: 'Sopralluoghi: cliente informato entro 1 ora', spiegazione: 'Numeratore: sopralluoghi con il cliente informato entro 60 minuti. Denominatore: sopralluoghi con il cliente già informato.', fonte: 'pratiche',
+    num: (r, c) => P(r).tipo === 'sopralluogo' && c.slaEv(P(r).id, 'cliente')?.dati?.sla_rispettato === true, den: (r, c) => P(r).tipo === 'sopralluogo' && !!c.slaEv(P(r).id, 'cliente') },
+  { id: 'urgenti', titolo: 'Richieste urgenti', spiegazione: 'Interventi e sopralluoghi valutati «urgente» (da fare oggi).', fonte: 'pratiche', num: r => (r as RecPratica & { urgenza?: string | null }).urgenza === 'urgente' },
   { id: 'off_richieste', titolo: 'Offerte richieste', spiegazione: 'Pratiche di offerta (≤ e > 1.000 €) del periodo.', fonte: 'pratiche', num: r => offerta(P(r).tipo) },
-  { id: 'off_inviate', titolo: 'Offerte inviate', spiegazione: 'Offerte del periodo arrivate almeno al passo «Offerta inviata».', fonte: 'pratiche', num: r => offerta(P(r).tipo) && inviata(P(r)) },
-  { id: 'off_accettate', titolo: 'Offerte accettate', spiegazione: 'Offerte con esito accettata (o già a contratto). Percentuale = accettate / inviate.', fonte: 'pratiche', num: r => offerta(P(r).tipo) && accettata(P(r)), den: r => offerta(P(r).tipo) && inviata(P(r)) },
-  { id: 'off_contratti', titolo: 'Contratti', spiegazione: 'Offerte arrivate al passo «Contratto».', fonte: 'pratiche', num: r => offerta(P(r).tipo) && P(r).stato_corrente === 'contratto' },
+  { id: 'off_inviate', titolo: 'Offerte evase dal centralino', spiegazione: 'Offerte fino a 999,99 € inviate dal centralino e offerte da 1.000 € passate al Tecnico Commerciale (email al cliente fatta).', fonte: 'pratiche', num: r => offerta(P(r).tipo) && inviata(P(r)) },
   // situazione attuale
   { id: 'in_ritardo', titolo: 'In ritardo adesso', spiegazione: 'Pratiche aperte (di qualunque giorno) con la scadenza del prossimo passo già superata.', fonte: 'aperte', num: (r, c) => !!P(r).sla_scadenza && new Date(P(r).sla_scadenza!) < c.ora },
   { id: 'in_scadenza', titolo: 'In scadenza (60 min)', spiegazione: 'Pratiche aperte con la scadenza del prossimo passo entro i prossimi 60 minuti.', fonte: 'aperte', num: (r, c) => !!P(r).sla_scadenza && new Date(P(r).sla_scadenza!) >= c.ora && new Date(P(r).sla_scadenza!).getTime() - c.ora.getTime() <= 3600e3 },
@@ -76,8 +73,6 @@ export const KPI: Def[] = [
   { id: 'reg_chiuse', titolo: 'Chiuse', spiegazione: 'Pratiche chiuse nel periodo (data di chiusura), annullate escluse.', fonte: 'chiuse', num: r => P(r).esito !== 'annullata' },
   // chiamate trasferite
   { id: 'trasferite', titolo: 'Chiamate trasferite', spiegazione: 'Chiamate passate a un responsabile (trasferite o «responsabile non disponibile»).', fonte: 'trasferimenti', num: tutto },
-  { id: 'trasf_risposte', titolo: 'Risposte subito', spiegazione: 'Numeratore: trasferite e risposte dal responsabile. Denominatore: chiamate trasferite (escluse «non disponibile»).', fonte: 'trasferimenti',
-    num: r => (T(r).modalita ?? 'trasferita') === 'trasferita' && T(r).esito === 'risposto', den: r => (T(r).modalita ?? 'trasferita') === 'trasferita' },
   { id: 'trasf_in_tempo', titolo: 'Richiamati entro la scadenza', spiegazione: 'Numeratore: richiami fatti entro la scadenza promessa. Denominatore: richiami già fatti o con scadenza superata.', fonte: 'trasferimenti',
     num: r => inTempo(T(r)), den: (r, c) => richiamoValutabile(T(r), c.ora) },
   { id: 'trasf_da_richiamare', titolo: 'Ancora da richiamare', spiegazione: 'Richiami promessi e non ancora fatti.', fonte: 'trasferimenti', num: r => !!T(r).richiamo_scadenza && !T(r).richiamato_at },

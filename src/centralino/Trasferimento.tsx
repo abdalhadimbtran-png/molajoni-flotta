@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { ESITI_TRASF, NOME_TIPO, senzaCliente, senzaReferente, senzaRiepilogo, type Commerciale, type EsitoTrasf, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
+import { NOME_TIPO, senzaCliente, senzaReferente, senzaRiepilogo, type Commerciale, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
 import { daRoma, giornoRoma, partiRoma, prossimoLavorativo, scadenzaSla, semaforo, testoResiduo } from '../lib/centralino/sla';
 import { useAdesso, useAggiornamento, useConfig } from './comune';
 import EmailTrasferimento from './EmailTrasferimento';
 import { useCtx } from './ShellCentralino';
 import { Conto } from './componenti';
 
-const ARGOMENTI = ['Offerta ≤ 1.000 €', 'Offerta > 1.000 €', 'Sopralluogo', 'Manutenzione / guasto', 'Fatture / amministrazione', 'Fornitori', 'Reclamo', 'Informazione'];
+const ARGOMENTI = ['Offerta fino a 999,99 €', 'Offerta da 1.000 €', 'Sopralluogo', 'Manutenzione / guasto', 'Fatture / amministrazione', 'Fornitori', 'Reclamo', 'Informazione'];
 type Entro = '30m' | '1h' | '2h' | 'pom' | 'dom' | 'scelta';
 const ENTRO: { v: Entro; l: string }[] = [
   { v: '30m', l: '30 minuti' }, { v: '1h', l: '1 ora' }, { v: '2h', l: '2 ore' }, { v: 'pom', l: 'Oggi pomeriggio' }, { v: 'dom', l: 'Domani mattina' }, { v: 'scelta', l: 'Quando preferisce il cliente' },
@@ -45,7 +45,6 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
   const [a, setA] = useState(''); const [altro, setAltro] = useState('');
   const [tipo, setTipo] = useState(pratica ? NOME_TIPO[pratica.tipo] : '');
   const [arg, setArg] = useState('');
-  const [esito, setEsito] = useState<EsitoTrasf | ''>('');
   const [entro, setEntro] = useState<Entro | ''>('2h');
   const [scelta, setScelta] = useState('');
   const [cli, setCli] = useState({ nome: pratica?.cliente_nome ?? '', telefono: pratica?.telefono ?? '', email: pratica?.email ?? '' });
@@ -57,14 +56,13 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
     e.preventDefault(); setErr(null);
     const nome = a === 'Altro' ? altro.trim() : a;
     if (!nome) { setErr('Indica il responsabile.'); return; }
-    if (modo === 'trasferita' && !esito) { setErr('Indica com\'è andato il trasferimento.'); return; }
     if (modo === 'richiamo' && !sc) { setErr('Indica entro quando lo ricontatteremo.'); return; }
     const d = dest.find(x => x.nome === a);
     setInvio(true);
     try {
       const r = await rpc<{ id: number; notificato: boolean; richiamo_scadenza: string | null }>('centralino_trasferisci', { p: {
         pratica_id: pratica?.id ?? null, cliente_nome: cli.nome, telefono: cli.telefono, cliente_email: cli.email, destinatario_nome: nome, destinatario_ruolo: d?.ruolo ?? 'altro',
-        argomento: arg, tipo_argomento: tipo, modalita: modo, esito: modo === 'trasferita' ? esito : null,
+        argomento: arg, tipo_argomento: tipo, modalita: modo, esito: modo === 'trasferita' ? 'risposto' : null,
         scadenza: modo === 'richiamo' ? sc!.quando.toISOString() : null, entro_testo: modo === 'richiamo' ? sc!.testo : null } });
       toast(r.richiamo_scadenza ? `Richiamo ${testoResiduo(r.richiamo_scadenza)}${r.notificato ? ' · responsabile avvisato' : ''}` : 'Trasferimento registrato');
       const { data } = await supabase.from('chiamate_trasferite').select('*').eq('id', r.id).single();
@@ -75,7 +73,7 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
   return (
     <Modal titolo="Chiamata per un responsabile" onClose={onClose}>
       <form className="form" onSubmit={salva}>
-        <div className="segmented ct-seg-xl" role="group" aria-label="Esito">
+        <div className="segmented ct-seg-xl" role="group" aria-label="Modalità">
           <button type="button" className={modo === 'trasferita' ? 'on' : ''} onClick={() => setModo('trasferita')}>Trasferita</button>
           <button type="button" className={modo === 'richiamo' ? 'on' : ''} onClick={() => setModo('richiamo')}>Responsabile non disponibile</button>
         </div>
@@ -91,11 +89,7 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
         <div className="ct-sez"><b>Di cosa</b></div>
         <select aria-label="Argomento" value={tipo} onChange={e => setTipo(e.target.value)}><option value="">— scegli —</option>{[...new Set([...(tipo && !ARGOMENTI.includes(tipo) ? [tipo] : []), ...ARGOMENTI])].map(x => <option key={x}>{x}</option>)}</select>
         <div className="field"><label htmlFor="tr-arg">In breve</label><input id="tr-arg" value={arg} onChange={e => setArg(e.target.value)} placeholder="es. preventivo per 3 estintori" /></div>
-        {modo === 'trasferita' ? (<>
-          <div className="ct-sez"><b>Esito</b></div>
-          <select aria-label="Esito" value={esito} onChange={e => setEsito(e.target.value as EsitoTrasf)}><option value="">— scegli —</option>{(Object.keys(ESITI_TRASF) as EsitoTrasf[]).map(k => <option key={k} value={k}>{ESITI_TRASF[k]}</option>)}</select>
-          {esito && esito !== 'risposto' && <p className="hint">Si crea il promemoria «Richiamare il cliente / far richiamare» con scadenza; la persona riceve la campanella se ha un account.</p>}
-        </>) : (<>
+        {modo === 'trasferita' ? (<p className="hint">Si registra il trasferimento e si inviano le due email (al responsabile e al cliente).</p>) : (<>
           <div className="ct-sez"><b>«Vi ricontatteremo entro…»</b><span className="sub">Quando preferisce essere richiamato?</span></div>
           <select aria-label="Vi ricontatteremo entro" value={entro} onChange={e => setEntro(e.target.value as Entro)}><option value="">— scegli —</option>{ENTRO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
           {entro === 'scelta' && <input type="datetime-local" aria-label="Data e ora scelte dal cliente" value={scelta} onChange={e => setScelta(e.target.value)} />}
@@ -127,7 +121,7 @@ export function RigaTrasf({ t, ora, onRichiamato, onRiepilogo, base }: { t: Tras
         {t.email_non_disponibile && <div className="sub">Email non disponibile: {t.email_non_disponibile}</div>}
       </div>
       <div className="ct-trasf-dx">
-        <Pill s={t.modalita === 'richiamo' ? 'info' : t.esito === 'risposto' ? 'ok' : 'warn'}>{t.modalita === 'richiamo' ? 'Non disponibile' : ESITI_TRASF[t.esito]}</Pill>
+        <Pill s={t.modalita === 'richiamo' ? 'info' : 'ok'}>{t.modalita === 'richiamo' ? 'Non disponibile' : 'Trasferita'}</Pill>
         {senzaRiepilogo(t) && (() => { const txt = [senzaReferente(t) && 'al referente', senzaCliente(t) && 'al cliente'].filter(Boolean).join(' e '); return onRiepilogo ? <button className="ct-flag-email" onClick={() => onRiepilogo(t)}>Email {txt} non inviata</button> : <span className="ct-flag-email">Email {txt} non inviata</span>; })()}
         {aperto && <Conto inizio={t.at} scadenza={t.richiamo_scadenza} regola={t.modalita === 'richiamo' ? `richiamo promesso ${t.entro_testo ?? ''}` : 'richiamo entro 2 ore'} />}
         {t.richiamato_at && <span className="sub">richiamato {fmtOra(t.richiamato_at)}{t.richiamato_da ? ` · ${t.richiamato_da}` : ''}</span>}
@@ -174,7 +168,7 @@ export default function Trasferimenti() {
   );
 }
 
-/** Disponibilità di L. Esposito, A. Chiaradonna, A. Querini per le offerte > 1.000 € (le imposta il centralino o la persona stessa). */
+/** Disponibilità di L. Esposito, A. Chiaradonna, A. Querini per le offerte da 1.000 € (le imposta il centralino o la persona stessa). */
 function Disponibilita() {
   const { data, reload } = useLoad(() => rpc<Commerciale[]>('centralino_commerciali', {}).catch(() => null));
   if (!data?.length) return null;
@@ -182,7 +176,7 @@ function Disponibilita() {
     try { await rpc('centralino_imposta_disponibile', { p_nome: c.nome, p_disponibile: c.occupato }); reload(); } catch (e) { toast(testoErrore(e)); }
   }
   return (
-    <section className="ct-blocco"><h2>Commerciali per offerte oltre 1.000 €</h2>
+    <section className="ct-blocco"><h2>Commerciali per offerte da 1.000 €</h2>
       <div className="ct-disp">{data.map(c => (
         <div key={c.nome} className={`ct-disp-i ${c.disponibile ? 'si' : 'no'}`}>
           <b>{c.nome}</b><span className="sub">{c.assente ? 'assente oggi (ferie/permesso)' : c.occupato ? 'occupato' : c.disponibile ? 'disponibile' : 'non disponibile'}{!c.email ? ' · email da inserire' : ''}</span>

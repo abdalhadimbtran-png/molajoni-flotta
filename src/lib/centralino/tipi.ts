@@ -3,7 +3,7 @@ import type { RegolaSla } from './sla';
 export type Canale = 'telefono' | 'whatsapp' | 'email' | 'collega' | 'tablet_tmq' | 'altro';
 export type Esito = 'aperta' | 'chiusa_ok' | 'chiusa_ko' | 'annullata';
 export type TipoPratica = 'manutenzione' | 'sopralluogo' | 'offerta_piccola' | 'offerta_grande' | 'modifica' | 'amministrazione' | 'fornitori' | 'informazione' | 'trasferta' | 'abbigliamento';
-export type Requisito = 'appuntamento' | 'email' | 'taylor' | 'commerciale' | 'destinatario' | 'esito';
+export type Requisito = 'appuntamento' | 'email' | 'taylor' | 'commerciale' | 'destinatario' | 'urgenza' | 'coordinatore' | 'tecnico' | 'buono' | 'avviso';
 
 export interface Stadio { key: string; nome: string; sla?: RegolaSla; azione?: 'appuntamento' | 'taylor' | 'esito'; template?: string; requisiti?: Requisito[] }
 export interface Flusso {
@@ -22,7 +22,11 @@ export interface Pratica {
   sla_stadio: string | null; sla_scadenza: string | null; sla_rispettato: boolean | null;
   created_by: string | null; created_at: string; updated_at: string; closed_at: string | null;
   stato_cliente: StatoCliente | null; stato_cliente_manuale: boolean; documento_intervento: string | null;
+  urgenza?: 'urgente' | 'ordinario' | null; coordinatore_nome?: string | null; coordinatore_telefonato?: boolean | null;
+  tecnico_dipendente_id?: number | null; tecnico_quando?: string | null; tecnico_quando_at?: string | null; whatsapp_tecnico?: boolean | null; avviso_app_at?: string | null;
 }
+export interface PersonaDisp { nome: string; email: string | null; telefono?: string | null; cellulare?: string | null; account?: boolean; assente: boolean; occupato?: boolean; disponibile: boolean }
+export interface TecnicoDisp { id: number; nome: string; telefono: string | null; assente: boolean; interventi_oggi: number }
 export type StatoCliente = 'nuovo' | 'ex_cliente' | 'attivo';
 export const STATI_CLIENTE: Record<StatoCliente, [string, string]> = { nuovo: ['info', 'Nuovo'], ex_cliente: ['warn', 'Ex cliente'], attivo: ['ok', 'Cliente attivo'] };
 export type EsitoTrasf = 'risposto' | 'non_risposto' | 'occupato' | 'richiamera';

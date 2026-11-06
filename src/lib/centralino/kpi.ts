@@ -30,15 +30,11 @@ export function calcolaKpi(pr: PraticaKpi[], ev: EventoKpi[]) {
   }
 
   const off = pr.filter(p => offerta(p.tipo));
-  const inviate = off.filter(p => oltre(p.stato_corrente, ['offerta', 'followup', 'esito', 'contratto']) || p.esito_offerta != null);
-  const accettate = off.filter(p => p.esito_offerta === 'accettata' || p.stato_corrente === 'contratto');
-  const contratti = off.filter(p => p.stato_corrente === 'contratto');
+  const inviate = off.filter(p => oltre(p.stato_corrente, ['offerta', 'email_cliente', 'riepilogo']) || p.esito === 'chiusa_ok');
   const piccole = pr.filter(p => p.tipo === 'offerta_piccola').map(p => slaEv(p.id, 'offerta')).filter(Boolean);
-  const sop = pr.filter(p => p.tipo === 'sopralluogo').map(p => slaEv(p.id, 'eseguito')).filter(Boolean);
-  const allarmi = pr.filter(p => p.tipo === 'manutenzione' && p.sottotipo === 'Allarme sonoro attivo' && p.esito !== 'annullata');
-  const allarmiOk = allarmi.filter(p => p.sla_rispettato === true || slaEv(p.id, 'eseguito')?.dati?.sla_rispettato === true);
-  const allarmiChiusi = allarmi.filter(p => p.sla_rispettato != null || slaEv(p.id, 'eseguito'));
-  const valore = (l: PraticaKpi[]) => l.reduce((s, p) => s + Number(p.importo_stimato ?? 0), 0);
+  const int1 = pr.filter(p => p.tipo === 'manutenzione').map(p => slaEv(p.id, 'cliente')).filter(Boolean);
+  const sop1 = pr.filter(p => p.tipo === 'sopralluogo').map(p => slaEv(p.id, 'cliente')).filter(Boolean);
+  const valore = (l: PraticaKpi[]): number => l.reduce((s, p) => s + Number(p.importo_stimato ?? 0), 0);
 
   return {
     totale: pr.length,
@@ -49,18 +45,14 @@ export function calcolaKpi(pr: PraticaKpi[], ev: EventoKpi[]) {
     slaPct: pct(conSla.filter(p => p.sla_rispettato).length, conSla.length),
     tempiMedi: Object.fromEntries(Object.entries(tempi).map(([k, v]) => [k, Math.round(v.tot / v.n)])),
     offerte60Pct: pct(piccole.filter(e => e!.dati.sla_rispettato === true).length, piccole.length),
-    sopralluoghi2ggPct: pct(sop.filter(e => e!.dati.sla_rispettato === true).length, sop.length),
-    allarmiPct: pct(allarmiOk.length, allarmiChiusi.length),
+    interventi1hPct: pct(int1.filter(e => e!.dati.sla_rispettato === true).length, int1.length),
+    sopralluoghi1hPct: pct(sop1.filter(e => e!.dati.sla_rispettato === true).length, sop1.length),
     perStatoCliente: conta(pr, p => p.stato_cliente ?? 'nuovo'),
     funnelPerStato: Object.fromEntries(['nuovo', 'ex_cliente', 'attivo'].map(k => {
       const o = off.filter(p => (p.stato_cliente ?? 'nuovo') === k);
-      return [k, { richieste: o.length, inviate: o.filter(p => inviate.includes(p)).length, accettate: o.filter(p => accettate.includes(p)).length, valore: valore(o) }];
+      return [k, { richieste: o.length, inviate: o.filter(p => inviate.includes(p)).length, valore: valore(o) }];
     })),
-    funnel: {
-      richieste: off.length, inviate: inviate.length, accettate: accettate.length, contratti: contratti.length,
-      conversionePct: pct(accettate.length, inviate.length),
-      valoreRichieste: valore(off), valoreAccettate: valore(accettate),
-    },
+    funnel: { richieste: off.length, inviate: inviate.length, valoreRichieste: valore(off), valoreInviate: valore(inviate) },
   };
 }
 export type Kpi = ReturnType<typeof calcolaKpi>;
@@ -82,14 +74,13 @@ export interface Gruppo { tot: number; risposti: number; trasferite: number; ric
 const nuovoG = (): Gruppo => ({ tot: 0, risposti: 0, trasferite: 0, richiami: 0, inTempo: 0, fatti: 0, minuti: 0, aperti: 0 });
 /** Trasferimenti: per destinatario / argomento / stato cliente, % risposte, % richiamati in tempo, tempo medio di richiamo, email. */
 export function calcolaTrasf(l: TrasfKpi[], ora = new Date()) {
-  const trasferite = l.filter(t => (t.modalita ?? 'trasferita') === 'trasferita');
   const richiami = l.filter(t => t.richiamo_scadenza);
   const fatti = richiami.filter(t => t.richiamato_at);
   const inTempo = fatti.filter(t => new Date(t.richiamato_at!) <= new Date(t.richiamo_scadenza!));
   const aggiungi = (m: Record<string, Gruppo>, k: string, t: TrasfKpi) => {
     const d = m[k] ??= nuovoG();
     d.tot++;
-    if ((t.modalita ?? 'trasferita') === 'trasferita') { d.trasferite++; if (t.esito === 'risposto') d.risposti++; }
+    if ((t.modalita ?? 'trasferita') === 'trasferita') { d.trasferite++; }
     if (t.richiamo_scadenza) {
       d.richiami++;
       if (t.richiamato_at) { d.fatti++; d.minuti += Math.max(0, (new Date(t.richiamato_at).getTime() - new Date(t.at ?? t.richiamato_at).getTime()) / 60000); if (new Date(t.richiamato_at) <= new Date(t.richiamo_scadenza)) d.inTempo++; }
@@ -100,7 +91,7 @@ export function calcolaTrasf(l: TrasfKpi[], ora = new Date()) {
   for (const t of l) { aggiungi(dest, t.destinatario_nome, t); aggiungi(arg, t.tipo_argomento || 'Non indicato', t); aggiungi(stato, t.stato_cliente || 'non indicato', t); }
   const conCliente = (t: TrasfKpi) => !!(t.email_cliente_inviata_at || t.email_riepilogo_at);
   return {
-    totale: l.length, rispostiPct: pct(trasferite.filter(t => t.esito === 'risposto').length, trasferite.length),
+    totale: l.length,
     richiamatiInTempoPct: pct(inTempo.length, richiami.filter(t => t.richiamato_at || new Date(t.richiamo_scadenza!) < ora).length),
     aperti: richiami.filter(t => !t.richiamato_at).length, scaduti: richiami.filter(t => !t.richiamato_at && new Date(t.richiamo_scadenza!) < ora).length,
     emailPct: pct(l.filter(conCliente).length, l.length), senzaEmail: l.filter(t => !conCliente(t) && !t.email_non_disponibile).length,

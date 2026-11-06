@@ -81,20 +81,18 @@ describe('kpi', () => {
     expect(k.slaPct).toBe(50);
     expect(k.funnel.richieste).toBe(2);
     expect(k.funnel.inviate).toBe(2);
-    expect(k.funnel.accettate).toBe(1);
     expect(k.offerte60Pct).toBe(50);
-    expect(k.allarmiPct).toBe(0);
+    expect(k.interventi1hPct).toBe(null);
   });
 });
 
 describe('kpi trasferimenti', () => {
-  it('risposti, richiamati in tempo, email', () => {
+  it('richiamati in tempo, email', () => {
     const k = calcolaTrasf([
       { destinatario_nome: 'A', esito: 'risposto', richiamo_scadenza: null, richiamato_at: null, email_riepilogo_at: '2026-11-05T09:00:00Z' },
       { destinatario_nome: 'A', esito: 'non_risposto', richiamo_scadenza: '2026-11-05T11:00:00Z', richiamato_at: '2026-11-05T10:00:00Z' },
       { destinatario_nome: 'B', esito: 'richiamera', modalita: 'richiamo', richiamo_scadenza: '2026-11-05T11:00:00Z', richiamato_at: null, email_non_disponibile: 'nessuna' },
     ], new Date('2026-11-05T12:00:00Z'));
-    expect(k.rispostiPct).toBe(50);
     expect(k.richiamatiInTempoPct).toBe(50);
     expect(k.scaduti).toBe(1);
     expect(k.senzaEmail).toBe(1);

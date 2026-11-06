@@ -38,53 +38,46 @@ Giorni lavorativi lun–ven, festività (`festivita`) escluse, orario d'ufficio 
 
 | Tipo | Stadi (★ = con SLA) | SLA |
 |---|---|---|
-| Manutenzione (Guasto, Ritardo, Allarme sonoro attivo, Altro) | Ricevuta → Appuntamento fissato → Comunicato al tecnico («Alert inviato su Taylor») → ★Intervento eseguito → Chiusa | fine del giorno lavorativo successivo; **Allarme**: in giornata, urgente, «Tacitazione tentata» |
-| Sopralluogo | Ricevuta → ★Appuntamento → ★Confermato (email) → ★Commerciale informato → ★Sopralluogo eseguito → Offerta inviata → Esito → Contratto firmato | in giornata i primi; eseguito entro 2 giorni lavorativi |
-| Offerta ≤ 1.000 € (gestita da Jennifer) | Ricevuta → ★Conferma al cliente (email «entro 60 minuti») → ★Offerta inviata → ★Follow-up → Esito → Contratto/Ordine | conferma **10 min**, offerta **60 min dalla richiesta** (la promessa «entro 60 minuti» parte dalla telefonata, quindi la conferma deve arrivare subito); follow-up 2 gg lav. |
-| Offerta > 1.000 € (a L. Esposito / A. Chiaradonna / A. Querini) | Ricevuta → ★Presa in carico (CC commerciale + Esposito, Chiaradonna, Querini) → ★Commerciale ha contattato → ★Offerta o sopralluogo → Esito → Contratto | 30 min; contatto **2 ore**; offerta in giornata |
+| Manutenzione (rev2, 0056) | Ricevuta (urgenza) → ★Inviato al coordinatore (email + «Telefonato») → ★Tecnico individuato (tecnico + quando) → ★Cliente informato (email «La contatterà il nostro tecnico {tecnico} {quando}») → Buono creato e tecnico avvisato (n. buono + Taylor + WhatsApp, avviso app facoltativo) → chiusa | **10 / 45 / 60 min** dalla chiamata; obiettivo: urgente = oggi, ordinario = entro 2 gg lav. |
+| Sopralluogo (rev2) | Stessi passi: coordinatore sopralluoghi → tecnico/commerciale → cliente informato (cc commerciale) → avviso inviato | 10 / 45 / 60 min |
+| Offerta fino a 999,99 € (gestita da Jennifer) | come da flusso in `pratiche_flussi` (0055), senza passo «Esito» | conferma 10 min, offerta 60 min dalla richiesta |
+| Offerta da 1.000 € (L. Esposito / A. Chiaradonna / A. Querini, il primo disponibile) | Ricevuta (commerciale) → ★Email al cliente «Entro 2 ore la contatterà il nostro Tecnico Commerciale {nome}» → ★Email di riepilogo al commerciale → chiusa per Jennifer | **10 / 15 min**; richiamo 2 ore per il commerciale sempre creato |
 | Modifica / anagrafica / disdetta | Ricevuta → ★Registrata → ★Evasione comunicata → Chiusa | in giornata; email entro giorno lav. successivo |
 | Amministrazione · Fornitori · Informazione (anche info@) | Ricevuta → ★Girata a Simona Colagrossi / Roberta Felci (lun/ven) / responsabile → Chiusa | in giornata |
 | Trasferta (alloggio TMQ) · Abbigliamento di lavoro | Ricevuta → ★Prenotato / Ordinato → Comunicata / Consegnato → Chiusa | 1 / 2 gg lav. |
 
-Regole: **un passo alla volta** (mai salti), ogni passo con i suoi requisiti (`requisiti`: appuntamento, email, taylor, commerciale, destinatario, esito); «Prossimo passo: … · manca: …» nella scheda (`centralino_prossimo`). Prima della fine si può solo **annullare** con motivo dall'elenco. La soglia 1.000 € (importo stimato o pulsante) sceglie il flusso offerta. Appuntamento dato al primo contatto → stadio raggiunto subito. Ultimo stadio → chiusa positiva; esito «rifiutata» → chiusa negativa. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
+Regole: **un passo alla volta** (mai salti), ogni passo con i suoi requisiti (`requisiti`: urgenza, coordinatore, tecnico, buono, avviso, email, commerciale, destinatario, appuntamento, taylor); «Prossimo passo: … · manca: …» nella scheda (`centralino_prossimo`). Prima della fine si può solo **annullare** con motivo dall'elenco. Soglia: importo ≥ 1.000 € → Tecnico Commerciale; fino a 999,99 € → Jennifer. Nessun appuntamento al primo contatto per interventi e sopralluoghi. **Nessun «esito»**: la pratica si chiude quando l'ultimo passo è fatto, oppure si annulla con motivo. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
 
 ### Modificare un flusso
-`/centralino/impostazioni` › Flussi: JSON `stadi` = `[{key, nome, sla?, azione?, template?}]`, `sla` = `{"tipo":"minuti|ore|stesso_giorno|giorni_lav","valore":N,"da":"creazione|ingresso"}`, `azione` = `appuntamento|taylor|esito`, `template` = codice modello suggerito. `sla_sottotipi` per SLA diversi per sottotipo. Il primo stadio resta `ricevuta`; non rinominare chiavi già usate (la storia le conserva).
+`/centralino/impostazioni` › Flussi: JSON `stadi` = `[{key, nome, sla?, azione?, template?}]`, `sla` = `{"tipo":"minuti|ore|stesso_giorno|giorni_lav","valore":N,"da":"creazione|ingresso"}`, `azione` = `appuntamento|taylor`, `template` = codice modello suggerito. `sla_sottotipi` per SLA diversi per sottotipo. Il primo stadio resta `ricevuta`; non rinominare chiavi già usate (la storia le conserva).
 
 ## Appunti privati
 Tabella `appunti` (chiave `bozza` nel nuovo contatto, `p:<id>` nella pratica), salvataggio automatico. RLS: solo l'autore legge e scrive; non vanno nella storia, alla direzione né nei report. Al salvataggio del nuovo contatto la bozza passa alla pratica.
 
-## Procedura applicata (Rev.01/2027 → portale)
-| Regola della procedura | Dove / come |
+## Procedura applicata (rev2, 0056)
+| Regola | Dove / come |
 |---|---|
-| 1.1 Rispondere entro 3 squilli + «Molajoni dal 1930, Buongiorno sono Jennifer…» | Promemoria in cima al nuovo contatto (telefono/WhatsApp) e nella home |
-| 1.1 In assenza passa il compito a Simona Colagrossi | `centralino_copertura()`: banner se l'operatrice ha un'assenza approvata oggi; Simona = Ufficio personale + «Anche centralino» |
-| 1.2 Risponditore: 1 manutenzione/commerciale, 2 fatture (pomeriggio cellulare Simona), 3 fornitori lun/ven (Roberta Felci) | Tipi «Fatture / amministrazione» e «Fornitori» con regola mostrata; destinatari dei trasferimenti con nota del tasto |
-| 1.3 Intervento: DATA + mattina/pomeriggio alla prima telefonata | `centralino_crea` **rifiuta** manutenzione/sopralluogo senza data e fascia; il modulo non salva |
-| 1.3 Comunicato ai tecnici via Taylor con Documento di Intervento | Passo «Comunicato al tecnico»: casella «Alert inviato su Taylor» + **numero documento** obbligatori |
-| 1.3 Allarme sonoro: in giornata, tacitazione al telefono · Altri: entro il giorno dopo | SLA `stesso_giorno` per il sottotipo, urgente, casella «Tacitazione tentata»; altri `giorni_lav 1` |
-| 1.4 Sopralluogo entro 2 giorni, confermato al cliente, cc al Tecnico Commerciale | SLA 2 gg lav.; passo «Confermato» richiede commerciale + email (modello con cc) |
-| 1.4 Il commerciale sposta solo dopo accordo telefonico e conferma scritta | «Sposta appuntamento» (`centralino_sposta`): motivo dall'elenco + 2 conferme; cambi diretti bloccati da trigger |
-| 1.4 Offerte ≤ 1.000 €: conferma a voce e email «entro 60 minuti» | Gestita dal centralino; conferma 10 min con email, offerta 60 min dalla richiesta, entrambe con email obbligatoria |
-| 1.4 Offerte > 1.000 €: commerciale + cc Esposito/Chiaradonna/Querini, «la contatterà entro 2 ore», commerciale telefona in giornata e conferma per email | Assegnazione solo ai tre (disponibilità: account, assenze approvate, «disponibile/occupato»); disponibile → trasferimento; nessuno → email di presa in carico + **richiamo 2 ore** creato da `centralino_crea`; passi «Commerciale ha telefonato» (2 h) e «Offerta o sopralluogo (email)» in giornata |
-| Note: mai chiedere l'anagrafica completa per email | Avviso nel nuovo contatto e in «Dati e assegnazione»; bastano nome e telefono |
-| 1.5 Modifiche calendario/anagrafica/disdetta registrate in giornata, evasione per email | Passo «Registrata» in giornata, «Evasione comunicata» richiede email |
-| info@molajoni.it monitorata, girata al competente | Canale Email + tipo «Informazione» → passo «Girata» con destinatario obbligatorio |
-| WhatsApp: stesse regole del telefono per gli interventi | Stessi controlli (data/fascia, Taylor) per ogni canale |
-| B) Offerte da tablet TMQ e ≤ 1.000 € | Canale «Tablet TMQ» + flusso offerta ≤ 1.000 €; contatore dedicato |
-| C) Attestati di formazione | Link «Altre attività» → `/formazione` |
-| D) Anagrafica clienti/impianti | Tipo «Modifica / anagrafica» (sottotipo Anagrafica), contatore «Aggiornamento anagrafica» |
-| E) Trasferte (alloggio TMQ), abbigliamento di lavoro | Tipi dedicati (canale Collega); flotta resta nel pannello flotta |
-| Jennifer pannel: telefonate, offerte da tablet / WA / cliente, aggiornamento anagrafica | «Il mio registro di oggi» (`centralino_registro_giorno`), calcolato dalle pratiche |
+| Rispondere entro 3 squilli + script | Promemoria in cima al nuovo contatto |
+| Intervento/sopralluogo: **niente appuntamento** al primo contatto | `centralino_crea` chiede solo l'**urgenza** (Urgente oggi / Ordinario entro 2 gg lav.); allarme sonoro → urgente + suggerimento tacitazione; script «Entro 1 ora la ricontattiamo per confermarle l'appuntamento» |
+| Inviato al coordinatore (10 min) | Referenti con «Coordinamento interventi/sopralluoghi», in ordine; primo disponibile preselezionato (`centralino_coordinatori`); email precompilata + interruttore «Telefonato» obbligatorio |
+| Tecnico individuato (45 min) | `centralino_tecnici`: assenze e interventi di oggi; tecnico meno carico preselezionato; «quando» a scelta rapida (default da urgenza) o data/ora |
+| Cliente informato (60 min) | Inviato insieme alla conferma del tecnico («Conferma e informa il cliente») |
+| Buono creato e tecnico avvisato | N. buono + «Taylor + WhatsApp»; «Avviso urgente nell'app» facoltativo (`centralino_avviso_tecnico`, campanella al tecnico, registrato); poi chiusura automatica |
+| Offerte ≥ 1.000 € | Commerciale disponibile preselezionato; email al cliente (10 min) e riepilogo al commerciale (15 min) da un pulsante ciascuno; richiamo 2 ore per il commerciale |
+| Offerte ≤ 999,99 € | Restano a Jennifer |
+| Mai l'anagrafica completa per email | Avviso nel nuovo contatto |
 
-Scelte: canale e tipo restano pulsanti grandi (scelta chiusa, più rapida di un menu); tutte le altre scelte sono menu a tendina (dettaglio, fascia, commerciale, destinatario, argomento, esito, «entro», stato cliente, motivi). Testo libero solo per nomi, descrizioni e note.
+**Clic dopo la chiamata** (salvata la pratica si apre il primo passo e, fatto un passo, si apre da solo il successivo; scorciatoia `A` = prossimo passo, Invio = conferma):
+- Manutenzione standard: coordinatore 2 (Telefonato + Invia e avanti) · tecnico 2 (scelta tecnico + Conferma e informa il cliente; 1 se va bene quello proposto) · buono 2 (Taylor+WhatsApp + Chiudi; il numero si digita) → **6 clic** (5 col tecnico proposto).
+- Sopralluogo: uguale → **6 clic**.
+- Offerta da 1.000 €: Invia e avanti (cliente) + Invia e chiudi (riepilogo) → **2 clic** dopo il salvataggio.
 
 ## Stato del cliente
 `pratiche.stato_cliente`: **attivo** (interventi Taylor negli ultimi `mesi_cliente_attivo` = 12 mesi), **ex cliente** (codice noto in `interventi_importati`/`impianti_posizione` ma niente di recente), **nuovo** (sconosciuto). Proposto automaticamente (trigger), modificabile a mano (`centralino_imposta_stato_cliente`, null = torna alla proposta). KPI e funnel divisi per stato.
 
 ## Chiamate per un responsabile (trasferimenti)
-Tabella `chiamate_trasferite` (anche senza pratica). Due esiti:
-- **Trasferita**: risposto / non risposto / occupato / richiamerà. Non risposto → richiamo entro `trasferimento_sla` (2 ore lavorative).
+Tabella `chiamate_trasferite` (anche senza pratica). Due schede:
+- **Trasferita**: si registra e si inviano le due email (nessun esito da scegliere).
 - **Responsabile non disponibile**: «Vi ricontatteremo entro» 30 min / 1 ora / 2 ore / oggi pomeriggio / domani mattina / data-ora scelta dal cliente → scadenza del richiamo.
 Campanella al destinatario se la sua email (`destinatari_trasferimento`) corrisponde a un account; promemoria 15 minuti prima; se scade: escalation a centralino + direzione. «Richiamato» (con breve esito) dal centralino o dal destinatario. Ogni trasferimento è anche un evento `chiamata` nella storia della pratica.
 **Email di riepilogo obbligatoria**: dopo il salvataggio si apre il compositore con «Riepilogo telefonata – trasferita al referente» o «… vi ricontatteremo entro {entro}». Senza email: «Email non disponibile» con motivo. Finché manca: segnale rosso «Email di riepilogo non inviata» e KPI «% chiamate con email di riepilogo».

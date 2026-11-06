@@ -31,11 +31,29 @@ export default function Pratica() {
   const [riep, setRiep] = useState<Trasferimento | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const nuova = qs.get('nuova') === '1';
+  // dopo un passo si apre subito il successivo (una schermata per passo, nessun clic in più)
+  const [continua, setContinua] = useState<string | null>(null);
+  useEffect(() => {
+    if (!continua || !data) return;
+    if (data.pratica.stato_corrente === continua) return;
+    setContinua(null);
+    if (data.pratica.esito === 'aperta') setModale('avanza');
+  }, [continua, data]);
   useEffect(() => {
     if (!ctx.scrive) return;
-    if (qs.get('trasferisci') === '1') { setModale('trasf'); qs.delete('trasferisci'); setQs(qs, { replace: true }); }
+    if (qs.get('avanza') === '1') { setModale('avanza'); qs.delete('avanza'); setQs(qs, { replace: true }); }
+    else if (qs.get('trasferisci') === '1') { setModale('trasf'); qs.delete('trasferisci'); setQs(qs, { replace: true }); }
     else if (qs.get('email')) { setCodiceEmail(qs.get('email') || undefined); setModale('email'); qs.delete('email'); setQs(qs, { replace: true }); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // scorciatoia: «A» = prossimo passo (fuori dai campi di testo)
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.key.toLowerCase() !== 'a' || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable) return;
+      if (ctx.scrive && !modale && data?.pratica.esito === 'aperta') { e.preventDefault(); setModale('avanza'); }
+    };
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
+  }, [ctx.scrive, modale, data]);
 
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data || !config) return <Caricamento />;
@@ -69,8 +87,7 @@ export default function Pratica() {
         <div className="ct-dopo">
           <div><b>Pratica {p.numero} aperta.</b> {prossimo ? <>Prossimo passo: <b>{prossimo.nome}</b>.</> : null}</div>
           <div className="row-flex">
-            {prossimo?.template ? <button className="btn btn-sm" onClick={() => { setCodiceEmail(prossimo.template); setModale('email'); }}>Invia email: {prossimo.nome}</button>
-              : prossimo && <button className="btn btn-sm" onClick={avanzaUno}>Fatto: {prossimo.nome}</button>}
+            {prossimo && <button className="btn btn-sm" onClick={avanzaUno}>Prossimo passo: {prossimo.nome} <kbd>A</kbd></button>}
             <button className="btn-ghost btn-sm" onClick={() => { setCodiceEmail(undefined); setModale('email'); }}>Invia email al cliente</button>
             <button className="btn-ghost btn-sm" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
             <button className="btn-ghost btn-sm" onClick={() => { qs.delete('nuova'); setQs(qs); }}>Chiudi</button>
@@ -142,7 +159,9 @@ export default function Pratica() {
               {p.importo_stimato != null && <><dt>Importo stimato</dt><dd>{fmtEuro(p.importo_stimato)}</dd></>}
               {p.tipo === 'manutenzione' && <><dt>Alert Taylor</dt><dd>{p.alert_taylor ? `Inviato${p.documento_intervento ? ` · doc. ${p.documento_intervento}` : ''}` : 'No'}</dd></>}
               {p.sottotipo === 'Allarme sonoro attivo' && <><dt>Tacitazione</dt><dd>{p.tacitazione_tentata ? 'Tentata al telefono' : 'Non tentata'}</dd></>}
-              {p.esito_offerta && <><dt>Esito offerta</dt><dd>{p.esito_offerta.replace('_', ' ')}</dd></>}
+              {p.urgenza && <><dt>Urgenza</dt><dd>{p.urgenza === 'urgente' ? 'Urgente (oggi)' : 'Ordinario (entro 2 gg lav.)'}</dd></>}
+              {p.coordinatore_nome && <><dt>Coordinatore</dt><dd>{p.coordinatore_nome}{p.coordinatore_telefonato ? ' · telefonato' : ''}</dd></>}
+              {p.tecnico_quando && <><dt>Tecnico</dt><dd>{p.assegnato_nome} · {p.tecnico_quando}</dd></>}
               {p.descrizione && <><dt>Richiesta</dt><dd>{p.descrizione}</dd></>}
             </dl>
             {f?.nota_procedura && <p className="ct-proc">{f.nota_procedura}</p>}
@@ -154,7 +173,7 @@ export default function Pratica() {
         </aside>
       </div>
 
-      {modale === 'avanza' && f && <Avanza p={p} f={f} onClose={() => setModale('')} onFatto={fatto} onEmail={t => { setCodiceEmail(t); setModale('email'); }} />}
+      {modale === 'avanza' && f && <Avanza p={p} f={f} onClose={() => setModale('')} onFatto={() => { setContinua(p.stato_corrente); fatto(); }} onEmail={t => { setCodiceEmail(t); setModale('email'); }} />}
       {modale === 'sposta' && <ModaleSposta p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {(modale === 'nota' || modale === 'chiamata') && <ModaleNota p={p} tipo={modale} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'email' && <ModaleEmail pratica={p} codice={codiceEmail} onClose={() => setModale('')} onFatto={fatto} />}

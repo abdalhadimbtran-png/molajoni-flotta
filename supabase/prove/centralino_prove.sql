@@ -57,6 +57,17 @@ begin
   if not ok then raise exception 'Allarme: urgenza/stadio/SLA errati'; end if;
   r := public.centralino_crea('{"canale":"telefono","tipo":"manutenzione","sottotipo":"Guasto","urgenza":"ordinario","cliente_nome":"ZZ Uffici Prova"}');
   if (select urgenza from public.pratiche where id = (r->>'id')::bigint) <> 'ordinario' then raise exception 'Urgenza ordinaria non salvata'; end if;
+  -- basta il telefono; coordinatore solo con telefonata; cliente informato a voce
+  r := public.centralino_crea('{"canale":"telefono","tipo":"sopralluogo","urgenza":"ordinario","telefono":"06 111 2222"}');
+  pid2 := (r->>'id')::bigint;
+  if (select cliente_nome from public.pratiche where id = pid2) <> '06 111 2222' then raise exception 'Solo telefono: cliente non valorizzato'; end if;
+  begin perform public.centralino_crea('{"canale":"telefono","tipo":"informazione"}'); raise exception 'senza cliente né telefono permesso';
+  exception when others then if sqlerrm not like 'Indica il cliente o il telefono%' then raise; end if; end;
+  perform public.centralino_avanza(pid2, 'coordinatore', '{"coordinatore_nome":"Alberto","coordinatore_telefonato":true}');
+  perform public.centralino_avanza(pid2, 'tecnico', '{"tecnico_nome":"ZZ Commerciale"}');
+  perform public.centralino_avanza(pid2, 'cliente', '{"informato_voce":true}');
+  perform public.centralino_avanza(pid2, 'avviso', '{"alert_taylor":true}');
+  if (select esito from public.pratiche where id = pid2) <> 'chiusa_ok' then raise exception 'Sopralluogo minimo non chiuso'; end if;
   -- soglia: 999,99 resta al centralino, 1.000 va al Tecnico Commerciale
   r := public.centralino_crea('{"canale":"tablet_tmq","tipo":"offerta","importo_stimato":999.99,"cliente_nome":"ZZ Bar Prova"}');
   if r->>'tipo' <> 'offerta_piccola' then raise exception 'Soglia 999,99: %', r; end if;
@@ -81,26 +92,26 @@ begin
   exception when others then if sqlerrm not like 'Una pratica si chiude%' then raise; end if; end;
   perform public.centralino_invia_email(pid, 'intervento_coordinatore', 'alberto@prova.invalid', '{}', 'Intervento', '<p>x</p>', 'x', 'copia', null);
   perform public.centralino_avanza(pid, 'coordinatore', '{"coordinatore_nome":"Alberto","coordinatore_telefonato":true}');
-  begin perform public.centralino_avanza(pid, 'tecnico', '{"tecnico_nome":"ZZ Tecnico"}'); raise exception 'tecnico senza «quando» permesso';
+  begin perform public.centralino_avanza(pid, 'tecnico', '{"tecnico_quando":"entro 1 ora"}'); raise exception 'tecnico senza nome permesso';
   exception when others then if sqlerrm not like 'Per «%» manca%' then raise; end if; end;
   begin perform public.centralino_avviso_tecnico(pid); raise exception 'avviso app senza tecnico permesso';
   exception when others then if sqlerrm not like 'Prima scegli il tecnico%' then raise; end if; end;
-  perform public.centralino_avanza(pid, 'tecnico', '{"tecnico_nome":"ZZ Tecnico","tecnico_quando":"entro 1 ora"}');
+  perform public.centralino_avanza(pid, 'tecnico', '{"tecnico_nome":"ZZ Tecnico"}');  -- «quando» facoltativo
   if (select assegnato_nome from public.pratiche where id = pid) <> 'ZZ Tecnico' then raise exception 'Tecnico non assegnato'; end if;
   begin perform public.centralino_avanza(pid, 'cliente'); raise exception 'cliente informato senza email permesso';
   exception when others then if sqlerrm not like 'Per «%» manca%' then raise; end if; end;
   perform public.centralino_invia_email(pid, 'intervento_cliente', 'cliente@prova.invalid', '{}', 'Intervento', '<p>x</p>', 'x', 'copia', 'cliente');
-  begin perform public.centralino_avanza(pid, 'avviso', '{"documento_intervento":"DI-1","alert_taylor":true}'); raise exception 'buono senza WhatsApp permesso';
+  begin perform public.centralino_avanza(pid, 'avviso', '{"documento_intervento":"DI-1"}'); raise exception 'avviso senza Taylor/WhatsApp/app permesso';
   exception when others then if sqlerrm not like 'Per «%» manca%' then raise; end if; end;
-  perform public.centralino_avanza(pid, 'avviso', '{"documento_intervento":"DI-1","alert_taylor":true,"whatsapp_tecnico":true}');
-  select esito = 'chiusa_ok' and alert_taylor and whatsapp_tecnico and coordinatore_telefonato and closed_at is not null into ok from public.pratiche where id = pid;
+  perform public.centralino_avanza(pid, 'avviso', '{"whatsapp_tecnico":true}');  -- buono facoltativo, basta un avviso
+  select esito = 'chiusa_ok' and whatsapp_tecnico and documento_intervento is null and coordinatore_telefonato and closed_at is not null into ok from public.pratiche where id = pid;
   if not ok then raise exception 'Chiusura automatica all''ultimo passo mancata'; end if;
   select count(*) into n from public.pratiche_eventi where pratica_id = pid;
   if n < 6 then raise exception 'Storia incompleta: % eventi', n; end if;
   -- offerta da 1.000: email al cliente, riepilogo al commerciale, poi chiusa (nessun esito)
   begin perform public.centralino_avanza(pid2, 'email_cliente'); raise exception 'email cliente non inviata: passo permesso';
   exception when others then if sqlerrm not like 'Per «%» manca%' then raise; end if; end;
-  perform public.centralino_invia_email(pid2, 'presa_offerta_grande', 'cliente@prova.invalid', '{}', 'Presa', '<p>x</p>', 'x', 'copia', 'email_cliente');
+  perform public.centralino_avanza(pid2, 'email_cliente', '{"informato_voce":true}');  -- email non disponibile, informato a voce
   perform public.centralino_invia_email(pid2, 'riepilogo_commerciale', 'querini@prova.invalid', '{}', 'Riepilogo', '<p>x</p>', 'x', 'copia', 'riepilogo');
   if (select esito from public.pratiche where id = pid2) <> 'chiusa_ok' then raise exception 'Offerta da 1.000 non chiusa dopo il riepilogo'; end if;
   if exists (select 1 from public.pratiche_flussi f, jsonb_array_elements(f.stadi) s where f.attivo and (s->>'key' = 'esito' or s->'requisiti' ? 'esito')) then raise exception 'Passo «esito» ancora presente'; end if;

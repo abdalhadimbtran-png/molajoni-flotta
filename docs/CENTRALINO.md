@@ -68,9 +68,25 @@ Tabella `appunti` (chiave `bozza` nel nuovo contatto, `p:<id>` nella pratica), s
 | Mai l'anagrafica completa per email | Avviso nel nuovo contatto |
 
 **Clic dopo la chiamata** (salvata la pratica si apre il primo passo e, fatto un passo, si apre da solo il successivo; scorciatoia `A` = prossimo passo, Invio = conferma):
-- Manutenzione standard: coordinatore 2 (Telefonato + Invia e avanti) · tecnico 2 (scelta tecnico + Conferma e informa il cliente; 1 se va bene quello proposto) · buono 2 (Taylor+WhatsApp + Chiudi; il numero si digita) → **6 clic** (5 col tecnico proposto).
+- Manutenzione standard: coordinatore 1–2 (Invia e avanti; + Telefonato se fatto) · tecnico 2 (scelta tecnico + Conferma e informa il cliente; 1 se va bene quello proposto) · buono 2 (Taylor+WhatsApp + Chiudi; il numero si digita) → **6 clic** (5 col tecnico proposto).
 - Sopralluogo: uguale → **6 clic**.
 - Offerta da 1.000 €: Invia e avanti (cliente) + Invia e chiudi (riepilogo) → **2 clic** dopo il salvataggio.
+
+## Campi obbligatori (0059)
+| Dove | Obbligatorio | Perché |
+|---|---|---|
+| Nuovo contatto | Canale, tipo, cliente **o** telefono | Senza non si richiama nessuno |
+| Intervento / sopralluogo | Urgenza (già proposta: allarme = Urgente, altrimenti Ordinario) | Decide l'obiettivo oggi / 2 gg lav. |
+| Offerta | Importo o pulsante «Da 1.000 €»; commerciale (primo disponibile già scelto) | Decide chi la fa |
+| Inviato al coordinatore | Coordinatore (già scelto) + email **o** «Telefonato» | Prova che è stato avvisato |
+| Tecnico individuato | Tecnico | «Quando» facoltativo (default «entro 1 ora» / «entro 2 giorni lavorativi») |
+| Cliente informato / email al cliente (offerta da 1.000 €) / evasione modifica | Email **o** «Informato a voce» | Promessa al cliente mantenuta |
+| Avviso al tecnico | Almeno uno: Taylor, WhatsApp, app | N. buono facoltativo |
+| Riepilogo al commerciale, offerte fino a 999,99 € | Email | È il lavoro stesso del passo |
+| Girate | Destinatario (già proposto dai Referenti) | — |
+| Annulla | Motivo | Tracciabilità |
+
+Tolti: n. buono, «quando» del tecnico, nome cliente se c'è il telefono, telefonata al coordinatore se c'è l'email, WhatsApp+Taylor insieme, fascia mattina/pomeriggio, blocco commerciale «occupato», dettaglio non in elenco (ora ignorato). SLA invariati.
 
 ## Stato del cliente
 `pratiche.stato_cliente`: **attivo** (interventi Taylor negli ultimi `mesi_cliente_attivo` = 12 mesi), **ex cliente** (codice noto in `interventi_importati`/`impianti_posizione` ma niente di recente), **nuovo** (sconosciuto). Proposto automaticamente (trigger), modificabile a mano (`centralino_imposta_stato_cliente`, null = torna alla proposta). KPI e funnel divisi per stato.

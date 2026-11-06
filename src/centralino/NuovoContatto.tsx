@@ -60,7 +60,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const conUrgenza = tipo === 'manutenzione' || tipo === 'sopralluogo';
   const urgente = urgenza === 'urgente';
   // urgenza proposta dal sottotipo (allarme sonoro → urgente)
-  useEffect(() => { if (!conUrgenza) { setUrgenza(''); return; } if (allarme || (sottotipo && flusso?.sottotipi_urgenti.includes(sottotipo))) setUrgenza('urgente'); else if (sottotipo) setUrgenza('ordinario'); }, [sottotipo, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!conUrgenza) { setUrgenza(''); return; } if (allarme || (sottotipo && flusso?.sottotipi_urgenti.includes(sottotipo))) setUrgenza('urgente'); else setUrgenza('ordinario'); }, [sottotipo, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (richiesta === 'offerta' && importo) setGrande(Number(importo) >= 1000); }, [importo, richiesta]);
   // commerciale: il primo disponibile già scelto
   useEffect(() => { if (tipo === 'offerta_grande' && !f.commerciale && comms.length) setF(x => ({ ...x, commerciale: (comms.find(c => c.disponibile) ?? comms[0]).nome })); }, [comms, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -108,11 +108,11 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const manca = useMemo(() => {
     const l: string[] = [];
     if (!tipo) l.push('cosa chiede');
-    if (!q.trim()) l.push('cliente');
+    if (!q.trim() && !f.telefono.trim()) l.push('cliente o telefono');
     if (conUrgenza && !urgenza) l.push('urgenza');
     if (tipo === 'offerta_grande' && !f.commerciale) l.push('commerciale');
     return l;
-  }, [tipo, q, urgenza, conUrgenza, f.commerciale]);
+  }, [tipo, q, f.telefono, urgenza, conUrgenza, f.commerciale]);
 
   async function salva(e?: FormEvent) {
     e?.preventDefault(); setErr(null);
@@ -184,7 +184,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             <div className="field"><label htmlFor="ct-com">Assegna a</label>
               <select id="ct-com" value={f.commerciale} onChange={e => setF({ ...f, commerciale: e.target.value })}>
                 <option value="">— scegli —</option>
-                {comms.map(c => <option key={c.nome} value={c.nome} disabled={!nessunoEff && !c.disponibile}>{c.nome} · {c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : !c.account && c.email ? 'senza account' : 'occupato'}</option>)}
+                {comms.map(c => <option key={c.nome} value={c.nome} >{c.nome} · {c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : !c.account && c.email ? 'senza account' : 'occupato'}</option>)}
               </select></div>
             <label className="check"><input type="checkbox" checked={nessunoEff} disabled={comms.length > 0 && !disponibili.length} onChange={e => setNessuno(e.target.checked)} /> Nessuno disponibile ora</label>
             <span className="sub">Di' al cliente: «Entro 2 ore la contatterà il nostro Tecnico Commerciale». Dopo il salvataggio: email al cliente, email di riepilogo al commerciale, richiamo entro 2 ore.</span>

@@ -10,8 +10,8 @@ export interface Prossimo { key: string; nome: string; mancanti: string[] }
 export const prossimoDi = (id: number) => rpc<Prossimo | null>('centralino_prossimo', { p_id: id });
 
 const emailOk = (s: string | null | undefined) => !!s && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
-const QUANDO = ['entro 30 minuti', 'entro 1 ora', 'entro 2 ore', 'oggi in mattinata', 'oggi pomeriggio', 'domani mattina', 'domani pomeriggio'];
-const quandoDefault = (p: Pratica) => (p.urgenza === 'ordinario' ? 'domani mattina' : 'entro 1 ora');
+const QUANDO = ['entro 30 minuti', 'entro 1 ora', 'entro 2 ore', 'oggi pomeriggio', 'domani mattina', 'entro 2 giorni lavorativi'];
+const quandoDefault = (p: Pratica) => (p.urgenza === 'ordinario' ? 'entro 2 giorni lavorativi' : 'entro 1 ora');
 
 /** Email pronta da modello per la pratica (destinatario scelto dal passo). */
 export function componi(t: Template, p: Pratica, firma: string, a: string, extra: Partial<Pratica> = {}, ccOfferte: string[] = []) {
@@ -53,7 +53,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [taylor, setTaylor] = useState(p.alert_taylor);
   const [comm, setComm] = useState(p.commerciale_nome ?? '');
   const [commerciali, setCommerciali] = useState<Commerciale[]>([]);
-  const [dest, setDest] = useState(p.assegnato_nome ?? '');
+  const [dest, setDest] = useState(p.assegnato_nome ?? f.assegnazione?.nome ?? '');
+  const [voce, setVoce] = useState(false);
   const [nota, setNota] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
@@ -72,9 +73,10 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const elencoComm = p.tipo === 'offerta_grande' ? commerciali.map(c => ({ nome: c.nome, email: c.email ?? '', nota: c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : 'occupato' }))
     : (config?.impostazioni.commerciali ?? []).map(c => ({ ...c, nota: '' }));
   const destinatari = config?.impostazioni.destinatari_trasferimento ?? [];
+  const destEff = dest || destinatari[0]?.nome || '';
 
   // email del passo (precompilata, anteprima chiusa)
-  const tEmail = has('email') ? modello(s?.template) : undefined;
+  const tEmail = has('email') || has('informato') ? modello(s?.template) : undefined;
   const aEmail = !tEmail ? '' : tEmail.codice.endsWith('_coordinatore') ? (coordSel?.email ?? '') : tEmail.codice === 'riepilogo_commerciale' ? (p.commerciale_email ?? '') : (p.email ?? '');
   const ccOff = (config?.impostazioni.cc_offerte_grandi ?? []).map(x => x.email).filter(Boolean) as string[];
   const email = useMemo(() => (tEmail ? componi(tEmail, p, firma, aEmail, {}, ccOff) : null), [tEmail, p, firma, aEmail]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,7 +84,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const destEmail = aMod ?? aEmail;
 
   // passo «cliente» successivo al tecnico: si invia insieme
-  const tCliente = has('tecnico') && dopo?.requisiti?.includes('email') ? modello(dopo.template) : undefined;
+  const tCliente = has('tecnico') && (dopo?.requisiti?.includes('email') || (dopo?.requisiti as string[] | undefined)?.includes('informato')) ? modello(dopo!.template) : undefined;
 
   if (!s) return null;
 
@@ -95,33 +97,34 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     const dati: Record<string, unknown> = {};
     if (has('coordinatore')) {
       if (!coordNome) return setErr('Scegli il coordinatore.');
-      if (!telefonato) return setErr('Spunta «Telefonato» dopo averlo chiamato.');
-      dati.coordinatore_nome = coordNome; dati.coordinatore_telefonato = true;
+      if (!telefonato && !emailOk(destEmail)) return setErr('Invia l\'email (manca l\'indirizzo) oppure segna «Telefonato».');
+      dati.coordinatore_nome = coordNome; dati.coordinatore_telefonato = telefonato;
     }
     if (has('tecnico')) {
       if (!tecnico) return setErr('Scegli il tecnico.');
-      if (!quando && !quandoAt) return setErr('Indica quando passa il tecnico.');
-      const q = quandoAt ? `il ${new Date(quandoAt).toLocaleString('it-IT', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : quando;
+      const q = !quando && !quandoAt ? quandoDefault(p) : quandoAt ? `il ${new Date(quandoAt).toLocaleString('it-IT', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : quando;
       Object.assign(dati, { tecnico_nome: tecnico.nome, tecnico_dipendente_id: tecnico.id, tecnico_quando: q, tecnico_quando_at: quandoAt ? new Date(quandoAt).toISOString() : null });
     }
     if (has('buono') || has('avviso')) {
-      if (has('buono') && !doc.trim()) return setErr('Scrivi il numero del buono.');
-      if (!avvisato && !app) return setErr('Spunta l\'avviso al tecnico (Taylor + WhatsApp).');
+      if (!avvisato && !app) return setErr('Spunta almeno un avviso al tecnico (Taylor/WhatsApp o app).');
       if (doc.trim()) dati.documento_intervento = doc.trim();
       if (avvisato) { dati.alert_taylor = true; dati.whatsapp_tecnico = true; }
     }
     if (has('appuntamento')) { dati.appuntamento_data = data; dati.appuntamento_fascia = fascia; }
     if (has('taylor')) { dati.alert_taylor = taylor; dati.documento_intervento = doc; }
     if (has('commerciale') && comm) { dati.commerciale_nome = comm; dati.commerciale_email = elencoComm.find(c => c.nome === comm)?.email || null; }
-    if (has('destinatario') && dest) dati.assegnato_nome = dest;
-    if (email && tEmail && !emailOk(destEmail)) return setErr('Manca l\'indirizzo email del destinatario.');
+    if (has('destinatario') && destEff) dati.assegnato_nome = destEff;
+    if (has('informato') && voce) dati.informato_voce = true;
+    const mandaEmail = !!email && !!tEmail && !(has('informato') && voce) && !(has('coordinatore') && !emailOk(destEmail));
+    if (mandaEmail && !emailOk(destEmail)) return setErr(has('informato') ? 'Manca l\'email del cliente: spunta «Informato a voce».' : 'Manca l\'indirizzo email del destinatario.');
     setInvio(true);
     try {
-      if (email && tEmail) await inviaEmail({ ...email, a: destEmail }, tEmail.codice);
+      if (mandaEmail && email && tEmail) await inviaEmail({ ...email, a: destEmail }, tEmail.codice);
       if (app) await rpc('centralino_avviso_tecnico', { p_id: p.id });
       await avanza(s.key, dati);
       if (tCliente && dopo) {
-        if (emailOk(p.email)) {
+        if (voce) { await avanza(dopo.key, { informato_voce: true }); toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato a voce`); }
+        else if (emailOk(p.email)) {
           const ec = componi(tCliente, p, firma, p.email!, { tecnico_nome: String(dati.tecnico_nome), tecnico_quando: String(dati.tecnico_quando) });
           await inviaEmail(ec, tCliente.codice);
           await avanza(dopo.key, {});
@@ -133,7 +136,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   }
 
   const etichetta = invio ? 'Invio…'
-    : has('coordinatore') ? 'Invia email al coordinatore e avanti'
+    : has('coordinatore') ? (emailOk(destEmail) ? 'Invia email al coordinatore e avanti' : 'Avanti')
+    : has('informato') && voce ? (ultimo ? 'Chiudi la pratica' : 'Avanti')
     : tCliente ? 'Conferma e informa il cliente'
     : ultimo ? (email ? 'Invia e chiudi' : 'Chiudi la pratica')
     : email ? 'Invia e avanti' : `Fatto: ${s.nome}`;
@@ -155,10 +159,11 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             {QUANDO.map(q => <button type="button" key={q} className={!quandoAt && quando === q ? 'on' : ''} onClick={() => { setQuando(q); setQuandoAt(''); }}>{q}</button>)}
           </div>
           <div className="field"><label htmlFor="av-qat">Oppure data e ora</label><input id="av-qat" type="datetime-local" value={quandoAt} onChange={e => setQuandoAt(e.target.value)} /></div>
+          {tCliente && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Cliente informato a voce (senza email)</label>}
           {tCliente && <p className="hint">Il cliente riceve: «La contatterà il nostro tecnico {tecnico?.nome ?? '…'} {quandoAt ? 'il giorno scelto' : quando}».{!emailOk(p.email) && ' Manca l\'email del cliente.'}</p>}
         </>)}
         {(has('buono') || has('avviso')) && (<>
-          {has('buono') && <div className="field"><label htmlFor="av-doc">N. buono di intervento</label><input id="av-doc" value={doc} onChange={e => setDoc(e.target.value)} autoFocus /></div>}
+          {has('buono') && <div className="field"><label htmlFor="av-doc">N. buono di intervento (facoltativo)</label><input id="av-doc" value={doc} onChange={e => setDoc(e.target.value)} autoFocus /></div>}
           <label className="check"><input type="checkbox" checked={avvisato} onChange={e => setAvvisato(e.target.checked)} /> Tecnico avvisato: alert su Taylor + WhatsApp</label>
           <label className="check"><input type="checkbox" checked={app} onChange={e => setApp(e.target.checked)} /> Invia anche l'avviso urgente nell'app{p.tecnico_dipendente_id ? '' : ' (tecnico senza app)'}</label>
           <p className="hint">Obiettivo: {p.urgenza === 'ordinario' ? 'intervento entro 2 giorni lavorativi' : 'intervento oggi'}.</p>
@@ -177,8 +182,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             <select id="av-com" value={comm} onChange={e => setComm(e.target.value)}><option value="">— scegli —</option>{elencoComm.map(c => <option key={c.nome} value={c.nome}>{c.nome}{c.nota ? ` · ${c.nota}` : ''}</option>)}</select></div>)}
         {has('destinatario') && (
           <div className="field"><label htmlFor="av-dest">Girata a</label>
-            <select id="av-dest" value={dest} onChange={e => setDest(e.target.value)}><option value="">— scegli —</option>{destinatari.map(d => <option key={d.nome} value={d.nome}>{d.nome}{d.nota ? ` · ${d.nota}` : ''}</option>)}</select></div>)}
-        {has('email') && !tEmail && <Banner s="warn">Questo passo richiede un'email. <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Scrivi l'email</button></Banner>}
+            <select id="av-dest" value={destEff} onChange={e => setDest(e.target.value)}><option value="">— scegli —</option>{destinatari.map(d => <option key={d.nome} value={d.nome}>{d.nome}{d.nota ? ` · ${d.nota}` : ''}</option>)}</select></div>)}
+        {(has('email') || (has('informato') && !voce)) && !tEmail && <Banner s="warn">Questo passo richiede un'email. <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Scrivi l'email</button></Banner>}
         {email && (
           <details className="ct-anteprima-box">
             <summary>Email a <b>{destEmail || '— manca l\'indirizzo —'}</b>: {email.oggetto}</summary>
@@ -187,7 +192,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             <div className="ct-anteprima" dangerouslySetInnerHTML={{ __html: email.corpo }} />
             <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Modifica il testo</button>
           </details>)}
-        {email && !emailOk(destEmail) && <p className="hint">Apri l'anteprima e scrivi l'indirizzo.</p>}
+        {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Email non disponibile: cliente informato a voce</label>}
+        {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? 'Senza indirizzo basta «Telefonato».' : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}
         <details><summary>Nota (facoltativa)</summary><input aria-label="Nota" value={nota} onChange={e => setNota(e.target.value)} /></details>
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex"><button className="btn" disabled={invio}>{etichetta}</button><span className="hint">Invio ↵</span></div>

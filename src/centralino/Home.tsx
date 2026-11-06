@@ -6,7 +6,7 @@ import { Banner, Errore, toast, useLoad } from '../ui';
 import { REGOLA_SQUILLI, SCRIPT_TELEFONO, prossimoStadio, senzaRiepilogo, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
 import { giornoRoma, semaforo } from '../lib/centralino/sla';
 import { praticheAperte, useAdesso, useAggiornamento, useConfig } from './comune';
-import { CardPratica, Ic, Vuoto, nomeStadio } from './componenti';
+import { CardPratica, Vuoto, nomeStadio } from './componenti';
 import Avanza, { avanzaDiretto } from './Avanza';
 import { RigaTrasf, daRichiamare, segnaRichiamato, trasferimenti } from './Trasferimento';
 import EmailTrasferimento from './EmailTrasferimento';
@@ -84,7 +84,6 @@ export default function Home() {
           <p className="ct-script-h">{REGOLA_SQUILLI} «{SCRIPT_TELEFONO}»</p>
         </div>
         {ctx.scrive && <div className="ct-hero2-a">
-          <button className="btn ct-btn-xl" onClick={() => ctx.nuovo()}><Ic n="piu" size={20} /> Nuovo contatto <kbd>N</kbd></button>
           <div className="ct-info-rapide"><span className="sub">Solo informazione:</span>
             <button className="btn-ghost btn-sm" onClick={() => info('telefono')}>+1 telefonata</button>
             <button className="btn-ghost btn-sm" onClick={() => info('whatsapp')}>+1 WhatsApp</button>

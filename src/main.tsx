@@ -9,6 +9,7 @@ import '@fontsource/ibm-plex-sans-arabic/arabic-700.css';
 import '@fontsource/jetbrains-mono/latin-500.css';
 import '@fontsource/jetbrains-mono/latin-600.css';
 import './styles.css';
+import './design/tokens.css';
 import { configurato } from './lib/supabase';
 import { LinguaProvider } from './lib/i18n';
 import Shell, { Smistamento } from './admin/Shell';

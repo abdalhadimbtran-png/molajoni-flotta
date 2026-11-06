@@ -13,10 +13,11 @@ export const CAMPI = 'id,id_intervento,numero,data_riferimento,tecnico_sigla,tec
 export const QUALITA: Record<string, string> = { esatto: 'Esatta (civico)', via: 'Via (punto medio)', centro_cap: 'Centro CAP', centro_comune: 'Centro comune', manuale: 'Manuale' };
 export const STATI: Record<string, string> = { da_pianificare: 'Da pianificare', pianificato: 'Pianificato', eseguito: 'Eseguito', annullato: 'Annullato' };
 
-const PALETTE: Record<string, string> = { TECA: '#1f77b4', TECB: '#2ca02c', TECE: '#9467bd', TECI: '#ff7f0e', TECF: '#17becf', TECC: '#8c564b', TECH: '#e377c2' };
-const ALTRI = ['#bcbd22', '#7f7f7f', '#393b79', '#637939', '#8c6d31'];
+/** Colori tecnico: token in src/design/tokens.css (--tec-*). Usati solo in CSS (sfondo, --c dei pin). */
+const PALETTE: Record<string, string> = Object.fromEntries(['TECA', 'TECB', 'TECE', 'TECI', 'TECF', 'TECC', 'TECH'].map(k => [k, `var(--tec-${k.toLowerCase()})`]));
+const ALTRI = [1, 2, 3, 4, 5].map(n => `var(--tec-altro-${n})`);
 export function coloreTecnico(s: string | null): string {
-  if (!s) return '#C8102E';
+  if (!s) return 'var(--brand)';
   if (PALETTE[s]) return PALETTE[s];
   let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return ALTRI[h % ALTRI.length];

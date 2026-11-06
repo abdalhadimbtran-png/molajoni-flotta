@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+/** Colore brand dai token (Leaflet vuole un colore reale, non var()). */
+const brand = () => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || undefined;
 
 export interface Segnaposto { id: string; lat: number; lon: number; etichetta: string; numero?: number; sede?: boolean }
 
@@ -32,8 +34,8 @@ export default function Mappa({ punti, linea, scelto, onClic, onSposta }: {
       mk.on('dragend', () => { const q = mk.getLatLng(); cb.current.onSposta?.(p.id, q.lat, q.lng); });
       ll.push([p.lat, p.lon]);
     }
-    if (scelto) L.circleMarker([scelto.lat, scelto.lon], { radius: 9, color: '#C8102E', weight: 3, fillOpacity: .2 }).addTo(s);
-    if (linea?.length) L.polyline(linea, { color: '#C8102E', weight: 4, opacity: .8 }).addTo(s);
+    if (scelto) L.circleMarker([scelto.lat, scelto.lon], { radius: 9, color: brand(), weight: 3, fillOpacity: .2 }).addTo(s);
+    if (linea?.length) L.polyline(linea, { color: brand(), weight: 4, opacity: .8 }).addTo(s);
     // reinquadra solo quando cambia l'insieme dei punti (non a ogni trascinamento o clic)
     const chiave = punti.map(p => p.id).join(',') + (linea?.length ? '+l' : '');
     if (chiave !== inquadrato.current && ll.length) {

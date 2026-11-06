@@ -23,18 +23,6 @@ export function bip() {
 }
 import NuovoContatto from './NuovoContatto';
 import './centralino.css';
-import '../design/tokens.css';
-
-/** Direzione grafica (ramo design-premium): ?tema=apple|graphite|heritage, ricordata nel browser. */
-const TEMI = ['apple', 'graphite', 'heritage'] as const;
-function temaIniziale(): string {
-  try {
-    const q = new URLSearchParams(location.search).get('tema');
-    if (q && (TEMI as readonly string[]).includes(q)) { localStorage.setItem('ct_tema', q); return q; }
-    const v = localStorage.getItem('ct_tema'); if (v && (TEMI as readonly string[]).includes(v)) return v;
-  } catch { /* nessuna memoria */ }
-  return 'apple';
-}
 
 export interface ClientePreset { codice: string | null; nome: string; fonte?: 'taylor' | 'pratiche' }
 export interface CtxCentralino { scrive: boolean; base: string; nuovo: (cliente?: ClientePreset) => void; versione: number; aggiorna: () => void }
@@ -52,7 +40,6 @@ export default function ShellCentralino() {
   const [preset, setPreset] = useState<ClientePreset | undefined>(undefined);
   const [versione, setVersione] = useState(0);
   const direzione = loc.pathname.startsWith('/direzione');
-  useEffect(() => { const r = document.documentElement; r.dataset.theme = temaIniziale(); return () => { delete r.dataset.theme; }; }, []);
   useEffect(() => { document.title = direzione ? 'Molajoni · Direzione' : 'Molajoni · Centralino'; return () => { document.title = 'Molajoni'; }; }, [direzione]);
   // controllo SLA all'apertura (c'è anche il controllo automatico ogni 5 minuti)
   useEffect(() => { if (s.centralino || s.direzione) supabase.rpc('centralino_controlla_sla').then(() => undefined); }, [s.centralino, s.direzione]);

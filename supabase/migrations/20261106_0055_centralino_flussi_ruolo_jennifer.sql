@@ -1,0 +1,7 @@
+-- Flussi ridotti al solo compito del centralino (decisione Hadi 06/11/2026). Applicata come centralino_flussi_ruolo_jennifer.
+-- sopralluogo: Ricevuta → Appuntamento fissato → Confermato al cliente (email, cc commerciale) → Commerciale informato (fine).
+-- offerta_piccola: Ricevuta → Conferma al cliente (10 min) → Offerta inviata (60 min) (fine).
+-- offerta_grande: Ricevuta (assegna a Esposito/Chiaradonna/Querini) → Presa in carico (30 min, email) (fine).
+-- informazione: Ricevuta → Risposta data dal centralino oppure girata al responsabile → Chiusa.
+-- trasferta, abbigliamento: disattivati (attivo = false).
+-- Manutenzione, modifica, amministrazione, fornitori: invariati.

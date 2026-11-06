@@ -1,0 +1,2 @@
+-- Se l'urgenza non arriva, centralino_crea usa 'ordinario' invece di bloccare (l'allarme sonoro resta 'urgente').
+-- Applicata come migrazione centralino_urgenza_predefinita.

@@ -243,10 +243,10 @@ function Legenda({ sigle }: { sigle: string[] }) {
     <div className="int-legenda">
       {[...sigle, null].map(s => <span key={s ?? '-'}><i className="int-dot" style={{ background: coloreTecnico(s) }} />{s ?? t('Senza tecnico')}</span>)}
       <span className="sep" />
-      <span><i className="int-pin q-esatto"><span style={{ ['--c' as string]: '#555' }} /></i>{t('Civico esatto')}</span>
-      <span><i className="int-pin q-via"><span style={{ ['--c' as string]: '#555' }} /></i>{t('Punto medio via')}</span>
-      <span><i className="int-pin q-centro_cap"><span style={{ ['--c' as string]: '#555' }}>?</span></i>{t('Centro CAP/comune')}</span>
-      <span><i className="int-pin q-manuale"><span style={{ ['--c' as string]: '#555' }} /></i>{t('Manuale')}</span>
+      <span><i className="int-pin q-esatto"><span style={{ ['--c' as string]: 'var(--ink-2)' }} /></i>{t('Civico esatto')}</span>
+      <span><i className="int-pin q-via"><span style={{ ['--c' as string]: 'var(--ink-2)' }} /></i>{t('Punto medio via')}</span>
+      <span><i className="int-pin q-centro_cap"><span style={{ ['--c' as string]: 'var(--ink-2)' }}>?</span></i>{t('Centro CAP/comune')}</span>
+      <span><i className="int-pin q-manuale"><span style={{ ['--c' as string]: 'var(--ink-2)' }} /></i>{t('Manuale')}</span>
     </div>
   );
 }

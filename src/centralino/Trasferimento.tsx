@@ -108,7 +108,8 @@ export async function trasferimenti(da?: string, praticaId?: number): Promise<Tr
   if (praticaId) q = q.eq('pratica_id', praticaId);
   const { data, error } = await q; if (error) throw error; return (data ?? []) as Trasferimento[];
 }
-export const daRichiamare = (l: Trasferimento[]) => l.filter(t => t.richiamo_scadenza && !t.richiamato_at);
+/** Coda del centralino: esclusi i richiami del commerciale (offerte da 1.000 €). */
+export const daRichiamare = (l: Trasferimento[]) => l.filter(t => t.richiamo_scadenza && !t.richiamato_at && !t.solo_commerciale);
 
 export function RigaTrasf({ t, ora, onRichiamato, onRiepilogo, base }: { t: Trasferimento; ora: Date; onRichiamato?: (t: Trasferimento) => void; onRiepilogo?: (t: Trasferimento) => void; base: string }) {
   const aperto = !!t.richiamo_scadenza && !t.richiamato_at;

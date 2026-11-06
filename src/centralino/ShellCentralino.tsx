@@ -134,7 +134,7 @@ function StatoLive({ base, versione }: { base: string; versione: number }) {
     let ok = true;
     const carica = () => Promise.all([
       supabase.from('pratiche').select('id,sla_scadenza').eq('esito', 'aperta').not('sla_scadenza', 'is', null).limit(2000),
-      supabase.from('chiamate_trasferite').select('richiamo_scadenza,richiamato_at').is('richiamato_at', null).not('richiamo_scadenza', 'is', null).limit(2000),
+      supabase.from('chiamate_trasferite').select('richiamo_scadenza,richiamato_at').is('richiamato_at', null).not('richiamo_scadenza', 'is', null).eq('solo_commerciale', false).limit(2000),
     ]).then(([a, t]) => ok && setD({ ap: (a.data ?? []) as Pratica[], tr: (t.data ?? []) as { richiamo_scadenza: string | null; richiamato_at: string | null }[] }));
     carica(); const k = window.setInterval(carica, 60000);
     return () => { ok = false; window.clearInterval(k); };

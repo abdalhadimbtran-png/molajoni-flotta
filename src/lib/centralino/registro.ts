@@ -9,7 +9,7 @@ export interface RecPratica {
   created_at: string; closed_at: string | null; assegnato_nome?: string | null;
 }
 export interface RecTrasf {
-  id: number; pratica_id: number | null; destinatario_nome: string; esito: string; modalita?: string; richiamo_scadenza: string | null; richiamato_at: string | null; at: string;
+  id: number; pratica_id: number | null; destinatario_nome: string; esito: string; modalita?: string; richiamo_scadenza: string | null; richiamato_at: string | null; at: string; solo_commerciale?: boolean;
   cliente_nome: string | null; telefono?: string | null; tipo_argomento?: string | null; stato_cliente?: string | null;
   email_referente_inviata_at?: string | null; email_cliente_inviata_at?: string | null; email_riepilogo_at?: string | null; email_non_disponibile?: string | null;
 }
@@ -76,7 +76,7 @@ export const KPI: Def[] = [
   { id: 'trasf_in_tempo', titolo: 'Richiamati entro la scadenza', spiegazione: 'Numeratore: richiami fatti entro la scadenza promessa. Denominatore: richiami già fatti o con scadenza superata.', fonte: 'trasferimenti',
     num: r => inTempo(T(r)), den: (r, c) => richiamoValutabile(T(r), c.ora) },
   { id: 'trasf_da_richiamare', titolo: 'Ancora da richiamare', spiegazione: 'Richiami promessi e non ancora fatti.', fonte: 'trasferimenti', num: r => !!T(r).richiamo_scadenza && !T(r).richiamato_at },
-  { id: 'richiami_dovuti', titolo: 'Richiami dovuti', spiegazione: 'Richiami da fare (tutti i giorni) con scadenza già superata o entro 60 minuti.', fonte: 'trasferimenti', num: (r, c) => !!T(r).richiamo_scadenza && !T(r).richiamato_at && new Date(T(r).richiamo_scadenza!).getTime() - c.ora.getTime() <= 3600e3 },
+  { id: 'richiami_dovuti', titolo: 'Richiami dovuti', spiegazione: 'Richiami del centralino (tutti i giorni) con scadenza già superata o entro 60 minuti; esclusi quelli del Tecnico Commerciale (offerte da 1.000 €).', fonte: 'trasferimenti', num: (r, c) => !T(r).solo_commerciale && !!T(r).richiamo_scadenza && !T(r).richiamato_at && new Date(T(r).richiamo_scadenza!).getTime() - c.ora.getTime() <= 3600e3 },
   { id: 'trasf_scadute', titolo: 'Scadute non richiamate', spiegazione: 'Richiami non fatti con la scadenza già superata.', fonte: 'trasferimenti', num: (r, c) => !!T(r).richiamo_scadenza && !T(r).richiamato_at && new Date(T(r).richiamo_scadenza!) < c.ora },
   { id: 'trasf_email_ref', titolo: 'Con email al referente', spiegazione: 'Numeratore: trasferimenti con l\'email inviata al referente. Denominatore: tutti i trasferimenti.', fonte: 'trasferimenti', num: r => !!T(r).email_referente_inviata_at, den: tutto },
   { id: 'trasf_email_cli', titolo: 'Con email al cliente', spiegazione: 'Numeratore: trasferimenti con l\'email di riepilogo al cliente. Denominatore: tutti i trasferimenti.', fonte: 'trasferimenti', num: r => conCliente(T(r)), den: tutto },

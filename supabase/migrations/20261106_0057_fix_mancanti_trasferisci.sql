@@ -1,0 +1,4 @@
+-- Correzioni dopo le prove rev2 (applicate come fix_ct_mancanti_array e trasferisci_esito_predefinito):
+-- 1) privato.ct_mancanti: "m := m || 'testo'" falliva (22P02 malformed array literal) → "m || text 'testo'".
+--    Senza questa correzione ogni passo con requisiti mancanti dava un errore tecnico invece del messaggio.
+-- 2) centralino_trasferisci: se «Trasferita» arriva senza esito, il default è 'risposto' (il campo non c'è più nel modulo).

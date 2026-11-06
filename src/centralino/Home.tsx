@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Banner, Errore, toast, useLoad } from '../ui';
-import { NOME_TIPO, REGOLA_SQUILLI, SCRIPT_TELEFONO, prossimoStadio, senzaRiepilogo, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
+import { REGOLA_SQUILLI, SCRIPT_TELEFONO, prossimoStadio, senzaRiepilogo, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
 import { giornoRoma, semaforo } from '../lib/centralino/sla';
 import { praticheAperte, useAdesso, useAggiornamento, useConfig } from './comune';
 import { CardPratica, Ic, Vuoto, nomeStadio } from './componenti';
@@ -134,7 +134,6 @@ export default function Home() {
               <Link to="/centralino/clienti">Anagrafica clienti</Link>
               <Link to="/centralino/monitoraggio">Analisi del centralino</Link>
             </div>
-            <p className="sub">Trasferte e abbigliamento: Nuovo contatto › canale Collega. Tipi: {NOME_TIPO.trasferta}, {NOME_TIPO.abbigliamento}.</p>
           </section>
         </aside>
       </div>

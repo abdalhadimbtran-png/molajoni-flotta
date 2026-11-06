@@ -15,8 +15,6 @@ export const RESPONSABILITA: { k: string; l: string; d: string }[] = [
   { k: 'sostituto', l: 'Sostituto del centralino', d: 'Copre il centralino quando l\'operatrice è assente' },
   { k: 'formazione', l: 'Formazione', d: 'Attestati e corsi del personale' },
   { k: 'flotta', l: 'Flotta', d: 'Automezzi' },
-  { k: 'trasferte', l: 'Trasferte', d: 'Alloggio dei TMQ' },
-  { k: 'abbigliamento', l: 'Abbigliamento di lavoro', d: 'Capi da lavoro' },
 ];
 const nomeR = (k: string) => RESPONSABILITA.find(r => r.k === k)?.l ?? k;
 interface Referente { id: number; nome: string; ruolo: string | null; email: string | null; telefono: string | null; cellulare: string | null; attivo: boolean; responsabilita: string[]; note: string | null; ordine: number }

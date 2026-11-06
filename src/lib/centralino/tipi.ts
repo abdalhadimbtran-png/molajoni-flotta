@@ -67,8 +67,6 @@ export const RICHIESTE: { v: TipoPratica | 'offerta'; l: string; ic: string; bre
   { v: 'amministrazione', l: 'Fatture / amministrazione', ic: 'amministrazione', breve: '→ Simona Colagrossi' },
   { v: 'fornitori', l: 'Fornitori', ic: 'fornitori', breve: '→ Roberta Felci' },
   { v: 'informazione', l: 'Informazione / altro', ic: 'informazione', breve: '→ responsabile (anche info@)' },
-  { v: 'trasferta', l: 'Trasferta (alloggio TMQ)', ic: 'trasferta', breve: 'Richiesta di un collega' },
-  { v: 'abbigliamento', l: 'Abbigliamento di lavoro', ic: 'abbigliamento', breve: 'Richiesta di un collega' },
 ];
 
 export const NOME_TIPO: Record<TipoPratica, string> = {

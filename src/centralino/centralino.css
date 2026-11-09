@@ -367,3 +367,30 @@ tr.ct-spento td { opacity:.5; }
 .segmented.ct-chips { flex-wrap: wrap; gap: 6px; }
 .ct-anteprima-box summary { cursor: pointer; font-size: 14px; }
 .ct-anteprima-box[open] { display: grid; gap: 8px; }
+
+/* Tastiera: anello di focus accessibile (blu di sistema, token info), suggerimenti tasti discreti */
+.ct-area :focus-visible, .modal :focus-visible { outline:2px solid var(--info); outline-offset:2px; border-radius:8px; box-shadow:0 0 0 4px var(--info-bg); }
+.ct-big button:focus-visible, .segmented [role=radio]:focus-visible { outline-offset:1px; }
+.ct-card:focus-within { border-color:var(--info-line); box-shadow:0 0 0 3px var(--info-bg); }
+.ct-card-main:focus-visible { outline:none; box-shadow:none; background:var(--info-bg); }
+.ct-trasf:focus, .ct-trasf:focus-within { outline:none; box-shadow:0 0 0 3px var(--info-bg); border-color:var(--info-line); }
+.ct-split-i:focus-visible { outline:none; box-shadow:inset 3px 0 0 var(--info); background:var(--info-bg); }
+.ct-ac-pop button.sel { background:var(--info-bg); }
+.k-hint { font-size:12px; font-weight:400; color:var(--ink-3); margin-inline-start:auto; display:inline-flex; gap:3px; align-items:center; flex-wrap:wrap; }
+.k-hint kbd, .k-aiuto kbd, .ct-kbd-h kbd, .ct-aiuto-btn kbd { font-family:var(--f-mono); font-size:11px; line-height:1.4; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:0 5px; min-width:18px; text-align:center; }
+p.k-hint { margin:4px 0 0; }
+.ct-sez .k-hint { opacity:0; transition:opacity .15s; }
+.ct-nuovo:focus-within .ct-sez .k-hint { opacity:1; }
+@media (hover:none) { .k-hint, .ct-aiuto-btn { display:none !important; } }
+.k-n { display:none; flex:none; font-family:var(--f-mono); font-size:10.5px; width:16px; height:16px; place-items:center; border-radius:4px; background:var(--surface-2); color:var(--ink-3); margin-inline-end:6px; }
+[role=radiogroup]:focus-within .k-n { display:inline-grid; }
+.ct-big button.on .k-n, .segmented .on .k-n { background:var(--on-brand-tint); color:inherit; }
+.ct-aiuto-btn { padding:4px 8px; }
+.k-aiuto { display:grid; gap:14px; }
+.k-aiuto h3 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-3); margin:0 0 6px; }
+.k-aiuto dl { margin:0; display:grid; gap:4px; }
+.k-aiuto dl > div { display:grid; grid-template-columns:120px 1fr; gap:10px; align-items:center; font-size:14px; }
+.k-aiuto dt { display:flex; gap:3px; align-items:center; }
+.k-aiuto dd { margin:0; color:var(--ink-2); }
+.k-poi { font-size:11px; color:var(--ink-3); margin:0 2px; }
+@media (prefers-reduced-motion:reduce) { .ct-sez .k-hint { transition:none; } }

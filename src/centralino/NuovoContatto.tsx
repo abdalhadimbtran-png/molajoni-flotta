@@ -6,6 +6,7 @@ import { scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla
 import { salvaAppunti, useConfig } from './comune';
 import Appunti from './Appunti';
 import { Ic, iconaCanale } from './componenti';
+import { focusGruppo, indiceSuccessivo, tabRoving, tastiRadio } from './tastiera';
 
 interface Cliente { codice: string | null; nome: string; stato_cliente?: StatoCliente | null; sedi?: number; fonte: 'taylor' | 'pratiche'; contatto?: string | null; telefono?: string | null; email?: string | null; indirizzo?: string | null; cap?: string | null; comune?: string | null }
 interface Contatto { id: number; contatto_nome: string | null; ruolo: string | null; telefono: string | null; cellulare: string | null; email: string | null; preferito: boolean; sede: string | null }
@@ -46,6 +47,10 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [statoMan, setStatoMan] = useState(false);
   const [trasf, setTrasf] = useState(false);
   const qRef = useRef<HTMLInputElement>(null);
+  const canaliRef = useRef<HTMLDivElement>(null);
+  const [suggSel, setSuggSel] = useState(-1);
+  // all'apertura: focus sulla scelta del canale
+  useEffect(() => { const k = window.setTimeout(() => focusGruppo(canaliRef.current), 30); return () => window.clearTimeout(k); }, []);
 
   const tipo: TipoPratica | null = richiesta === 'offerta' ? (grande || Number(importo) > 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
   const flusso = config?.flussi.find(x => x.tipo === tipo);
@@ -137,26 +142,32 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
 
   return (
     <Modal titolo="Nuovo contatto" onClose={onClose}>
-      <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) salva(); }}>
+      <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(); } }}>
         {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
 
-        <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b></div>
-        <div className="ct-big ct-big-canali" role="radiogroup" aria-label="Canale">
-          {CANALI.map(c => (
-            <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} className={canale === c.v ? 'on' : ''} onClick={() => setCanale(c.v)}>
+        <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b><span className="k-hint"><kbd>←</kbd><kbd>→</kbd> per scegliere · <kbd>Invio</kbd> per confermare · <kbd>1</kbd>–<kbd>9</kbd> scelta rapida</span></div>
+        <div className="ct-big ct-big-canali" role="radiogroup" aria-label="Canale" ref={canaliRef} onKeyDown={tastiRadio}>
+          {CANALI.map((c, i) => (
+            <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} tabIndex={tabRoving(canale === c.v, i, true)} className={canale === c.v ? 'on' : ''} onClick={() => setCanale(c.v)}>
+              <span className="k-n" aria-hidden>{i + 1}</span>
               <Ic n={iconaCanale(c.v)} size={22} /><span>{c.l}</span></button>))}
         </div>
 
         <div className="ct-sez"><span className="ct-sez-n">2</span><b>Cosa chiede?</b></div>
-        <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta">
-          {RICHIESTE.map(r => (
-            <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} className={richiesta === r.v ? 'on' : ''}
-              onClick={() => { setRichiesta(r.v); setSottotipo(''); }}>
+        <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta" onKeyDown={tastiRadio}>
+          {RICHIESTE.map((r, i) => (
+            <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} tabIndex={tabRoving(richiesta === r.v, i, !!richiesta)} className={richiesta === r.v ? 'on' : ''}
+              onClick={() => { if (richiesta !== r.v) { setRichiesta(r.v); setSottotipo(''); } }}>
+              <span className="k-n" aria-hidden>{i + 1}</span>
               <Ic n={r.ic} size={22} /><span><b>{r.l}</b><span className="sub">{r.breve}</span></span></button>))}
         </div>
         {flusso && flusso.sottotipi.length > 0 && (
-          <div className="field"><label htmlFor="ct-sotto">Dettaglio</label>
-            <select id="ct-sotto" value={sottotipo} onChange={e => setSottotipo(e.target.value)}><option value="">— scegli —</option>{flusso.sottotipi.map(st => <option key={st} value={st}>{st}{flusso.sottotipi_urgenti.includes(st) ? ' (urgente: in giornata)' : ''}</option>)}</select></div>)}
+          <div className="field"><label id="ct-sotto-l">Dettaglio</label>
+            <div className="segmented ct-chips" role="radiogroup" aria-labelledby="ct-sotto-l" onKeyDown={tastiRadio}>
+              {flusso.sottotipi.map((st, i) => <button type="button" key={st} role="radio" aria-checked={sottotipo === st} tabIndex={tabRoving(sottotipo === st, i, !!sottotipo)} className={sottotipo === st ? 'on' : ''}
+                onClick={() => setSottotipo(st)} title={flusso.sottotipi_urgenti.includes(st) ? 'Urgente: in giornata' : undefined}>
+                {i < 9 && <span className="k-n" aria-hidden>{i + 1}</span>}{st}{flusso.sottotipi_urgenti.includes(st) ? ' ·!' : ''}</button>)}
+            </div></div>)}
         {allarme && (
           <div className="ct-allarme">
             <b>Allarme sonoro attivo: urgente, intervento in giornata.</b>
@@ -164,16 +175,19 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             <label className="check"><input type="checkbox" checked={tacit} onChange={e => setTacit(e.target.checked)} /> Tacitazione tentata al telefono</label>
           </div>)}
         {conUrgenza && (<>
-          <div className="field"><label htmlFor="ct-urg">Urgenza</label>
-            <select id="ct-urg" value={urgenza} onChange={e => setUrgenza(e.target.value as '' | 'urgente' | 'ordinario')}>
-              <option value="">— scegli —</option><option value="urgente">Urgente (oggi)</option><option value="ordinario">Ordinario (entro 2 gg lav.)</option></select></div>
+          <div className="field"><label id="ct-urg-l">Urgenza</label>
+            <div className="segmented" role="radiogroup" aria-labelledby="ct-urg-l" onKeyDown={tastiRadio}>
+              {([['urgente', 'Urgente (oggi)'], ['ordinario', 'Ordinario (entro 2 gg lav.)']] as const).map(([v, l], i) => (
+                <button type="button" key={v} role="radio" aria-checked={urgenza === v} tabIndex={tabRoving(urgenza === v, i, !!urgenza)} className={urgenza === v ? 'on' : ''} onClick={() => setUrgenza(v)}>
+                  <span className="k-n" aria-hidden>{i + 1}</span>{l}</button>))}
+            </div></div>
           <p className="ct-script">Nessun appuntamento ora. Di' al cliente: «Entro 1 ora la ricontattiamo per confermarle l'appuntamento».</p>
         </>)}
         {richiesta === 'offerta' && (
           <div className="ct-riga">
-            <div className="segmented" role="group" aria-label="Valore">
-              <button type="button" className={!grande ? 'on' : ''} onClick={() => { setGrande(false); if (Number(importo) > 1000) setImporto(''); }}>Fino a 1.000 €</button>
-              <button type="button" className={grande ? 'on' : ''} onClick={() => setGrande(true)}>Oltre 1.000 €</button>
+            <div className="segmented" role="radiogroup" aria-label="Valore" onKeyDown={tastiRadio}>
+              <button type="button" role="radio" aria-checked={!grande} tabIndex={tabRoving(!grande, 0, true)} className={!grande ? 'on' : ''} onClick={() => { setGrande(false); if (Number(importo) > 1000) setImporto(''); }}><span className="k-n" aria-hidden>1</span>Fino a 1.000 €</button>
+              <button type="button" role="radio" aria-checked={grande} tabIndex={tabRoving(grande, 1, true)} className={grande ? 'on' : ''} onClick={() => setGrande(true)}><span className="k-n" aria-hidden>2</span>Oltre 1.000 €</button>
             </div>
             <div className="field ct-importo"><label htmlFor="ct-imp">Importo stimato (facoltativo)</label>
               <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>
@@ -194,13 +208,21 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         <div className="ct-cliente">
           <div className="field ct-ac">
             <label htmlFor="ct-cli">Cliente / condominio / azienda</label>
-            <input id="ct-cli" ref={qRef} autoComplete="off" value={q} onChange={e => { setQ(e.target.value); if (cli) { setCli(null); setSedi([]); setSede(''); } }} placeholder="Scrivi il nome o il codice cliente" />
+            <input id="ct-cli" ref={qRef} autoComplete="off" value={q} onChange={e => { setQ(e.target.value); setSuggSel(-1); if (cli) { setCli(null); setSedi([]); setSede(''); } }} placeholder="Scrivi il nome o il codice cliente"
+              role="combobox" aria-expanded={sugg.length > 0} aria-controls="ct-cli-pop" aria-autocomplete="list" aria-activedescendant={suggSel >= 0 ? `ct-cli-o${suggSel}` : undefined}
+              onKeyDown={e => {
+                if (!sugg.length) return;
+                const m = e.key === 'ArrowDown' || e.key === 'ArrowUp' ? indiceSuccessivo(suggSel, sugg.length, e.key) : null;
+                if (m !== null) { e.preventDefault(); setSuggSel(m); return; }
+                if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && suggSel >= 0) { e.preventDefault(); scegli(sugg[suggSel]); setSuggSel(-1); }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setSugg([]); setSuggSel(-1); }
+              }} />
             {stato && <span className={`ct-stato-cli pill ${STATI_CLIENTE[stato][0]}`}>{STATI_CLIENTE[stato][1]}{statoMan ? '' : ' (proposto)'}</span>}
             {cli && <span className="ct-ac-tag">{cli.fonte === 'taylor' ? `Cliente ${cli.codice}` : 'Già contattato'}</span>}
             {sugg.length > 0 && (
-              <div className="ct-ac-pop">
-                {sugg.map((c, i) => <button type="button" key={i} onClick={() => scegli(c)}><b>{c.nome}</b><span className="sub">{c.fonte === 'taylor' ? `Cod. ${c.codice} · ${c.sedi} ${c.sedi === 1 ? 'sede' : 'sedi'}` : [c.contatto, c.telefono, c.comune].filter(Boolean).join(' · ') || 'già contattato'}</span></button>)}
-                <div className="ct-ac-nuovo sub">Non c'è? Continua a scrivere: sarà un nuovo cliente.</div>
+              <div className="ct-ac-pop" id="ct-cli-pop" role="listbox">
+                {sugg.map((c, i) => <button type="button" key={i} id={`ct-cli-o${i}`} role="option" aria-selected={i === suggSel} tabIndex={-1} className={i === suggSel ? 'sel' : ''} onMouseEnter={() => setSuggSel(i)} onClick={() => scegli(c)}><b>{c.nome}</b><span className="sub">{c.fonte === 'taylor' ? `Cod. ${c.codice} · ${c.sedi} ${c.sedi === 1 ? 'sede' : 'sedi'}` : [c.contatto, c.telefono, c.comune].filter(Boolean).join(' · ') || 'già contattato'}</span></button>)}
+                <div className="ct-ac-nuovo sub">Non c'è? Continua a scrivere: sarà un nuovo cliente. <span className="k-hint"><kbd>↑</kbd><kbd>↓</kbd> per scegliere · <kbd>Invio</kbd> per confermare</span></div>
               </div>)}
           </div>
           {sedi.length > 0 && (
@@ -247,7 +269,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
           <div className="sub">
             {scad && <>Prima scadenza: <b>{testoResiduo(scad)}</b> · </>}
             {urgente && <span className="ct-sla rosso">urgente</span>}
-            <span className="ct-kbd-h"> · Ctrl+Invio per salvare</span>
+            <span className="ct-kbd-h"> · <kbd>Ctrl</kbd>+<kbd>Invio</kbd> per salvare · <kbd>?</kbd> scorciatoie</span>
           </div>
           <div className="row-flex"><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button><button className="btn" disabled={invio}>{invio ? 'Salvo…' : 'Salva'}</button></div>
         </div>

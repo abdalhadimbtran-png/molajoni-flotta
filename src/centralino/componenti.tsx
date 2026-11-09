@@ -72,7 +72,7 @@ export function CardPratica({ p, f, ora, base, onAvanza, soglia }: { p: Pratica;
   const urg = p.priorita === 'urgente';
   return (
     <div className={`ct-card ${urg ? 'urgente' : ''} sla-${p.esito === 'aperta' ? semaforo(p.created_at, p.sla_scadenza, ora, soglia) : 'chiusa'}`}>
-      <Link to={`${base}/pratica/${p.id}`} className="ct-card-main">
+      <Link to={`${base}/pratica/${p.id}`} className="ct-card-main" data-k-apri>
         <span className="ct-card-ic"><Ic n={urg && p.tipo === 'manutenzione' ? 'allarme' : iconaTipo(p.tipo)} /></span>
         <span className="ct-card-body">
           <span className="ct-card-top"><b className="ct-card-cli">{p.cliente_nome}</b><SlaChip p={p} soglia={soglia} regola={regolaDi(f, p)} /></span>
@@ -87,7 +87,7 @@ export function CardPratica({ p, f, ora, base, onAvanza, soglia }: { p: Pratica;
         </span>
       </Link>
       {onAvanza && p.esito === 'aperta' && prossimo && (
-        <button className="ct-card-next" onClick={() => onAvanza(p)} title={`Avanza a «${prossimo.nome}»`}>
+        <button className="ct-card-next" data-k-avanza onClick={() => onAvanza(p)} title={`Avanza a «${prossimo.nome}» (tasto A)`}>
           <span className="sub">Prossimo</span><span>{prossimo.nome} →</span>
         </button>)}
     </div>

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useListaTastiera } from './tastiera';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
@@ -18,6 +19,8 @@ type Vista = 'aperte' | 'oggi' | 'periodo';
  */
 export default function Pratiche() {
   const ctx = useCtx();
+  const lista = useRef<HTMLUListElement>(null);
+  useListaTastiera(lista, 'li');
   const { id } = useParams();
   const ora = useAdesso();
   const { config } = useConfig();
@@ -53,13 +56,13 @@ export default function Pratiche() {
             <select aria-label="Stato cliente" value={stato} onChange={e => setStato(e.target.value)}><option value="">Clienti</option>{Object.entries(STATI_CLIENTE).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>
             {vista !== 'aperte' && <select aria-label="Stato" value={esito} onChange={e => setEsito(e.target.value)}><option value="">Stato</option>{Object.entries(ESITI).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>}
           </div>
-          <span className="sub">{righe.length} pratiche</span>
+          <span className="sub">{righe.length} pratiche <span className="k-hint"><kbd>J</kbd><kbd>K</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>A</kbd> avanza</span></span>
         </div>
         {!data ? <Scheletro righe={10} /> : (
-          <ul className="ct-split-lista">
+          <ul className="ct-split-lista" ref={lista}>
             {righe.slice(0, 500).map(p => (
               <li key={p.id}>
-                <Link to={`${ctx.base}/pratica/${p.id}`} className={`ct-split-i ${String(p.id) === id ? 'sel' : ''} ${p.priorita === 'urgente' ? 'urgente' : ''}`} aria-current={String(p.id) === id ? 'page' : undefined}>
+                <Link to={`${ctx.base}/pratica/${p.id}`} data-k-apri className={`ct-split-i ${String(p.id) === id ? 'sel' : ''} ${p.priorita === 'urgente' ? 'urgente' : ''}`} aria-current={String(p.id) === id ? 'page' : undefined}>
                   <span className="ct-split-ic"><Ic n={iconaTipo(p.tipo)} size={16} /></span>
                   <span className="ct-split-c">
                     <span className="ct-split-r1"><b>{p.cliente_nome}</b>{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}</span>

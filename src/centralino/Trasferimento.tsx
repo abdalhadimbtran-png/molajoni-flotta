@@ -1,4 +1,5 @@
-import { FormEvent, useCallback, useState } from 'react';
+import { FormEvent, useCallback, useRef, useState } from 'react';
+import { useListaTastiera } from './tastiera';
 import { Link } from 'react-router-dom';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
@@ -115,9 +116,9 @@ export function RigaTrasf({ t, ora, onRichiamato, onRiepilogo, base }: { t: Tras
   const aperto = !!t.richiamo_scadenza && !t.richiamato_at;
   const s = aperto ? semaforo(t.at, t.richiamo_scadenza, ora) : 'nessuno';
   return (
-    <div className={`ct-trasf sla-${s}`}>
+    <div className={`ct-trasf sla-${s}`} tabIndex={-1}>
       <div><b>{t.cliente_nome || t.telefono || 'Cliente'}</b>{t.telefono && t.cliente_nome ? <span className="sub"> · {t.telefono}</span> : null}
-        <div className="sub">{t.modalita === 'richiamo' ? `${t.destinatario_nome} richiamerà ${t.entro_testo ?? ''}` : `→ ${t.destinatario_nome}`}{t.tipo_argomento ? ` · ${t.tipo_argomento}` : ''}{t.argomento ? ` · ${t.argomento}` : ''} · {fmtOra(t.at)}{t.pratica_id ? <> · <Link to={`${base}/pratica/${t.pratica_id}`}>pratica</Link></> : null}</div>
+        <div className="sub">{t.modalita === 'richiamo' ? `${t.destinatario_nome} richiamerà ${t.entro_testo ?? ''}` : `→ ${t.destinatario_nome}`}{t.tipo_argomento ? ` · ${t.tipo_argomento}` : ''}{t.argomento ? ` · ${t.argomento}` : ''} · {fmtOra(t.at)}{t.pratica_id ? <> · <Link to={`${base}/pratica/${t.pratica_id}`} data-k-apri>pratica</Link></> : null}</div>
         {t.esito_richiamo && <div className="sub">Esito richiamo: {t.esito_richiamo}</div>}
         {t.email_non_disponibile && <div className="sub">Email non disponibile: {t.email_non_disponibile}</div>}
       </div>
@@ -147,14 +148,16 @@ export default function Trasferimenti() {
   const r = useCallback(() => { reload(); }, [reload]); useAggiornamento(r);
   const [nuovo, setNuovo] = useState(false);
   const [riep, setRiep] = useState<Trasferimento | null>(null);
+  const lista = useRef<HTMLDivElement>(null);
+  useListaTastiera(lista, '.ct-trasf');
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data) return <Caricamento />;
   const aperti = daRichiamare(data);
   const senza = data.filter(senzaRiepilogo);
   const ric = async (t: Trasferimento) => { if (await segnaRichiamato(t)) reload(); };
   return (
-    <>
-      <div className="page-hero"><div><h1>Chiamate trasferite</h1><p className="sub">Ultimi 30 giorni. Chi non ha risposto o non era disponibile va richiamato entro la scadenza.</p></div>
+    <div ref={lista}>
+      <div className="page-hero"><div><h1>Chiamate trasferite</h1><p className="sub">Ultimi 30 giorni. Chi non ha risposto o non era disponibile va richiamato entro la scadenza.</p><p className="k-hint"><kbd>J</kbd><kbd>K</kbd> per scorrere · <kbd>Invio</kbd> apre la pratica</p></div>
         {ctx.scrive && <button className="btn" onClick={() => setNuovo(true)}>Chiamata per un responsabile</button>}</div>
       <Disponibilita />
       <h2 className="section-title">Da richiamare ({aperti.length})</h2>
@@ -165,7 +168,7 @@ export default function Trasferimenti() {
       {data.filter(t => !aperti.includes(t) && !senza.includes(t)).map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} />)}
       {nuovo && <ModaleTrasferimento onClose={() => setNuovo(false)} onFatto={() => { setNuovo(false); reload(); }} />}
       {riep && <EmailTrasferimento trasf={riep} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
-    </>
+    </div>
   );
 }
 

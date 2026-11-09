@@ -124,6 +124,22 @@ Da compilare in Impostazioni: email di L. Esposito, A. Chiaradonna, A. Querini (
 ## Assenza
 `centralino_copertura()`: se un account centralino (collegato al dipendente) ha un'assenza approvata oggi, banner «Centralino coperto da Simona Colagrossi» (`sostituto`).
 
+## Tastiera
+Il Centralino si usa tutto senza mouse. Helper in `src/centralino/tastiera.ts` (test: `tastiera.test.ts`); l'elenco `SCORCIATOIE` alimenta il riquadro <kbd>?</kbd>.
+
+**Ovunque** (non partono mentre si scrive in un campo, tranne <kbd>Esc</kbd> e <kbd>Ctrl</kbd>+<kbd>Invio</kbd>):
+- <kbd>N</kbd> nuovo contatto · <kbd>/</kbd> cerca · <kbd>?</kbd> riquadro scorciatoie (anche pulsante «?» nella barra)
+- <kbd>G</kbd> poi <kbd>O</kbd>/<kbd>P</kbd>/<kbd>T</kbd>/<kbd>C</kbd> → Oggi / Pratiche / Trasferimenti / Clienti (entro 1,2 s)
+- <kbd>Esc</kbd> chiude la finestra; in un campo toglie il focus; sulla scheda pratica torna indietro
+
+**Nuovo contatto**: all'apertura il focus è sul Canale. Canale, Cosa chiede, Dettaglio (sottotipo), Urgenza e Fino a/Oltre 1.000 € sono gruppi a scelta (`role="radiogroup"`, roving tabindex): <kbd>←</kbd><kbd>→</kbd>/<kbd>↑</kbd><kbd>↓</kbd> spostano, <kbd>Invio</kbd>/<kbd>Spazio</kbd> scelgono e portano al gruppo successivo, <kbd>1</kbd>–<kbd>9</kbd> scelgono la n-esima voce (il numero compare sulla voce quando il gruppo ha il focus). <kbd>Tab</kbd>/<kbd>Maiusc</kbd>+<kbd>Tab</kbd> tra gruppi e campi. Cliente: <kbd>↑</kbd><kbd>↓</kbd> nei suggerimenti, <kbd>Invio</kbd> sceglie, <kbd>Esc</kbd> chiude l'elenco. <kbd>Ctrl</kbd>+<kbd>Invio</kbd> salva da qualunque punto.
+
+**Passo (Avanza)**: focus sul primo campo; tendine con le frecce; caselle e «Telefonato» con <kbd>Spazio</kbd>; «Quando» è un gruppo a scelta; <kbd>Invio</kbd> = Avanti; <kbd>Esc</kbd> = chiudi.
+
+**Elenchi** (Oggi «Adesso», Pratiche, Trasferimenti): <kbd>J</kbd>/<kbd>K</kbd> o <kbd>↓</kbd>/<kbd>↑</kbd> spostano la riga evidenziata (focus reale sul link della riga), <kbd>Invio</kbd> apre, <kbd>A</kbd> fa il prossimo passo (pulsante `[data-k-avanza]` della card in Oggi; nella scheda pratica aperta, come prima).
+
+Anello di focus: `--info` 2px + alone `--info-bg` (token Apple Light). Suggerimenti tasti `.k-hint` discreti, nascosti su dispositivi touch.
+
 ## RPC
 `centralino_crea(p)`, `centralino_avanza(p_id, p_stadio, p_dati, p_testo)`, `centralino_chiudi(p_id, p_esito, p_testo)`, `centralino_nota(p_id, 'nota'|'chiamata', p_testo, p_dati)`, `centralino_aggiorna(p_id, p)`, `centralino_invia_email(...)`, `centralino_allegato(...)` (bucket privato `pratiche`, 10 MB, pdf/jpg/png/docx/xlsx/eml/msg, percorso `<pratica>/<uuid>.<ext>`), `centralino_chiamata_info`, `centralino_registro_giorno`, `centralino_clienti`, `centralino_sedi`, `centralino_persone`, `centralino_copertura`, `centralino_controlla_sla`, `centralino_sla_anteprima`, `centralino_stato_cliente`, `centralino_imposta_stato_cliente`, `centralino_trasferisci(p)`, `centralino_richiamato(p_id, p_nota)`, `centralino_trasf_email(...)`, `centralino_trasf_senza_email(p_id, p_motivo)`. Taylor: nessuna integrazione, solo la casella «Alert inviato su Taylor».
 

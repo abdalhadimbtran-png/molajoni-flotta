@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { tabRoving, tabbabili, tastiRadio } from './tastiera';
 import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
 import { prossimoStadio, type Commerciale, type Flusso, type PersonaDisp, type Pratica, type TecnicoDisp, type Template } from '../lib/centralino/tipi';
@@ -62,6 +63,9 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [nota, setNota] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  // all'apertura: focus sul primo campo
+  useEffect(() => { const k = window.setTimeout(() => { const f = formRef.current; if (f && !f.contains(document.activeElement)) tabbabili(f)[0]?.focus(); }, 30); return () => window.clearTimeout(k); }, [s?.key]);
 
   useEffect(() => {
     if (has('coordinatore')) {
@@ -167,7 +171,13 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
 
   return (
     <Modal titolo={`Passo ${idx + 1} di ${f.stadi.length}: ${s.nome}`} onClose={onClose}>
-      <form className="form" onSubmit={salva}>
+      <form className="form" onSubmit={salva} ref={formRef} onKeyDown={e => {
+        // Invio = Avanti (anche da tendine e caselle); non su pulsanti, link, riepiloghi o gruppi a scelta
+        if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.defaultPrevented) return;
+        const t = e.target as HTMLElement;
+        if (/^(BUTTON|TEXTAREA|A|SUMMARY)$/.test(t.tagName) || t.closest('[role=radiogroup]')) { if (!(e.ctrlKey || e.metaKey)) return; }
+        e.preventDefault(); if (!invio) formRef.current?.requestSubmit();
+      }}>
         {has('coordinatore') && (<>
           <div className="field"><label htmlFor="av-coord">Coordinatore</label>
             <select id="av-coord" value={keyEff} onChange={e => sceltaCoord(e.target.value)}>
@@ -185,15 +195,15 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
           <div className="field"><label htmlFor="av-tec">Tecnico</label>
             <select id="av-tec" value={tecId} onChange={e => setTecId(e.target.value ? Number(e.target.value) : '')}><option value="">— scegli —</option>
               {tecnici.map(t => <option key={t.id} value={t.id}>{t.nome} · {t.assente ? 'assente oggi' : `${t.interventi_oggi} interventi oggi`}</option>)}</select></div>
-          <div className="segmented ct-chips" role="group" aria-label="Quando">
-            {QUANDO.map(q => <button type="button" key={q} className={!quandoAt && quando === q ? 'on' : ''} onClick={() => { setQuando(q); setQuandoAt(''); }}>{q}</button>)}
+          <div className="segmented ct-chips" role="radiogroup" aria-label="Quando" onKeyDown={tastiRadio}>
+            {QUANDO.map((q, i) => { const on = !quandoAt && quando === q; return <button type="button" key={q} role="radio" aria-checked={on} tabIndex={tabRoving(on, i, !quandoAt && QUANDO.includes(quando))} className={on ? 'on' : ''} onClick={() => { setQuando(q); setQuandoAt(''); }}><span className="k-n" aria-hidden>{i + 1}</span>{q}</button>; })}
           </div>
           <div className="field"><label htmlFor="av-qat">Oppure data e ora</label><input id="av-qat" type="datetime-local" value={quandoAt} onChange={e => setQuandoAt(e.target.value)} /></div>
           {tCliente && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Cliente informato a voce (senza email)</label>}
           {tCliente && <p className="hint">Il cliente riceve: «La contatterà il nostro tecnico {tecnico?.nome ?? '…'} {quandoAt ? 'il giorno scelto' : quando}».{!emailOk(p.email) && ' Manca l\'email del cliente.'}</p>}
         </>)}
         {(has('buono') || has('avviso')) && (<>
-          {has('buono') && <div className="field"><label htmlFor="av-doc">N. buono di intervento (facoltativo)</label><input id="av-doc" value={doc} onChange={e => setDoc(e.target.value)} autoFocus /></div>}
+          {has('buono') && <div className="field"><label htmlFor="av-doc">N. buono di intervento (facoltativo)</label><input id="av-doc" value={doc} onChange={e => setDoc(e.target.value)} /></div>}
           <label className="check"><input type="checkbox" checked={avvisato} onChange={e => setAvvisato(e.target.checked)} /> Tecnico avvisato: alert su Taylor + WhatsApp</label>
           <label className="check"><input type="checkbox" checked={app} onChange={e => setApp(e.target.checked)} /> Invia anche l'avviso urgente nell'app{p.tecnico_dipendente_id ? '' : ' (tecnico senza app)'}</label>
           <p className="hint">Obiettivo: {p.urgenza === 'ordinario' ? 'intervento entro 2 giorni lavorativi' : 'intervento oggi'}.</p>
@@ -226,7 +236,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
         {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? `Manca l'email di ${coordNome || 'questa persona'}: aggiungila in ${tecDiretto ? 'Dipendenti' : 'Referenti'} oppure basta «Telefonato».` : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}
         <details><summary>Nota (facoltativa)</summary><input aria-label="Nota" value={nota} onChange={e => setNota(e.target.value)} /></details>
         {err && <Banner s="ko">{err}</Banner>}
-        <div className="row-flex"><button className="btn" disabled={invio}>{etichetta}</button><span className="hint">Invio ↵</span></div>
+        <div className="row-flex"><button className="btn" disabled={invio}>{etichetta}</button><span className="k-hint"><kbd>Invio</kbd> avanti · <kbd>Spazio</kbd> spunta · <kbd>↑</kbd><kbd>↓</kbd> nelle tendine · <kbd>Esc</kbd> chiudi</span></div>
       </form>
     </Modal>
   );

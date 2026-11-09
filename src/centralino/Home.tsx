@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useListaTastiera } from './tastiera';
 import { Link, useNavigate } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
@@ -37,6 +38,8 @@ export default function Home() {
   const [avanza, setAvanza] = useState<Pratica | null>(null);
   const [riep, setRiep] = useState<Trasferimento | null>(null);
   const [filtro, setFiltro] = useState<'tutte' | 'rosse' | 'oggi'>('tutte');
+  const lista = useRef<HTMLElement>(null);
+  useListaTastiera(lista, '.ct-card');
   const rosse = useRef<Set<number> | null>(null);
   useEffect(() => {
     if (!data) return;
@@ -97,8 +100,8 @@ export default function Home() {
       </section>
 
       <div className="ct-plancia">
-        <section className="ct-blocco ct-coda" aria-label="Adesso">
-          <div className="ct-blocco-h"><h2>Adesso <span className="ct-n">{coda.length}</span></h2>
+        <section className="ct-blocco ct-coda" aria-label="Adesso" ref={lista}>
+          <div className="ct-blocco-h"><h2>Adesso <span className="ct-n">{coda.length}</span><span className="k-hint"><kbd>J</kbd><kbd>K</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>A</kbd> avanza</span></h2>
             <div className="segmented" role="group" aria-label="Filtro">
               {([['tutte', 'Tutte'], ['rosse', 'In ritardo'], ['oggi', 'Scadono oggi']] as const).map(([v, l]) => <button key={v} className={filtro === v ? 'on' : ''} onClick={() => setFiltro(v)}>{l}</button>)}
             </div></div>

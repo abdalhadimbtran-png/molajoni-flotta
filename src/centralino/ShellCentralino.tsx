@@ -8,7 +8,8 @@ import { Campanella } from '../formazione/ShellFormazione';
 import { NOME_TIPO, type Pratica } from '../lib/centralino/tipi';
 import { cerca } from './comune';
 import { Ic } from './componenti';
-import { toast } from '../ui';
+import { Modal, toast } from '../ui';
+import { SCORCIATOIE, sequenzaVai, staScrivendo } from './tastiera';
 
 const SUONO = 'ct_suono_avvisi';
 export const suonoAttivo = () => { try { return localStorage.getItem(SUONO) === '1'; } catch { return false; } };
@@ -62,16 +63,32 @@ export default function ShellCentralino() {
       .subscribe();
     return () => { window.clearTimeout(k); supabase.removeChannel(ch); };
   }, [s.sessione, s.centralino, s.direzione]);
-  // N = nuovo contatto (fuori dai campi di testo)
+  // tastiera globale: N, ?, G poi O/P/T/C, Esc (fuori dai campi di testo; Esc anche nei campi)
+  const [aiuto, setAiuto] = useState(false);
+  const prec = useRef<{ k: string; t: number } | null>(null);
+  const baseK = loc.pathname.startsWith('/direzione') ? '/direzione/centralino' : '/centralino';
   useEffect(() => {
-    if (!scrive) return;
     const k = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey || t.closest('input,textarea,select,[contenteditable],.modal')) return;
-      e.preventDefault(); setPreset(undefined); setAperto(true);
+      const modale = !!document.querySelector('.modal');
+      if (e.key === 'Escape') {
+        if (modale) return; // la chiude il Modal
+        if (staScrivendo(t)) { t.blur(); return; }
+        if (/\/pratica\/\d+/.test(loc.pathname)) { e.preventDefault(); nav(-1); }
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || staScrivendo(t) || modale) return;
+      const p = prec.current; prec.current = null;
+      if (p && Date.now() - p.t < 1200) {
+        const dove = sequenzaVai(p.k, e.key);
+        if (dove !== null) { e.preventDefault(); nav(baseK + dove); return; }
+      }
+      if (e.key === 'g' || e.key === 'G') { prec.current = { k: 'g', t: Date.now() }; return; }
+      if (e.key === '?') { e.preventDefault(); setAiuto(true); return; }
+      if (scrive && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); setPreset(undefined); setAperto(true); }
     };
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
-  }, [scrive]);
+  }, [scrive, loc.pathname, baseK]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (loc.pathname === '/centralino/nuovo' && s.centralino) { setPreset(undefined); setAperto(true); nav('/centralino', { replace: true }); } }, [loc.pathname, s.centralino]); // eslint-disable-line react-hooks/exhaustive-deps
   if (s.stato === 'caricamento') return <div className="wrap"><Caricamento /></div>;
@@ -112,6 +129,7 @@ export default function ShellCentralino() {
           {!soloTrasf && <StatoLive base={base} versione={versione} />}
           {!soloTrasf && <Ricerca base={base} />}
           {scrive && <button className="btn ct-nuovo-btn" onClick={() => { setPreset(undefined); setAperto(true); }} title="Nuovo contatto (tasto N)"><Ic n="piu" size={18} /><span>Nuovo contatto</span><kbd>N</kbd></button>}
+          <button className="btn-ghost btn-sm ct-aiuto-btn" onClick={() => setAiuto(true)} title="Scorciatoie da tastiera (tasto ?)" aria-label="Scorciatoie da tastiera"><kbd>?</kbd></button>
           <Campanella />
         </>}
         menuUtente={<>
@@ -121,6 +139,7 @@ export default function ShellCentralino() {
         </>}>
         <Outlet context={ctx} />
       </Layout>
+      {aiuto && <AiutoTastiera onClose={() => setAiuto(false)} />}
       {aperto && <NuovoContatto cliente={preset} onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}
     </div>
   );
@@ -197,5 +216,22 @@ function Ricerca({ base }: { base: string }) {
             </button>))}
         </div>)}
     </div>
+  );
+}
+
+/** Riquadro «?»: scorciatoie da tastiera. */
+function AiutoTastiera({ onClose }: { onClose: () => void }) {
+  const gruppi = ['Ovunque', 'Elenchi', 'Moduli'] as const;
+  return (
+    <Modal titolo="Scorciatoie da tastiera" onClose={onClose}>
+      <div className="k-aiuto">
+        {gruppi.map(g => (
+          <section key={g}><h3>{g}</h3>
+            <dl>{SCORCIATOIE.filter(x => x.gruppo === g).map(x => (
+              <div key={x.testo}><dt>{x.tasti.map((t, i) => <span key={i}>{i > 0 && <span className="k-poi">{x.tasti[0] === 'G' ? 'poi' : x.tasti[0] === 'Ctrl' ? '+' : '/'}</span>}<kbd>{t}</kbd></span>)}</dt><dd>{x.testo}</dd></div>))}
+            </dl></section>))}
+        <p className="k-hint">Le lettere non funzionano mentre scrivi in un campo (tranne <kbd>Esc</kbd> e <kbd>Ctrl</kbd>+<kbd>Invio</kbd>).</p>
+      </div>
+    </Modal>
   );
 }

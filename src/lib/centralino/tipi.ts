@@ -26,7 +26,7 @@ export interface Pratica {
   tecnico_dipendente_id?: number | null; tecnico_quando?: string | null; tecnico_quando_at?: string | null; whatsapp_tecnico?: boolean | null; avviso_app_at?: string | null;
 }
 export interface PersonaDisp { nome: string; email: string | null; telefono?: string | null; cellulare?: string | null; account?: boolean; assente: boolean; occupato?: boolean; disponibile: boolean }
-export interface TecnicoDisp { id: number; nome: string; telefono: string | null; assente: boolean; interventi_oggi: number }
+export interface TecnicoDisp { id: number; nome: string; telefono: string | null; email?: string | null; assente: boolean; interventi_oggi: number }
 export type StatoCliente = 'nuovo' | 'ex_cliente' | 'attivo';
 export const STATI_CLIENTE: Record<StatoCliente, [string, string]> = { nuovo: ['info', 'Nuovo'], ex_cliente: ['warn', 'Ex cliente'], attivo: ['ok', 'Cliente attivo'] };
 export type EsitoTrasf = 'risposto' | 'non_risposto' | 'occupato' | 'richiamera';

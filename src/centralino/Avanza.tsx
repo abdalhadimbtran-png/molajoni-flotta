@@ -41,6 +41,10 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [coord, setCoord] = useState<PersonaDisp[]>([]);
   const [coordNome, setCoordNome] = useState(p.coordinatore_nome ?? '');
   const [telefonato, setTelefonato] = useState(!!p.coordinatore_telefonato);
+  const [altri, setAltri] = useState<PersonaDisp[]>([]);
+  const [tecCoord, setTecCoord] = useState<TecnicoDisp[]>([]);
+  const [coordSelKey, setCoordSelKey] = useState('');
+  const [avvisoCoordApp, setAvvisoCoordApp] = useState(false);
   const [tecnici, setTecnici] = useState<TecnicoDisp[]>([]);
   const [tecId, setTecId] = useState<number | ''>(p.tecnico_dipendente_id ?? '');
   const [quando, setQuando] = useState(p.tecnico_quando ?? quandoDefault(p));
@@ -60,7 +64,11 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [invio, setInvio] = useState(false);
 
   useEffect(() => {
-    if (has('coordinatore')) rpc<PersonaDisp[]>('centralino_coordinatori', { p_tipo: p.tipo }).then(l => { setCoord(l ?? []); if (!coordNome) setCoordNome((l ?? []).find(x => x.disponibile)?.nome ?? l?.[0]?.nome ?? ''); }, () => undefined);
+    if (has('coordinatore')) {
+      rpc<PersonaDisp[]>('centralino_coordinatori', { p_tipo: p.tipo }).then(l => { setCoord(l ?? []); if (!coordNome) setCoordNome((l ?? []).find(x => x.disponibile)?.nome ?? l?.[0]?.nome ?? ''); }, () => undefined);
+      rpc<PersonaDisp[]>('centralino_altri_referenti', { p_tipo: p.tipo }).then(l => setAltri(l ?? []), () => undefined);
+      rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => setTecCoord(l ?? []), () => undefined);
+    }
     if (has('tecnico')) rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => {
       setTecnici(l ?? []);
       if (!tecId) { const lib = [...(l ?? [])].filter(t => !t.assente).sort((a, b) => a.interventi_oggi - b.interventi_oggi)[0]; if (lib) setTecId(lib.id); }
@@ -69,7 +77,17 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   }, [s?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tecnico = tecnici.find(t => t.id === tecId);
-  const coordSel = coord.find(c => c.nome === coordNome);
+  // destinatario del passo coordinatore: chiave «c:nome» / «r:nome» / «t:id»
+  const keyEff = coordSelKey || (coordNome ? (coord.some(c => c.nome === coordNome) ? `c:${coordNome}` : altri.some(c => c.nome === coordNome) ? `r:${coordNome}` : (() => { const t = tecCoord.find(x => x.nome === coordNome); return t ? `t:${t.id}` : `c:${coordNome}`; })()) : '');
+  const tecDiretto = keyEff.startsWith('t:') ? tecCoord.find(t => `t:${t.id}` === keyEff) : undefined;
+  const coordSel: { nome: string; email: string | null } | undefined = tecDiretto ? { nome: tecDiretto.nome, email: tecDiretto.email ?? null } : [...coord, ...altri].find(c => c.nome === coordNome);
+  const sceltaCoord = (k: string) => {
+    setCoordSelKey(k); setAMod(null);
+    if (k.startsWith('t:')) { const t = tecCoord.find(x => `t:${x.id}` === k); setCoordNome(t?.nome ?? ''); }
+    else setCoordNome(k.slice(2));
+    if (!k.startsWith('t:')) setAvvisoCoordApp(false);
+  };
+  const notaP = (c: PersonaDisp) => (c.disponibile ? 'disponibile' : c.assente ? 'in ferie oggi' : 'occupato');
   const elencoComm = p.tipo === 'offerta_grande' ? commerciali.map(c => ({ nome: c.nome, email: c.email ?? '', nota: c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : 'occupato' }))
     : (config?.impostazioni.commerciali ?? []).map(c => ({ ...c, nota: '' }));
   const destinatari = config?.impostazioni.destinatari_trasferimento ?? [];
@@ -99,6 +117,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       if (!coordNome) return setErr('Scegli il coordinatore.');
       if (!telefonato && !emailOk(destEmail)) return setErr('Invia l\'email (manca l\'indirizzo) oppure segna «Telefonato».');
       dati.coordinatore_nome = coordNome; dati.coordinatore_telefonato = telefonato;
+      // inviato direttamente a un tecnico: diventa il tecnico proposto per il passo successivo (modificabile)
+      if (tecDiretto) { dati.tecnico_dipendente_id = tecDiretto.id; dati.coordinatore_tecnico = true; }
     }
     if (has('tecnico')) {
       if (!tecnico) return setErr('Scegli il tecnico.');
@@ -122,6 +142,9 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       if (mandaEmail && email && tEmail) await inviaEmail({ ...email, a: destEmail }, tEmail.codice);
       if (app) await rpc('centralino_avviso_tecnico', { p_id: p.id });
       await avanza(s.key, dati);
+      if (tecDiretto && avvisoCoordApp) {
+        try { await rpc('centralino_avviso_tecnico', { p_id: p.id }); } catch (x) { toast(`Avviso nell'app non inviato: ${testoErrore(x)}`); }
+      }
       if (tCliente && dopo) {
         if (voce) { await avanza(dopo.key, { informato_voce: true }); toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato a voce`); }
         else if (emailOk(p.email)) {
@@ -136,7 +159,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   }
 
   const etichetta = invio ? 'Invio…'
-    : has('coordinatore') ? (emailOk(destEmail) ? 'Invia email al coordinatore e avanti' : 'Avanti')
+    : has('coordinatore') ? (emailOk(destEmail) ? (tecDiretto ? 'Invia email al tecnico e avanti' : 'Invia email al coordinatore e avanti') : 'Avanti')
     : has('informato') && voce ? (ultimo ? 'Chiudi la pratica' : 'Avanti')
     : tCliente ? 'Conferma e informa il cliente'
     : ultimo ? (email ? 'Invia e chiudi' : 'Chiudi la pratica')
@@ -147,8 +170,15 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       <form className="form" onSubmit={salva}>
         {has('coordinatore') && (<>
           <div className="field"><label htmlFor="av-coord">Coordinatore</label>
-            <select id="av-coord" value={coordNome} onChange={e => setCoordNome(e.target.value)}>{coord.map(c => <option key={c.nome} value={c.nome}>{c.nome} · {c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : 'occupato'}{c.telefono || c.cellulare ? ` · ${c.cellulare || c.telefono}` : ''}</option>)}</select>
-            {!coord.length && <p className="hint">Nessun coordinatore: impostalo in Referenti («Coordinamento interventi/sopralluoghi»).</p>}</div>
+            <select id="av-coord" value={keyEff} onChange={e => sceltaCoord(e.target.value)}>
+              {!keyEff && <option value="">— scegli —</option>}
+              {coord.length > 0 && <optgroup label="Coordinatori">{coord.map(c => <option key={`c${c.nome}`} value={`c:${c.nome}`}>{c.nome} · {notaP(c)}{c.telefono || c.cellulare ? ` · ${c.cellulare || c.telefono}` : ''}</option>)}</optgroup>}
+              {altri.length > 0 && <optgroup label="Altri referenti">{altri.map(c => <option key={`r${c.nome}`} value={`r:${c.nome}`}>{c.nome} · {notaP(c)}{c.telefono || c.cellulare ? ` · ${c.cellulare || c.telefono}` : ''}</option>)}</optgroup>}
+              {tecCoord.length > 0 && <optgroup label="Tecnici">{tecCoord.map(t => <option key={`t${t.id}`} value={`t:${t.id}`}>{t.nome} · {t.assente ? 'in ferie oggi' : `disponibile · ${t.interventi_oggi} interventi oggi`}{t.telefono ? ` · ${t.telefono}` : ''}</option>)}</optgroup>}
+            </select>
+            {!coord.length && <p className="hint">Nessun coordinatore: impostalo in Referenti («Coordinamento interventi/sopralluoghi»).</p>}
+            {tecDiretto && <p className="hint">Inviato direttamente al tecnico: sarà proposto come tecnico nel passo successivo (modificabile).{tecDiretto.assente ? ' Attenzione: è in ferie oggi.' : ''}</p>}</div>
+          {tecDiretto && <label className="check"><input type="checkbox" checked={avvisoCoordApp} onChange={e => setAvvisoCoordApp(e.target.checked)} /> Invia anche avviso nell'app del tecnico</label>}
           <button type="button" className={`btn-ghost ct-toggle ${telefonato ? 'on' : ''}`} aria-pressed={telefonato} onClick={() => setTelefonato(!telefonato)}>{telefonato ? '✓ Telefonato' : 'Telefonato'}</button>
         </>)}
         {has('tecnico') && (<>
@@ -193,7 +223,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Modifica il testo</button>
           </details>)}
         {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Email non disponibile: cliente informato a voce</label>}
-        {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? 'Senza indirizzo basta «Telefonato».' : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}
+        {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? `Manca l'email di ${coordNome || 'questa persona'}: aggiungila in ${tecDiretto ? 'Dipendenti' : 'Referenti'} oppure basta «Telefonato».` : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}
         <details><summary>Nota (facoltativa)</summary><input aria-label="Nota" value={nota} onChange={e => setNota(e.target.value)} /></details>
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex"><button className="btn" disabled={invio}>{etichetta}</button><span className="hint">Invio ↵</span></div>

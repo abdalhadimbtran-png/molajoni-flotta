@@ -59,7 +59,7 @@ Tabella `appunti` (chiave `bozza` nel nuovo contatto, `p:<id>` nella pratica), s
 |---|---|
 | Rispondere entro 3 squilli + script | Promemoria in cima al nuovo contatto |
 | Intervento/sopralluogo: **niente appuntamento** al primo contatto | `centralino_crea` chiede solo l'**urgenza** (Urgente oggi / Ordinario entro 2 gg lav.); allarme sonoro → urgente + suggerimento tacitazione; script «Entro 1 ora la ricontattiamo per confermarle l'appuntamento» |
-| Inviato al coordinatore (10 min) | Referenti con «Coordinamento interventi/sopralluoghi», in ordine; primo disponibile preselezionato (`centralino_coordinatori`); email precompilata + interruttore «Telefonato» obbligatorio |
+| Inviato al coordinatore (10 min) | Referenti con «Coordinamento interventi/sopralluoghi», in ordine; primo disponibile preselezionato (`centralino_coordinatori`); email precompilata + interruttore «Telefonato» (basta uno dei due). Menu a gruppi (0061): Coordinatori · Altri referenti (`centralino_altri_referenti`, escluso «Tecnico») · Tecnici (`centralino_tecnici`, «in ferie oggi»). Scelto un tecnico: email a `dipendenti.email`, tecnico proposto nel passo successivo, avviso app facoltativo |
 | Tecnico individuato (45 min) | `centralino_tecnici`: assenze e interventi di oggi; tecnico meno carico preselezionato; «quando» a scelta rapida (default da urgenza) o data/ora |
 | Cliente informato (60 min) | Inviato insieme alla conferma del tecnico («Conferma e informa il cliente») |
 | Buono creato e tecnico avvisato | N. buono + «Taylor + WhatsApp»; «Avviso urgente nell'app» facoltativo (`centralino_avviso_tecnico`, campanella al tecnico, registrato); poi chiusura automatica |

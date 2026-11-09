@@ -10,7 +10,7 @@ import EmailTrasferimento from './EmailTrasferimento';
 import { useCtx } from './ShellCentralino';
 import { Conto } from './componenti';
 
-const ARGOMENTI = ['Offerta fino a 999,99 €', 'Offerta da 1.000 €', 'Sopralluogo', 'Manutenzione / guasto', 'Fatture / amministrazione', 'Fornitori', 'Reclamo', 'Informazione'];
+const ARGOMENTI = ['Offerta fino a 1.000 €', 'Offerta oltre 1.000 €', 'Sopralluogo', 'Manutenzione / guasto', 'Fatture / amministrazione', 'Fornitori', 'Reclamo', 'Informazione'];
 type Entro = '30m' | '1h' | '2h' | 'pom' | 'dom' | 'scelta';
 const ENTRO: { v: Entro; l: string }[] = [
   { v: '30m', l: '30 minuti' }, { v: '1h', l: '1 ora' }, { v: '2h', l: '2 ore' }, { v: 'pom', l: 'Oggi pomeriggio' }, { v: 'dom', l: 'Domani mattina' }, { v: 'scelta', l: 'Quando preferisce il cliente' },
@@ -108,7 +108,7 @@ export async function trasferimenti(da?: string, praticaId?: number): Promise<Tr
   if (praticaId) q = q.eq('pratica_id', praticaId);
   const { data, error } = await q; if (error) throw error; return (data ?? []) as Trasferimento[];
 }
-/** Coda del centralino: esclusi i richiami del commerciale (offerte da 1.000 €). */
+/** Coda del centralino: esclusi i richiami del commerciale (offerte oltre 1.000 €). */
 export const daRichiamare = (l: Trasferimento[]) => l.filter(t => t.richiamo_scadenza && !t.richiamato_at && !t.solo_commerciale);
 
 export function RigaTrasf({ t, ora, onRichiamato, onRiepilogo, base }: { t: Trasferimento; ora: Date; onRichiamato?: (t: Trasferimento) => void; onRiepilogo?: (t: Trasferimento) => void; base: string }) {
@@ -169,7 +169,7 @@ export default function Trasferimenti() {
   );
 }
 
-/** Disponibilità di L. Esposito, A. Chiaradonna, A. Querini per le offerte da 1.000 € (le imposta il centralino o la persona stessa). */
+/** Disponibilità di L. Esposito, A. Chiaradonna, A. Querini per le offerte oltre 1.000 € (le imposta il centralino o la persona stessa). */
 function Disponibilita() {
   const { data, reload } = useLoad(() => rpc<Commerciale[]>('centralino_commerciali', {}).catch(() => null));
   if (!data?.length) return null;
@@ -177,7 +177,7 @@ function Disponibilita() {
     try { await rpc('centralino_imposta_disponibile', { p_nome: c.nome, p_disponibile: c.occupato }); reload(); } catch (e) { toast(testoErrore(e)); }
   }
   return (
-    <section className="ct-blocco"><h2>Commerciali per offerte da 1.000 €</h2>
+    <section className="ct-blocco"><h2>Commerciali per offerte oltre 1.000 €</h2>
       <div className="ct-disp">{data.map(c => (
         <div key={c.nome} className={`ct-disp-i ${c.disponibile ? 'si' : 'no'}`}>
           <b>{c.nome}</b><span className="sub">{c.assente ? 'assente oggi (ferie/permesso)' : c.occupato ? 'occupato' : c.disponibile ? 'disponibile' : 'non disponibile'}{!c.email ? ' · email da inserire' : ''}</span>

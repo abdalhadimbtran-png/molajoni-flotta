@@ -40,13 +40,13 @@ Giorni lavorativi lun–ven, festività (`festivita`) escluse, orario d'ufficio 
 |---|---|---|
 | Manutenzione (rev2, 0056) | Ricevuta (urgenza) → ★Inviato al coordinatore (email + «Telefonato») → ★Tecnico individuato (tecnico + quando) → ★Cliente informato (email «La contatterà il nostro tecnico {tecnico} {quando}») → Buono creato e tecnico avvisato (n. buono + Taylor + WhatsApp, avviso app facoltativo) → chiusa | **10 / 45 / 60 min** dalla chiamata; obiettivo: urgente = oggi, ordinario = entro 2 gg lav. |
 | Sopralluogo (rev2) | Stessi passi: coordinatore sopralluoghi → tecnico/commerciale → cliente informato (cc commerciale) → avviso inviato | 10 / 45 / 60 min |
-| Offerta fino a 999,99 € (gestita da Jennifer) | come da flusso in `pratiche_flussi` (0055), senza passo «Esito» | conferma 10 min, offerta 60 min dalla richiesta |
-| Offerta da 1.000 € (L. Esposito / A. Chiaradonna / A. Querini, il primo disponibile) | Ricevuta (commerciale) → ★Email al cliente «Entro 2 ore la contatterà il nostro Tecnico Commerciale {nome}» → ★Email di riepilogo al commerciale → chiusa per Jennifer | **10 / 15 min**; richiamo 2 ore per il commerciale sempre creato |
+| Offerta fino a 1.000 € (gestita da Jennifer) | come da flusso in `pratiche_flussi` (0055), senza passo «Esito» | conferma 10 min, offerta 60 min dalla richiesta |
+| Offerta oltre 1.000 € (L. Esposito / A. Chiaradonna / A. Querini, il primo disponibile) | Ricevuta (commerciale) → ★Email al cliente «Entro 2 ore la contatterà il nostro Tecnico Commerciale {nome}» → ★Email di riepilogo al commerciale → chiusa per Jennifer | **10 / 15 min**; richiamo 2 ore per il commerciale sempre creato |
 | Modifica / anagrafica / disdetta | Ricevuta → ★Registrata → ★Evasione comunicata → Chiusa | in giornata; email entro giorno lav. successivo |
 | Amministrazione · Fornitori · Informazione (anche info@) | Ricevuta → ★Girata a Simona Colagrossi / Roberta Felci (lun/ven) / responsabile → Chiusa | in giornata |
 | Trasferta (alloggio TMQ) · Abbigliamento di lavoro | Ricevuta → ★Prenotato / Ordinato → Comunicata / Consegnato → Chiusa | 1 / 2 gg lav. |
 
-Regole: **un passo alla volta** (mai salti), ogni passo con i suoi requisiti (`requisiti`: urgenza, coordinatore, tecnico, buono, avviso, email, commerciale, destinatario, appuntamento, taylor); «Prossimo passo: … · manca: …» nella scheda (`centralino_prossimo`). Prima della fine si può solo **annullare** con motivo dall'elenco. Soglia: importo ≥ 1.000 € → Tecnico Commerciale; fino a 999,99 € → Jennifer. Nessun appuntamento al primo contatto per interventi e sopralluoghi. **Nessun «esito»**: la pratica si chiude quando l'ultimo passo è fatto, oppure si annulla con motivo. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
+Regole: **un passo alla volta** (mai salti), ogni passo con i suoi requisiti (`requisiti`: urgenza, coordinatore, tecnico, buono, avviso, email, commerciale, destinatario, appuntamento, taylor); «Prossimo passo: … · manca: …» nella scheda (`centralino_prossimo`). Prima della fine si può solo **annullare** con motivo dall'elenco. Soglia: importo ≥ 1.000 € → Tecnico Commerciale; fino a 1.000 € → Jennifer. Nessun appuntamento al primo contatto per interventi e sopralluoghi. **Nessun «esito»**: la pratica si chiude quando l'ultimo passo è fatto, oppure si annulla con motivo. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
 
 ### Modificare un flusso
 `/centralino/impostazioni` › Flussi: JSON `stadi` = `[{key, nome, sla?, azione?, template?}]`, `sla` = `{"tipo":"minuti|ore|stesso_giorno|giorni_lav","valore":N,"da":"creazione|ingresso"}`, `azione` = `appuntamento|taylor`, `template` = codice modello suggerito. `sla_sottotipi` per SLA diversi per sottotipo. Il primo stadio resta `ricevuta`; non rinominare chiavi già usate (la storia le conserva).
@@ -64,25 +64,25 @@ Tabella `appunti` (chiave `bozza` nel nuovo contatto, `p:<id>` nella pratica), s
 | Cliente informato (60 min) | Inviato insieme alla conferma del tecnico («Conferma e informa il cliente») |
 | Buono creato e tecnico avvisato | N. buono + «Taylor + WhatsApp»; «Avviso urgente nell'app» facoltativo (`centralino_avviso_tecnico`, campanella al tecnico, registrato); poi chiusura automatica |
 | Offerte ≥ 1.000 € | Commerciale disponibile preselezionato; email al cliente (10 min) e riepilogo al commerciale (15 min) da un pulsante ciascuno; richiamo 2 ore per il commerciale |
-| Offerte ≤ 999,99 € | Restano a Jennifer |
+| Offerte ≤ 1.000 € | Restano a Jennifer |
 | Mai l'anagrafica completa per email | Avviso nel nuovo contatto |
 
 **Clic dopo la chiamata** (salvata la pratica si apre il primo passo e, fatto un passo, si apre da solo il successivo; scorciatoia `A` = prossimo passo, Invio = conferma):
 - Manutenzione standard: coordinatore 1–2 (Invia e avanti; + Telefonato se fatto) · tecnico 2 (scelta tecnico + Conferma e informa il cliente; 1 se va bene quello proposto) · buono 2 (Taylor+WhatsApp + Chiudi; il numero si digita) → **6 clic** (5 col tecnico proposto).
 - Sopralluogo: uguale → **6 clic**.
-- Offerta da 1.000 €: Invia e avanti (cliente) + Invia e chiudi (riepilogo) → **2 clic** dopo il salvataggio.
+- Offerta oltre 1.000 €: Invia e avanti (cliente) + Invia e chiudi (riepilogo) → **2 clic** dopo il salvataggio.
 
 ## Campi obbligatori (0059)
 | Dove | Obbligatorio | Perché |
 |---|---|---|
 | Nuovo contatto | Canale, tipo, cliente **o** telefono | Senza non si richiama nessuno |
 | Intervento / sopralluogo | Urgenza (già proposta: allarme = Urgente, altrimenti Ordinario) | Decide l'obiettivo oggi / 2 gg lav. |
-| Offerta | Importo o pulsante «Da 1.000 €»; commerciale (primo disponibile già scelto) | Decide chi la fa |
+| Offerta | Importo o pulsante «Oltre 1.000 €»; commerciale (primo disponibile già scelto) | Decide chi la fa |
 | Inviato al coordinatore | Coordinatore (già scelto) + email **o** «Telefonato» | Prova che è stato avvisato |
 | Tecnico individuato | Tecnico | «Quando» facoltativo (default «entro 1 ora» / «entro 2 giorni lavorativi») |
-| Cliente informato / email al cliente (offerta da 1.000 €) / evasione modifica | Email **o** «Informato a voce» | Promessa al cliente mantenuta |
+| Cliente informato / email al cliente (offerta oltre 1.000 €) / evasione modifica | Email **o** «Informato a voce» | Promessa al cliente mantenuta |
 | Avviso al tecnico | Almeno uno: Taylor, WhatsApp, app | N. buono facoltativo |
-| Riepilogo al commerciale, offerte fino a 999,99 € | Email | È il lavoro stesso del passo |
+| Riepilogo al commerciale, offerte fino a 1.000 € | Email | È il lavoro stesso del passo |
 | Girate | Destinatario (già proposto dai Referenti) | — |
 | Annulla | Motivo | Tracciabilità |
 

@@ -69,13 +69,13 @@ begin
   perform public.centralino_avanza(pid2, 'avviso', '{"alert_taylor":true}');
   if (select esito from public.pratiche where id = pid2) <> 'chiusa_ok' then raise exception 'Sopralluogo minimo non chiuso'; end if;
   -- soglia: 999,99 resta al centralino, 1.000 va al Tecnico Commerciale
-  r := public.centralino_crea('{"canale":"tablet_tmq","tipo":"offerta","importo_stimato":999.99,"cliente_nome":"ZZ Bar Prova"}');
+  r := public.centralino_crea('{"canale":"tablet_tmq","tipo":"offerta","importo_stimato":1000,"cliente_nome":"ZZ Bar Prova"}');
   if r->>'tipo' <> 'offerta_piccola' then raise exception 'Soglia 999,99: %', r; end if;
   begin
     perform public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","importo_stimato":1000,"cliente_nome":"X"}');
     raise exception 'offerta da 1.000 senza commerciale: doveva fallire';
   exception when others then if sqlerrm not like 'Offerta da 1.000%' then raise; end if; end;
-  r := public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","importo_stimato":1000,"cliente_nome":"ZZ Ditta Prova","commerciale_nome":"A. Querini"}');
+  r := public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","importo_stimato":1000.01,"cliente_nome":"ZZ Ditta Prova","commerciale_nome":"A. Querini"}');
   pid2 := (r->>'id')::bigint;
   if r->>'tipo' <> 'offerta_grande' then raise exception 'Soglia 1000: %', r; end if;
   if not exists (select 1 from public.chiamate_trasferite where pratica_id = pid2 and modalita = 'richiamo' and destinatario_nome = 'A. Querini'

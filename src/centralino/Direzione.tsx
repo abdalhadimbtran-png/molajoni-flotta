@@ -93,7 +93,7 @@ export default function Direzione() {
           {([['Richieste', F.richieste, 'off_richieste'], ['Inviate', F.inviate, 'off_inviate']] as const).map(([l, n, id]) => (
             <Link key={l} to={linkAnalisi(ctx.base, id, da, a)} className="ct-funnel-r ct-clic"><span>{l}</span><span className="ct-funnel-b"><i style={{ width: `${(n / maxF) * 100}%` }} /></span><b>{n}</b></Link>))}
         </div>
-        <p className="sub">Valore richiesto {fmtEuro(F.valoreRichieste)} · evaso {fmtEuro(F.valoreInviate)} · offerte fino a 999,99 € in 60 min: <b>{pc(k.offerte60Pct)}</b></p>
+        <p className="sub">Valore richiesto {fmtEuro(F.valoreRichieste)} · evaso {fmtEuro(F.valoreInviate)} · offerte fino a 1.000 € in 60 min: <b>{pc(k.offerte60Pct)}</b></p>
         <table className="ct-tab"><thead><tr><th>Cliente</th><th>Richieste</th><th>Evase</th><th>Valore</th></tr></thead>
           <tbody>{(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(s => { const x = k.funnelPerStato[s]; const L = (id: string, n: number) => <Link to={linkAnalisi(ctx.base, id, da, a, { stato: s })}>{n}</Link>; return <tr key={s}><td>{STATI_CLIENTE[s][1]}</td><td>{L('off_richieste', x.richieste)}</td><td>{L('off_inviate', x.inviate)}</td><td>{fmtEuro(x.valore)}</td></tr>; })}</tbody></table>
       </section>

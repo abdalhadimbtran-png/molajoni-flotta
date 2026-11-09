@@ -47,7 +47,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [trasf, setTrasf] = useState(false);
   const qRef = useRef<HTMLInputElement>(null);
 
-  const tipo: TipoPratica | null = richiesta === 'offerta' ? (grande || Number(importo) >= 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
+  const tipo: TipoPratica | null = richiesta === 'offerta' ? (grande || Number(importo) > 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
   const flusso = config?.flussi.find(x => x.tipo === tipo);
   const allarme = tipo === 'manutenzione' && sottotipo === 'Allarme sonoro attivo';
   const fest = config?.festivi ?? new Set<string>();
@@ -61,7 +61,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const urgente = urgenza === 'urgente';
   // urgenza proposta dal sottotipo (allarme sonoro → urgente)
   useEffect(() => { if (!conUrgenza) { setUrgenza(''); return; } if (allarme || (sottotipo && flusso?.sottotipi_urgenti.includes(sottotipo))) setUrgenza('urgente'); else setUrgenza('ordinario'); }, [sottotipo, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (richiesta === 'offerta' && importo) setGrande(Number(importo) >= 1000); }, [importo, richiesta]);
+  useEffect(() => { if (richiesta === 'offerta' && importo) setGrande(Number(importo) > 1000); }, [importo, richiesta]);
   // commerciale: il primo disponibile già scelto
   useEffect(() => { if (tipo === 'offerta_grande' && !f.commerciale && comms.length) setF(x => ({ ...x, commerciale: (comms.find(c => c.disponibile) ?? comms[0]).nome })); }, [comms, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -130,7 +130,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
       } });
       if (cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
       if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
-      // da 1.000 €: subito il passo «email al cliente» (richiamo 2 ore per il commerciale già creato)
+      // oltre 1.000 €: subito il passo «email al cliente» (richiamo 2 ore per il commerciale già creato)
       onCreata(r.id, tipo === 'offerta_grande' ? 'avanza=1' : conUrgenza ? 'avanza=1' : trasf ? 'trasferisci=1' : '');
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
@@ -172,15 +172,15 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         {richiesta === 'offerta' && (
           <div className="ct-riga">
             <div className="segmented" role="group" aria-label="Valore">
-              <button type="button" className={!grande ? 'on' : ''} onClick={() => { setGrande(false); if (Number(importo) >= 1000) setImporto(''); }}>Fino a 999,99 €</button>
-              <button type="button" className={grande ? 'on' : ''} onClick={() => setGrande(true)}>Da 1.000 €</button>
+              <button type="button" className={!grande ? 'on' : ''} onClick={() => { setGrande(false); if (Number(importo) > 1000) setImporto(''); }}>Fino a 1.000 €</button>
+              <button type="button" className={grande ? 'on' : ''} onClick={() => setGrande(true)}>Oltre 1.000 €</button>
             </div>
             <div className="field ct-importo"><label htmlFor="ct-imp">Importo stimato (facoltativo)</label>
               <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>
           </div>)}
         {tipo === 'offerta_grande' && (
           <div className="ct-allarme ct-grande">
-            <b>Da 1.000 €: l'offerta la fa un Tecnico Commerciale.</b>
+            <b>Oltre 1.000 €: l'offerta la fa un Tecnico Commerciale.</b>
             <div className="field"><label htmlFor="ct-com">Assegna a</label>
               <select id="ct-com" value={f.commerciale} onChange={e => setF({ ...f, commerciale: e.target.value })}>
                 <option value="">— scegli —</option>

@@ -1,0 +1,2 @@
+-- Soglia offerte: fino a 1.000 € (incluso) = centralino; oltre 1.000 € = Tecnico Commerciale.
+-- Applicata come centralino_soglia_oltre_1000 (centralino_crea: imp > 1000; nomi flussi e modelli email aggiornati).

@@ -62,7 +62,7 @@ begin
   delete from public.notifiche where dati->>'categoria' = 'centralino' and (p_fino_a is null or creato_il < p_fino_a);
   delete from public.centralino_chiamate_info where p_fino_a is null or at < p_fino_a;
   delete from public.pratiche where id = any(pr);
-  if p_fino_a is null then delete from privato.pratiche_contatori; end if;
+  if p_fino_a is null then delete from privato.pratiche_contatori where true; end if;
   perform set_config('privato.azzera', 'off', true);
   insert into public.centralino_azzeramenti(autore_nome, fino_a, contatti, conteggi)
     values ((select coalesce(raw_user_meta_data->>'nome', email) from auth.users where id = auth.uid()), p_fino_a, p_contatti, c);

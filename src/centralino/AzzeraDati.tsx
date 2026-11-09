@@ -61,7 +61,7 @@ export default function AzzeraDati() {
   return (
     <div className="card" style={{ borderColor: 'var(--ko, #c0392b)', borderWidth: 2, borderStyle: 'solid', marginTop: 24 }}>
       <h2 className="section-title" style={{ color: 'var(--ko, #c0392b)' }}>Zona pericolosa · Azzera dati di prova</h2>
-      <p className="sub">Cancella pratiche, storia, allegati (con i file), trasferimenti, appunti, email e notifiche del centralino, «+1 chiamata informativa» e riparte la numerazione (CT-{new Date().getFullYear()}-000001). Non tocca clienti Taylor, referenti, modelli email, flussi e impostazioni. Prima scarica un backup automatico.</p>
+      <p className="sub">Cancella pratiche, storia, allegati (con i file), trasferimenti, appunti, email e notifiche del centralino, «+1 chiamata informativa» e riparte la numerazione (CT-{new Date().getFullYear()}-000001). Non tocca clienti Taylor, referenti, modelli email, flussi e impostazioni. La copia di backup è facoltativa.</p>
       <div className="row-flex" style={{ flexWrap: 'wrap', gap: 12 }}>
         <label>Facoltativo: cancella solo le pratiche create <b>prima del</b> <input type="date" value={data} onChange={e => setData(e.target.value)} /> <span className="hint">— lascia vuoto per cancellare TUTTO</span>{data && <button type="button" className="btn btn-sm" onClick={() => setData("")}>Tutto</button>}</label>
         <label><input type="checkbox" checked={contatti} onChange={e => setContatti(e.target.checked)} /> Anche i contatti creati dal centralino (e la loro storia)</label>

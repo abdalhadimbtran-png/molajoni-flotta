@@ -50,7 +50,6 @@ export default function AzzeraDati() {
     if (!conti || !confermaValida(testo)) return;
     setLavoro(true); setErr(null);
     try {
-      await backup();
       const files = (conti.allegati_path ?? []) as string[];
       for (let i = 0; i < files.length; i += 100) { const x = await supabase.storage.from('pratiche').remove(files.slice(i, i + 100)); if (x.error) throw x.error; }
       const r = await supabase.rpc('admin_centralino_azzera', { p_fino_a: fino, p_contatti: contatti });
@@ -79,7 +78,8 @@ export default function AzzeraDati() {
           <p>Totale: <b>{totale(conti)}</b> righe. Verrà scaricato un backup JSON prima della cancellazione. L'azione resta nel registro.</p>
           <label>Scrivi <b>{PAROLA_CONFERMA}</b> per confermare <input value={testo} onChange={e => setTesto(e.target.value)} autoFocus aria-label="Conferma" /></label>
           <div className="row-flex" style={{ marginTop: 12 }}>
-            <button className="btn btn-sm" style={{ background: 'var(--ko, #c0392b)' }} disabled={!confermaValida(testo) || lavoro} onClick={esegui}>{lavoro ? 'Azzeramento…' : 'Scarica backup e azzera'}</button>
+            <button className="btn btn-sm" style={{ background: 'var(--ko, #c0392b)' }} disabled={!confermaValida(testo) || lavoro} onClick={esegui}>{lavoro ? 'Cancellazione…' : 'Cancella tutto'}</button>
+            <button type="button" className="btn-ghost btn-sm" disabled={lavoro} onClick={() => backup().catch(e => setErr(testoErrore(e)))}>Scarica copia (facoltativo)</button>
             <button className="btn-ghost btn-sm" disabled={lavoro} onClick={() => setConti(null)}>Annulla</button>
           </div>
         </Modal>

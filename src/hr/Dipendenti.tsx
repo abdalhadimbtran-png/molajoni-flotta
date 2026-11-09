@@ -22,6 +22,8 @@ export default function Dipendenti() {
   const [scheda, setScheda] = useState<Dipendente | null>(null);
   const [vedi, setVedi] = useState<Dipendente | null>(null);
   const [assenza, setAssenza] = useState<Dipendente | null>(null);
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [elimina, setElimina] = useState<number[] | null>(null);
   const { data, errore, reload } = useLoad(async () => {
     const [d, s] = await Promise.all([
       supabase.from('dipendenti').select(SEL_DIP).order('cognome').order('nome'),
@@ -34,6 +36,14 @@ export default function Dipendenti() {
   if (!data) return <Caricamento />;
   const lista = data.dip.filter(x => (inattivi || x.attivo) && (!cat || x.categoria === cat)
     && (!cerca || `${x.nome} ${x.cognome} ${x.codice} ${x.reparto ?? ''}`.toLowerCase().includes(cerca.toLowerCase())));
+
+  const visibili = lista.map(x => x.id);
+  const tuttiSel = visibili.length > 0 && visibili.every(id => sel.has(id));
+  const scegli = (id: number) => { const n = new Set(sel); if (n.has(id)) n.delete(id); else n.add(id); setSel(n); };
+  const scegliTutti = () => setSel(tuttiSel ? new Set() : new Set(visibili));
+  async function ripristina(x: Dipendente) {
+    try { await rpc('hr_ripristina_dipendente', { p_id: x.id }); toast(`${x.nome} ${x.cognome} ripristinato`); reload(); } catch (e) { toast(erroreHR(e)); }
+  }
 
   async function sblocca(x: Dipendente) {
     try { await rpc('hr_sblocca_accesso', { p_dipendente: x.id }); toast('Accesso sbloccato'); reload(); } catch (e) { toast(erroreHR(e)); }
@@ -51,17 +61,20 @@ export default function Dipendenti() {
           {CATEGORIE.map(([k, l]) => <button key={k} className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{k === 'TEC' ? 'Tecnici' : l}</button>)}
         </div>
         <input className="hr-cerca-in" aria-label="Cerca" placeholder="Cerca nome, codice o reparto" value={cerca} onChange={e => setCerca(e.target.value)} />
-        <label className="sub chk"><input type="checkbox" checked={inattivi} onChange={e => setInattivi(e.target.checked)} /> Mostra non attivi</label>
+        <label className="sub chk"><input type="checkbox" checked={inattivi} onChange={e => setInattivi(e.target.checked)} /> Mostra archiviati</label>
+        <label className="sub chk"><input type="checkbox" checked={tuttiSel} onChange={scegliTutti} /> Seleziona tutti</label>
+        {sel.size > 0 && <button className="btn btn-sm" onClick={() => setElimina([...sel])}>Elimina selezionati ({sel.size})</button>}
         <span className="spacer" /><span className="sub">{lista.length} {lista.length === 1 ? 'dipendente' : 'dipendenti'}</span>
       </div>
       <div className="table-wrap"><table className="hr-tab">
-        <thead><tr><th>Dipendente</th><th>Codice</th><th>Categoria</th><th className="hr-c-rep">Reparto</th><th>Accesso app</th><th className="hr-c-fer num-c">Ferie</th><th></th></tr></thead>
+        <thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Seleziona tutti" checked={tuttiSel} onChange={scegliTutti} /></th><th>Dipendente</th><th>Codice</th><th>Categoria</th><th className="hr-c-rep">Reparto</th><th>Accesso app</th><th className="hr-c-fer num-c">Ferie</th><th></th></tr></thead>
         <tbody>{lista.length ? lista.map(x => {
           const s = data.saldi.get(x.id);
           return (
             <tr key={x.id} className={x.attivo ? '' : 'muted'}>
+              <td><input type="checkbox" aria-label={`Seleziona ${x.nome} ${x.cognome}`} checked={sel.has(x.id)} onChange={() => scegli(x.id)} /></td>
               <td><button className="hr-nome-btn" onClick={() => setVedi(x)}>{x.nome} {x.cognome}</button>
-                <div className="sub">{[x.telefono, x.email].filter(Boolean).join(' · ') || '—'}{!x.attivo ? ' · non attivo' : x.data_cessazione ? ` · fine rapporto ${fmtData(x.data_cessazione)}` : ''}</div></td>
+                <div className="sub">{[x.telefono, x.email].filter(Boolean).join(' · ') || '—'}{!x.attivo ? ' · archiviato' : x.data_cessazione ? ` · fine rapporto ${fmtData(x.data_cessazione)}` : ''}</div></td>
               <td className="mono">{x.codice}</td>
               <td><Pill s="na">{nomeCategoria(x.categoria)}</Pill></td>
               <td className="hr-c-rep">{x.reparto ?? '—'}</td>
@@ -75,18 +88,21 @@ export default function Dipendenti() {
                   {bloccato(x) && <button onClick={() => sblocca(x)}>Sblocca</button>}
                   <button onClick={() => setVedi(x)}>Vedi saldo e storico</button>
                   {x.attivo && <button onClick={() => setAssenza(x)}>Inserisci un'assenza</button>}
+                  {!x.attivo && <button onClick={() => ripristina(x)}>Ripristina</button>}
+                  <button onClick={() => setElimina([x.id])}>Elimina</button>
                 </MenuAzioni>
               </td>
             </tr>
           );
-        }) : <tr><td colSpan={7} className="sub">Nessun dipendente con questi filtri.</td></tr>}</tbody>
+        }) : <tr><td colSpan={8} className="sub">Nessun dipendente con questi filtri.</td></tr>}</tbody>
       </table></div>
-      <p className="hint">Il codice (matricola) è quello che il dipendente digita nell'app insieme al PIN. I dipendenti non si cancellano: si chiude il rapporto con la data di fine.</p>
+      <p className="hint">Il codice (matricola) è quello che il dipendente digita nell'app insieme al PIN. Chi ha uno storico (interventi, ferie, veicoli…) non viene cancellato ma archiviato: lo storico resta e si può ripristinare.</p>
 
       {modifica && <FormDipendente x={modifica === 'nuovo' ? null : modifica} onClose={() => setModifica(null)} onSalvato={(nuovo) => { setModifica(null); reload(); if (nuovo) setScheda(nuovo); }} />}
       {pin && <ModalePin x={pin} onClose={() => setPin(null)} onSalvato={() => { setPin(null); reload(); }} />}
       {scheda && <ModaleScheda x={scheda} onClose={() => setScheda(null)} onPin={pin => nav('/hr/installa', { state: { dipendente: { nome: scheda.nome, cognome: scheda.cognome, codice: scheda.codice, email: scheda.email, categoria: scheda.categoria }, pin } })} />}
       {vedi && <SchedaDipendente x={vedi} onClose={() => setVedi(null)} onModifica={() => { setModifica(vedi); setVedi(null); }} />}
+      {elimina && <ModaleElimina ids={elimina} onClose={() => setElimina(null)} onFatto={() => { setElimina(null); setSel(new Set()); reload(); }} />}
       {assenza && <ModaleInserisci preDipendente={assenza.id} onClose={() => setAssenza(null)} onSalvato={() => { setAssenza(null); reload(); }} />}
     </>
   );
@@ -270,6 +286,68 @@ function SchedaDipendente({ x, onClose, onModifica }: { x: Dipendente; onClose: 
           </table></div> : <p className="sub">Nessuna richiesta.</p>}
         </>}
         <div className="row-flex"><button className="btn-ghost" onClick={onModifica}>Modifica dati</button></div>
+      </div>
+    </Modal>
+  );
+}
+
+interface EsitoElimina { id: number; nome: string; codice: string; esito: 'eliminato' | 'archiviato'; motivo: string }
+const MOTIVI = ['Dato di prova', 'Non più in azienda', 'Duplicato', 'Altro'];
+
+/** Anteprima (chi viene cancellato, chi archiviato e perché), motivo obbligatorio, conferma scritta oltre 5. */
+function ModaleElimina({ ids, onClose, onFatto }: { ids: number[]; onClose: () => void; onFatto: () => void }) {
+  const [motivo, setMotivo] = useState(MOTIVI[0]);
+  const [altro, setAltro] = useState('');
+  const [scritto, setScritto] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [invio, setInvio] = useState(false);
+  const [esito, setEsito] = useState<EsitoElimina[] | null>(null);
+  const { data, errore, reload } = useLoad(() => rpc<EsitoElimina[]>('hr_anteprima_eliminazione', { p_ids: ids }), [ids.join(',')]);
+  const molti = ids.length > 5;
+  const testoMotivo = motivo === 'Altro' ? altro.trim() : (altro.trim() ? `${motivo}: ${altro.trim()}` : motivo);
+  const ok = !!data && !!testoMotivo && (!molti || scritto.trim().toUpperCase() === 'ELIMINA');
+  async function conferma() {
+    setErr(null); setInvio(true);
+    try { setEsito(await rpc<EsitoElimina[]>('hr_elimina_dipendenti', { p_ids: ids, p_motivo: testoMotivo })); } catch (e) { setErr(erroreHR(e)); }
+    setInvio(false);
+  }
+  const elenco = (r: EsitoElimina[]) => (
+    <div className="table-wrap"><table>
+      <thead><tr><th>Dipendente</th><th>Esito</th><th>Perché</th></tr></thead>
+      <tbody>{r.map(x => <tr key={x.id}><td>{x.nome}<div className="sub mono">{x.codice}</div></td>
+        <td>{x.esito === 'eliminato' ? <Pill s="ko">{esito ? 'Eliminato' : 'Sarà eliminato'}</Pill> : <Pill s="warn">{esito ? 'Archiviato' : 'Sarà archiviato'}</Pill>}</td>
+        <td className="sub">{x.motivo}</td></tr>)}</tbody>
+    </table></div>
+  );
+  if (esito) {
+    const nE = esito.filter(x => x.esito === 'eliminato').length;
+    return (
+      <Modal titolo="Operazione completata" onClose={onFatto}>
+        <div className="form">
+          <Banner s="ok">{nE} eliminati, {esito.length - nE} archiviati (storico conservato).</Banner>
+          {elenco(esito)}
+          <button className="btn" onClick={onFatto}>Fatto</button>
+        </div>
+      </Modal>
+    );
+  }
+  return (
+    <Modal titolo={ids.length === 1 ? 'Eliminare il dipendente?' : `Eliminare ${ids.length} dipendenti?`} onClose={onClose}>
+      <div className="form">
+        {errore && <Errore testo={errore} onRetry={reload} />}
+        {!data ? <p className="sub">Controllo dello storico…</p> : <>
+          <p className="sub" style={{ marginTop: -8 }}>Chi non ha nessuno storico viene cancellato definitivamente. Chi ha storico viene archiviato: non può più accedere, il PIN viene annullato e lo storico resta.</p>
+          {elenco(data)}
+        </>}
+        <div className="field"><label htmlFor="el-mot">Motivo</label>
+          <select id="el-mot" value={motivo} onChange={e => setMotivo(e.target.value)}>{MOTIVI.map(m => <option key={m}>{m}</option>)}</select></div>
+        <div className="field"><label htmlFor="el-txt">{motivo === 'Altro' ? 'Descrivi il motivo' : 'Note (facoltative)'}</label>
+          <input id="el-txt" value={altro} onChange={e => setAltro(e.target.value)} /></div>
+        {molti && <div className="field"><label htmlFor="el-conf">Per confermare scrivi ELIMINA</label>
+          <input id="el-conf" className="mono" autoComplete="off" value={scritto} onChange={e => setScritto(e.target.value)} /></div>}
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn brand" onClick={conferma} disabled={!ok || invio}>{invio ? 'Attendere…' : 'Conferma'}</button>
+          <button className="btn-ghost" autoFocus onClick={onClose}>Annulla</button></div>
       </div>
     </Modal>
   );

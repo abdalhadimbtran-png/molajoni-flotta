@@ -21,12 +21,22 @@ export interface Pratica {
   esito_offerta: 'accettata' | 'rifiutata' | 'in_attesa' | null; stato_corrente: string; esito: Esito;
   sla_stadio: string | null; sla_scadenza: string | null; sla_rispettato: boolean | null;
   created_by: string | null; created_at: string; updated_at: string; closed_at: string | null;
-  stato_cliente: StatoCliente | null; stato_cliente_manuale: boolean; documento_intervento: string | null;
+  stato_cliente: StatoCliente | null; stato_cliente_manuale: boolean; tipo_contatto?: TipoContatto; documento_intervento: string | null;
   urgenza?: 'urgente' | 'ordinario' | null; coordinatore_nome?: string | null; coordinatore_telefonato?: boolean | null;
   tecnico_dipendente_id?: number | null; tecnico_quando?: string | null; tecnico_quando_at?: string | null; whatsapp_tecnico?: boolean | null; avviso_app_at?: string | null;
 }
 export interface PersonaDisp { nome: string; email: string | null; telefono?: string | null; cellulare?: string | null; account?: boolean; assente: boolean; occupato?: boolean; disponibile: boolean }
 export interface TecnicoDisp { id: number; nome: string; telefono: string | null; email?: string | null; assente: boolean; interventi_oggi: number }
+export type TipoContatto = 'cliente' | 'fornitore' | 'collega' | 'altro';
+/** «Chi chiama»: [classe pill, etichetta, etichetta del campo nome, descrizione breve]. */
+export const TIPI_CONTATTO: { v: TipoContatto; l: string; campo: string; breve: string; pill: string }[] = [
+  { v: 'cliente', l: 'Cliente', campo: 'Cliente / condominio / azienda', breve: 'cliente o potenziale', pill: 'info' },
+  { v: 'fornitore', l: 'Fornitore', campo: 'Fornitore', breve: '→ Roberta Felci', pill: 'warn' },
+  { v: 'collega', l: 'Collega o tecnico', campo: 'Collega / tecnico', breve: 'interno Molajoni', pill: 'ok' },
+  { v: 'altro', l: 'Altro', campo: 'Chi chiama (ente, privato, altra azienda)', breve: 'ente, privato, commerciale…', pill: 'muted' },
+];
+export const nomeTipoContatto = (t: string | null | undefined) => TIPI_CONTATTO.find(x => x.v === (t ?? 'cliente'))?.l ?? 'Cliente';
+export const eCliente = (x: { tipo_contatto?: string | null }) => (x.tipo_contatto ?? 'cliente') === 'cliente';
 export type StatoCliente = 'nuovo' | 'ex_cliente' | 'attivo';
 export const STATI_CLIENTE: Record<StatoCliente, [string, string]> = { nuovo: ['info', 'Nuovo'], ex_cliente: ['warn', 'Ex cliente'], attivo: ['ok', 'Cliente attivo'] };
 export type EsitoTrasf = 'risposto' | 'non_risposto' | 'occupato' | 'richiamera';
@@ -35,7 +45,7 @@ export interface Trasferimento {
   id: number; pratica_id: number | null; cliente_codice: string | null; cliente_nome: string | null; telefono: string | null;
   destinatario_nome: string; destinatario_ruolo: string | null; destinatario_user: string | null; argomento: string | null; tipo_argomento: string | null;
   esito: EsitoTrasf; modalita: 'trasferita' | 'richiamo'; entro_testo: string | null; cliente_email: string | null;
-  esito_richiamo: string | null; email_riepilogo_at: string | null; email_referente_inviata_at: string | null; email_cliente_inviata_at: string | null; referente_email: string | null; stato_cliente: StatoCliente | null; email_non_disponibile: string | null; richiamo_scadenza: string | null; richiamato_at: string | null; richiamato_da: string | null; autore_nome: string | null; at: string; solo_commerciale?: boolean;
+  esito_richiamo: string | null; email_riepilogo_at: string | null; email_referente_inviata_at: string | null; email_cliente_inviata_at: string | null; referente_email: string | null; stato_cliente: StatoCliente | null; email_non_disponibile: string | null; richiamo_scadenza: string | null; richiamato_at: string | null; richiamato_da: string | null; autore_nome: string | null; at: string; solo_commerciale?: boolean; tipo_contatto?: TipoContatto;
 }
 export interface Destinatario { nome: string; ruolo: string; email: string; nota?: string }
 export interface Commerciale { nome: string; email: string | null; account: boolean; assente: boolean; occupato: boolean; disponibile: boolean }

@@ -4,7 +4,7 @@ import { supabase, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Errore, toast, useLoad } from '../ui';
 import { testoCella, type Col, type Report, type Riga } from '../admin/report/catalogo';
-import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, nomeCanale, type Esito } from '../lib/centralino/tipi';
+import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, eCliente, nomeCanale, nomeTipoContatto, type Esito } from '../lib/centralino/tipi';
 import { KPI, kpi, valuta, type Filtri, type RecInfo, type RecPratica, type RecTrasf } from '../lib/centralino/registro';
 import { orologio } from '../lib/centralino/sla';
 import { datiPeriodo } from './Direzione';
@@ -14,9 +14,9 @@ import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
 
 const c = (k: string, l: string, t: Col['t'], w: number, tot?: boolean): Col => ({ k, l, t, w, tot });
-const COL_PRATICHE: Col[] = [c('numero', 'Numero', 'testo', 15), c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 11), c('tipo', 'Tipo', 'testo', 20), c('cliente', 'Cliente', 'testo', 24),
+const COL_PRATICHE: Col[] = [c('numero', 'Numero', 'testo', 15), c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 11), c('tipo', 'Tipo', 'testo', 20), c('chi', 'Chi chiama', 'testo', 12), c('cliente', 'Nome', 'testo', 24),
   c('stato_cliente', 'Cliente è', 'testo', 11), c('referente', 'Assegnata a', 'testo', 15), c('stadio', 'Passo', 'testo', 18), c('scadenza', 'Scadenza', 'dataora', 15), c('ritardo', 'Ritardo', 'testo', 10), c('esito', 'Stato', 'testo', 12), c('importo', 'Importo', 'euro', 11, true)];
-const COL_TRASF: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('cliente', 'Cliente', 'testo', 22), c('stato_cliente', 'Cliente è', 'testo', 11), c('referente', 'Referente', 'testo', 16), c('argomento', 'Argomento', 'testo', 18),
+const COL_TRASF: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('chi', 'Chi chiama', 'testo', 12), c('cliente', 'Nome', 'testo', 22), c('stato_cliente', 'Cliente è', 'testo', 11), c('referente', 'Referente', 'testo', 16), c('argomento', 'Argomento', 'testo', 18),
   c('esito', 'Modalità', 'testo', 16), c('scadenza', 'Richiamo entro', 'dataora', 15), c('richiamato', 'Richiamato', 'dataora', 15), c('ritardo', 'Ritardo', 'testo', 10), c('email_ref', 'Email referente', 'testo', 10), c('email_cli', 'Email cliente', 'testo', 10)];
 const COL_INFO: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 12), c('cliente', 'Cliente / nota', 'testo', 40), c('tipo', 'Tipo', 'testo', 20)];
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -38,7 +38,7 @@ export default function Analisi() {
   const def = kpi(id) ?? KPI[0];
   const oggi = iso(new Date());
   const da = qs.get('da') ?? oggi, a = qs.get('a') ?? oggi;
-  const f: Filtri = Object.fromEntries((['canale', 'tipo', 'stato', 'dest', 'arg', 'giorno'] as const).map(k => [k, qs.get(k) ?? '']).filter(([, v]) => v));
+  const f: Filtri = Object.fromEntries((['canale', 'tipo', 'stato', 'chi', 'dest', 'arg', 'giorno'] as const).map(k => [k, qs.get(k) ?? '']).filter(([, v]) => v));
   const { data, errore, reload } = useLoad(() => datiPeriodo(da, a), [da, a, ctx.versione]);
   const [esporto, setEsporto] = useState('');
   const v = useMemo(() => (data ? valuta(def, data, f, ora) : null), [data, def, qs.toString(), ora]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -49,7 +49,7 @@ export default function Analisi() {
     if ('destinatario_nome' in r) {
       const t = r as RecTrasf;
       const rit = t.richiamo_scadenza && new Date(t.richiamato_at ?? ora) > new Date(t.richiamo_scadenza) ? orologio(((t.richiamato_at ? new Date(t.richiamato_at) : ora).getTime() - new Date(t.richiamo_scadenza).getTime()) / 1000) : '';
-      return { _p: t.pratica_id, _t: t, quando: t.at, cliente: t.cliente_nome ?? t.telefono ?? '', stato_cliente: t.stato_cliente ? STATI_CLIENTE[t.stato_cliente as 'nuovo'][1] : '', referente: t.destinatario_nome,
+      return { _p: t.pratica_id, _t: t, quando: t.at, chi: nomeTipoContatto(t.tipo_contatto), cliente: t.cliente_nome ?? t.telefono ?? '', stato_cliente: eCliente(t) && t.stato_cliente ? STATI_CLIENTE[t.stato_cliente as 'nuovo'][1] : '', referente: t.destinatario_nome,
         argomento: t.tipo_argomento ?? '', esito: t.modalita === 'richiamo' ? 'Non disponibile' : 'Trasferita', scadenza: t.richiamo_scadenza, richiamato: t.richiamato_at, ritardo: rit,
         email_ref: t.email_referente_inviata_at ? 'Sì' : 'No', email_cli: t.email_cliente_inviata_at || t.email_riepilogo_at ? 'Sì' : t.email_non_disponibile ? 'Non disp.' : 'No' };
     }
@@ -57,8 +57,8 @@ export default function Analisi() {
     if (!('cliente_nome' in r)) { const x = r as RecInfo; return { quando: x.at, canale: nomeCanale(x.canale), cliente: x.nota ?? '—', tipo: 'Solo informazione' }; }
     const p = r as RecPratica;
     const rit = p.esito === 'aperta' && p.sla_scadenza && new Date(p.sla_scadenza) < ora ? orologio((ora.getTime() - new Date(p.sla_scadenza).getTime()) / 1000) : '';
-    return { _p: p.id, _r: p, numero: p.numero, quando: p.created_at, canale: nomeCanale(p.canale), tipo: NOME_TIPO[p.tipo as 'manutenzione'] + (p.sottotipo ? ` · ${p.sottotipo}` : ''), cliente: p.cliente_nome,
-      stato_cliente: p.stato_cliente ? STATI_CLIENTE[p.stato_cliente as 'nuovo'][1] : '', referente: chiDi(p), stadio: nomeStadio(fl(p.tipo), p.stato_corrente),
+    return { _p: p.id, _r: p, numero: p.numero, quando: p.created_at, canale: nomeCanale(p.canale), tipo: NOME_TIPO[p.tipo as 'manutenzione'] + (p.sottotipo ? ` · ${p.sottotipo}` : ''), chi: nomeTipoContatto(p.tipo_contatto), cliente: p.cliente_nome,
+      stato_cliente: eCliente(p) && p.stato_cliente ? STATI_CLIENTE[p.stato_cliente as 'nuovo'][1] : '', referente: chiDi(p), stadio: nomeStadio(fl(p.tipo), p.stato_corrente),
       scadenza: p.esito === 'aperta' ? p.sla_scadenza : null, ritardo: rit, esito: ESITI[p.esito as Esito][1], importo: p.importo_stimato };
   }), [v, ora, config]); // eslint-disable-line react-hooks/exhaustive-deps
   const colonne = def.fonte === 'trasferimenti' ? COL_TRASF : def.conInfo ? COL_INFO : COL_PRATICHE;
@@ -101,6 +101,7 @@ export default function Analisi() {
           <select aria-label="Destinatario" value={f.dest ?? ''} onChange={e => imposta('dest', e.target.value)}><option value="">Tutti i destinatari</option>{dest.map(x => <option key={x}>{x}</option>)}</select>
           <select aria-label="Argomento" value={f.arg ?? ''} onChange={e => imposta('arg', e.target.value)}><option value="">Tutti gli argomenti</option>{arg.map(x => <option key={x}>{x}</option>)}</select>
         </>}
+        {!def.conInfo && <select aria-label="Chi chiama" value={f.chi ?? ''} onChange={e => imposta('chi', e.target.value)}><option value="">Chi chiama: tutti</option>{TIPI_CONTATTO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>}
         {!def.conInfo && <select aria-label="Stato cliente" value={f.stato ?? ''} onChange={e => imposta('stato', e.target.value)}><option value="">Tutti i clienti</option>{Object.entries(STATI_CLIENTE).map(([k, x]) => <option key={k} value={k}>{x[1]}</option>)}</select>}
         <button className="btn btn-sm" onClick={() => esporta('pdf')} disabled={!righe.length || !!esporto}>{esporto === 'pdf' ? 'Preparo…' : 'PDF'}</button>
         <button className="btn-ghost btn-sm" onClick={() => esporta('xlsx')} disabled={!righe.length || !!esporto}>{esporto === 'xlsx' ? 'Preparo…' : 'Excel'}</button>

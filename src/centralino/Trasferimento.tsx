@@ -1,15 +1,15 @@
 import { FormEvent, useCallback, useRef, useState } from 'react';
-import { useListaTastiera } from './tastiera';
+import { tabRoving, tastiRadio, useListaTastiera } from './tastiera';
 import { Link } from 'react-router-dom';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { NOME_TIPO, senzaCliente, senzaReferente, senzaRiepilogo, type Commerciale, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
+import { NOME_TIPO, TIPI_CONTATTO, senzaCliente, senzaReferente, senzaRiepilogo, type Commerciale, type Pratica, type TipoContatto, type Trasferimento } from '../lib/centralino/tipi';
 import { daRoma, giornoRoma, partiRoma, prossimoLavorativo, scadenzaSla, semaforo, testoResiduo } from '../lib/centralino/sla';
 import { useAdesso, useAggiornamento, useConfig } from './comune';
 import EmailTrasferimento from './EmailTrasferimento';
 import { useCtx } from './ShellCentralino';
-import { Conto } from './componenti';
+import { ChiBadge, Conto } from './componenti';
 
 const ARGOMENTI = ['Offerta fino a 1.000 €', 'Offerta oltre 1.000 €', 'Sopralluogo', 'Manutenzione / guasto', 'Fatture / amministrazione', 'Fornitori', 'Reclamo', 'Informazione'];
 type Entro = '30m' | '1h' | '2h' | 'pom' | 'dom' | 'scelta';
@@ -48,6 +48,7 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
   const [arg, setArg] = useState('');
   const [entro, setEntro] = useState<Entro | ''>('2h');
   const [scelta, setScelta] = useState('');
+  const [chi, setChi] = useState<TipoContatto>(pratica?.tipo_contatto ?? 'cliente');
   const [cli, setCli] = useState({ nome: pratica?.cliente_nome ?? '', telefono: pratica?.telefono ?? '', email: pratica?.email ?? '' });
   const [err, setErr] = useState<string | null>(null); const [invio, setInvio] = useState(false);
   const [riepilogo, setRiepilogo] = useState<Trasferimento | null>(null);
@@ -65,6 +66,7 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
         pratica_id: pratica?.id ?? null, cliente_nome: cli.nome, telefono: cli.telefono, cliente_email: cli.email, destinatario_nome: nome, destinatario_ruolo: d?.ruolo ?? 'altro',
         argomento: arg, tipo_argomento: tipo, modalita: modo, esito: modo === 'trasferita' ? 'risposto' : null,
         scadenza: modo === 'richiamo' ? sc!.quando.toISOString() : null, entro_testo: modo === 'richiamo' ? sc!.testo : null } });
+      if (!pratica && chi !== 'cliente') await rpc('centralino_tipo_contatto', { p_pratica_id: null, p_trasf_id: r.id, p_tipo: chi });
       toast(r.richiamo_scadenza ? `Richiamo ${testoResiduo(r.richiamo_scadenza)}${r.notificato ? ' · responsabile avvisato' : ''}` : 'Trasferimento registrato');
       const { data } = await supabase.from('chiamate_trasferite').select('*').eq('id', r.id).single();
       setRiepilogo(data as Trasferimento); // email di riepilogo obbligatoria
@@ -78,8 +80,11 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
           <button type="button" className={modo === 'trasferita' ? 'on' : ''} onClick={() => setModo('trasferita')}>Trasferita</button>
           <button type="button" className={modo === 'richiamo' ? 'on' : ''} onClick={() => setModo('richiamo')}>Responsabile non disponibile</button>
         </div>
+        {!pratica && <div className="segmented ct-chips" role="radiogroup" aria-label="Chi chiama" onKeyDown={tastiRadio}>
+          {TIPI_CONTATTO.map((x, i) => <button type="button" key={x.v} role="radio" aria-checked={chi === x.v} tabIndex={tabRoving(chi === x.v, i, true)} className={chi === x.v ? 'on' : ''} onClick={() => setChi(x.v)}><span className="k-n" aria-hidden>{i + 1}</span>{x.l}</button>)}
+        </div>}
         {!pratica && <div className="ct-griglia">
-          <div className="field"><label htmlFor="tr-cli">Cliente</label><input id="tr-cli" value={cli.nome} onChange={e => setCli({ ...cli, nome: e.target.value })} /></div>
+          <div className="field"><label htmlFor="tr-cli">{chi === 'cliente' ? 'Cliente' : TIPI_CONTATTO.find(x => x.v === chi)!.campo}</label><input id="tr-cli" value={cli.nome} onChange={e => setCli({ ...cli, nome: e.target.value })} /></div>
           <div className="field"><label htmlFor="tr-tel">Telefono</label><input id="tr-tel" type="tel" value={cli.telefono} onChange={e => setCli({ ...cli, telefono: e.target.value })} /></div>
           <div className="field"><label htmlFor="tr-em">Email (per il riepilogo)</label><input id="tr-em" type="email" value={cli.email} onChange={e => setCli({ ...cli, email: e.target.value })} /></div>
         </div>}
@@ -117,7 +122,7 @@ export function RigaTrasf({ t, ora, onRichiamato, onRiepilogo, base }: { t: Tras
   const s = aperto ? semaforo(t.at, t.richiamo_scadenza, ora) : 'nessuno';
   return (
     <div className={`ct-trasf sla-${s}`} tabIndex={-1}>
-      <div><b>{t.cliente_nome || t.telefono || 'Cliente'}</b>{t.telefono && t.cliente_nome ? <span className="sub"> · {t.telefono}</span> : null}
+      <div><b>{t.cliente_nome || t.telefono || 'Cliente'}</b><ChiBadge t={t.tipo_contatto} soloNonClienti />{t.telefono && t.cliente_nome ? <span className="sub"> · {t.telefono}</span> : null}
         <div className="sub">{t.modalita === 'richiamo' ? `${t.destinatario_nome} richiamerà ${t.entro_testo ?? ''}` : `→ ${t.destinatario_nome}`}{t.tipo_argomento ? ` · ${t.tipo_argomento}` : ''}{t.argomento ? ` · ${t.argomento}` : ''} · {fmtOra(t.at)}{t.pratica_id ? <> · <Link to={`${base}/pratica/${t.pratica_id}`} data-k-apri>pratica</Link></> : null}</div>
         {t.esito_richiamo && <div className="sub">Esito richiamo: {t.esito_richiamo}</div>}
         {t.email_non_disponibile && <div className="sub">Email non disponibile: {t.email_non_disponibile}</div>}

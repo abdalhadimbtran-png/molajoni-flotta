@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Errore, useLoad } from '../ui';
 import { useT } from '../lib/i18n';
-import { NOME_TIPO, STATI_CLIENTE, nomeCanale, type Evento, type Pratica, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
+import { NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, nomeCanale, type Evento, type Pratica, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
 import { linkAnalisi } from '../lib/centralino/registro';
 import { calcolaKpi, durata } from '../lib/centralino/kpi';
 import { Scheletro } from './Scheletro';
@@ -82,7 +82,8 @@ export default function Direzione() {
       <div className="ct-dir-g">
         <section className="ct-blocco"><h2>Per canale</h2><Barre v={Object.entries(k.perCanale).map(([x, n]) => [nomeCanale(x), n, linkAnalisi(ctx.base, 'pratiche', da, a, { canale: x })])} /></section>
         <section className="ct-blocco"><h2>Per tipo</h2><Barre v={Object.entries(k.perTipo).map(([x, n]) => [NOME_TIPO[x as 'manutenzione'] ?? x, n, linkAnalisi(ctx.base, 'pratiche', da, a, { tipo: x })])} /></section>
-        <section className="ct-blocco"><h2>Per stato del cliente</h2><Barre v={(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(x => [STATI_CLIENTE[x][1], k.perStatoCliente[x] ?? 0, linkAnalisi(ctx.base, 'pratiche', da, a, { stato: x })])} /></section>
+        <section className="ct-blocco"><h2>Chi chiama</h2><Barre v={TIPI_CONTATTO.map(x => [x.l, k.perTipoContatto[x.v] ?? 0, linkAnalisi(ctx.base, 'pratiche', da, a, { chi: x.v })])} /></section>
+        <section className="ct-blocco"><h2>Per stato del cliente <span className="sub">(solo clienti)</span></h2><Barre v={(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(x => [STATI_CLIENTE[x][1], k.perStatoCliente[x] ?? 0, linkAnalisi(ctx.base, 'pratiche', da, a, { stato: x })])} /></section>
         <section className="ct-blocco"><h2>Tempi medi per passo</h2>
           <table className="ct-tab"><tbody>{stadi.filter(s => k.tempiMedi[s] != null).map(s => <tr key={s}><td>{nomeSt(s)}</td><td className="num">{durata(k.tempiMedi[s])}</td></tr>)}</tbody></table>
           {!stadi.some(s => k.tempiMedi[s] != null) && <p className="ct-vuoto">Nessun dato nel periodo.</p>}</section>

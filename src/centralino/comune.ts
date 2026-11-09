@@ -67,6 +67,9 @@ export async function cerca(q: string): Promise<Pratica[]> {
   if (x.length < 2) return [];
   const tel = x.replace(/[\s./-]/g, '');
   const or = [`numero.ilike.*${x}*`, `cliente_nome.ilike.*${x}*`, `contatto_nome.ilike.*${x}*`, `email.ilike.*${x}*`, `cliente_codice.ilike.*${x}*`];
+  // «fornitore», «collega», «altro»: anche per tipo di contatto
+  const chi = ({ fornitore: 'fornitore', fornitori: 'fornitore', collega: 'collega', colleghi: 'collega', tecnico: 'collega', altro: 'altro' } as Record<string, string>)[x.toLowerCase()];
+  if (chi) or.push(`tipo_contatto.eq.${chi}`);
   if (/^\+?\d{3,}$/.test(tel)) or.push(`telefono.ilike.*${tel.slice(-6)}*`); else or.push(`telefono.ilike.*${x}*`);
   const { data, error } = await supabase.from('pratiche').select(CAMPI_PRATICA).or(or.join(',')).order('created_at', { ascending: false }).limit(30);
   if (error) throw error; return (data ?? []) as Pratica[];

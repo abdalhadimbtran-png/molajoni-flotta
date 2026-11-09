@@ -4,9 +4,9 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Errore, useLoad } from '../ui';
-import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, type Pratica } from '../lib/centralino/tipi';
+import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, type Pratica } from '../lib/centralino/tipi';
 import { CAMPI_PRATICA, useAdesso, useConfig } from './comune';
-import { Ic, SlaChip, iconaTipo, nomeStadio, regolaDi } from './componenti';
+import { ChiBadge, Ic, SlaChip, iconaTipo, nomeStadio, regolaDi } from './componenti';
 import { Scheletro } from './Scheletro';
 import DettaglioPratica from './Pratica';
 import { useCtx } from './ShellCentralino';
@@ -28,7 +28,7 @@ export default function Pratiche() {
   const [vista, setVista] = useState<Vista>('aperte');
   const [da, setDa] = useState(new Date(oggi.getFullYear(), oggi.getMonth(), 1).toISOString().slice(0, 10));
   const [a, setA] = useState(oggi.toISOString().slice(0, 10));
-  const [tipo, setTipo] = useState(''); const [esito, setEsito] = useState(''); const [canale, setCanale] = useState(''); const [q, setQ] = useState(''); const [stato, setStato] = useState('');
+  const [tipo, setTipo] = useState(''); const [esito, setEsito] = useState(''); const [canale, setCanale] = useState(''); const [q, setQ] = useState(''); const [stato, setStato] = useState(''); const [chi, setChi] = useState('');
   const { data, errore, reload } = useLoad(async () => {
     let x = supabase.from('pratiche').select(CAMPI_PRATICA);
     if (vista === 'aperte') x = x.eq('esito', 'aperta').order('sla_scadenza', { ascending: true, nullsFirst: false });
@@ -37,8 +37,8 @@ export default function Pratiche() {
     const { data, error } = await x.limit(2000);
     if (error) throw error; return (data ?? []) as Pratica[];
   }, [vista, da, a, ctx.versione]);
-  const righe = useMemo(() => (data ?? []).filter(p => (!tipo || p.tipo === tipo) && (!esito || p.esito === esito) && (!canale || p.canale === canale) && (!stato || p.stato_cliente === stato)
-    && (!q || `${p.numero} ${p.cliente_nome} ${p.contatto_nome ?? ''} ${p.telefono ?? ''}`.toLowerCase().includes(q.toLowerCase()))), [data, tipo, esito, canale, stato, q]);
+  const righe = useMemo(() => (data ?? []).filter(p => (!tipo || p.tipo === tipo) && (!esito || p.esito === esito) && (!canale || p.canale === canale) && (!stato || ((p.tipo_contatto ?? 'cliente') === 'cliente' && p.stato_cliente === stato)) && (!chi || (p.tipo_contatto ?? 'cliente') === chi)
+    && (!q || `${p.numero} ${p.cliente_nome} ${p.contatto_nome ?? ''} ${p.telefono ?? ''}`.toLowerCase().includes(q.toLowerCase()))), [data, tipo, esito, canale, stato, chi, q]);
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   const fl = (t: string) => config?.flussi.find(f => f.tipo === t);
   return (
@@ -53,6 +53,7 @@ export default function Pratiche() {
           <div className="ct-split-f">
             <select aria-label="Tipo" value={tipo} onChange={e => setTipo(e.target.value)}><option value="">Tutti i tipi</option>{Object.entries(NOME_TIPO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             <select aria-label="Canale" value={canale} onChange={e => setCanale(e.target.value)}><option value="">Canali</option>{CANALI.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}</select>
+            <select aria-label="Chi chiama" value={chi} onChange={e => setChi(e.target.value)}><option value="">Chi chiama</option>{TIPI_CONTATTO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
             <select aria-label="Stato cliente" value={stato} onChange={e => setStato(e.target.value)}><option value="">Clienti</option>{Object.entries(STATI_CLIENTE).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>
             {vista !== 'aperte' && <select aria-label="Stato" value={esito} onChange={e => setEsito(e.target.value)}><option value="">Stato</option>{Object.entries(ESITI).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>}
           </div>
@@ -65,7 +66,7 @@ export default function Pratiche() {
                 <Link to={`${ctx.base}/pratica/${p.id}`} data-k-apri className={`ct-split-i ${String(p.id) === id ? 'sel' : ''} ${p.priorita === 'urgente' ? 'urgente' : ''}`} aria-current={String(p.id) === id ? 'page' : undefined}>
                   <span className="ct-split-ic"><Ic n={iconaTipo(p.tipo)} size={16} /></span>
                   <span className="ct-split-c">
-                    <span className="ct-split-r1"><b>{p.cliente_nome}</b>{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}</span>
+                    <span className="ct-split-r1"><b>{p.cliente_nome}</b><ChiBadge t={p.tipo_contatto} soloNonClienti />{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}</span>
                     <span className="sub">{p.numero} · {NOME_TIPO[p.tipo]} · {nomeStadio(fl(p.tipo), p.stato_corrente)} · {fmtOra(p.created_at)}</span>
                   </span>
                 </Link>

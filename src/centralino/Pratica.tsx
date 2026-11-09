@@ -3,10 +3,10 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
+import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, TIPI_CONTATTO, eCliente, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 import { ESTENSIONI, apriAllegato, caricaAllegato, pratica, useAdesso, useAggiornamento, useConfig } from './comune';
-import { Ic, SlaChip, Trascorso, regolaDi, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
+import { ChiBadge, Ic, SlaChip, Trascorso, regolaDi, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
 import Avanza, { avanzaDiretto, prossimoDi } from './Avanza';
 import Appunti from './Appunti';
 import ModaleEmail from './ModaleEmail';
@@ -74,6 +74,9 @@ export default function Pratica() {
     for (const x of Array.from(l)) { try { await caricaAllegato(p.id, x); toast(`Allegato: ${x.name}`); } catch (e) { toast(testoErrore(e)); } }
     if (file.current) file.current.value = ''; reload();
   }
+  async function tipoContatto(v: string) {
+    try { await rpc('centralino_tipo_contatto', { p_pratica_id: p.id, p_trasf_id: null, p_tipo: v }); reload(); } catch (e) { toast(testoErrore(e)); }
+  }
   async function statoCliente(v: string) {
     try { await rpc('centralino_imposta_stato_cliente', { p_id: p.id, p_stato: v || null }); reload(); } catch (e) { toast(testoErrore(e)); }
   }
@@ -102,12 +105,13 @@ export default function Pratica() {
           <div className="ct-testa-r"><span className="ct-num">{p.numero}</span><Pill s={ESITI[p.esito][0] as 'ok'}>{ESITI[p.esito][1]}</Pill>
             {p.priorita === 'urgente' && <span className="ct-sla rosso">urgente</span>}<SlaChip p={p} regola={regolaDi(f, p)} /><Trascorso da={p.created_at} fino={p.closed_at} /></div>
           {aperta && regolaDi(f, p) && <div className="sub ct-regola">Procedura: {regolaDi(f, p)}</div>}
-          <h1>{p.cliente_nome}</h1>
+          <h1>{p.cliente_nome} <ChiBadge t={p.tipo_contatto} /></h1>
           <div className="sub">{NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''} · <Ic n={iconaCanale(p.canale)} size={14} /> {nomeCanale(p.canale)} · {fmtOra(p.created_at)}</div>
         </div>
         <div className="ct-stato-sel">
-          {p.stato_cliente && <span className={`pill ${STATI_CLIENTE[p.stato_cliente][0]}`}>{STATI_CLIENTE[p.stato_cliente][1]}</span>}
-          {ctx.scrive && <select aria-label="Stato del cliente" value={p.stato_cliente_manuale ? p.stato_cliente ?? '' : ''} onChange={e => statoCliente(e.target.value)}>
+          {eCliente(p) && p.stato_cliente && <span className={`pill ${STATI_CLIENTE[p.stato_cliente][0]}`}>{STATI_CLIENTE[p.stato_cliente][1]}</span>}
+          {ctx.scrive && <select aria-label="Chi chiama" value={p.tipo_contatto ?? 'cliente'} onChange={e => tipoContatto(e.target.value)}>{TIPI_CONTATTO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>}
+          {ctx.scrive && eCliente(p) && <select aria-label="Stato del cliente" value={p.stato_cliente_manuale ? p.stato_cliente ?? '' : ''} onChange={e => statoCliente(e.target.value)}>
             <option value="">{p.stato_cliente_manuale ? 'Torna a proposta automatica' : 'Proposta automatica'}</option>
             {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
           </select>}

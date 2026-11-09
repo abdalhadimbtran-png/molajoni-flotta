@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
-import { STATI_CLIENTE } from '../lib/centralino/tipi';
+import { STATI_CLIENTE, nomeTipoContatto } from '../lib/centralino/tipi';
 import { calcolaTrasf } from '../lib/centralino/kpi';
 import { linkAnalisi, valuta, kpi, type Dataset } from '../lib/centralino/registro';
 import { orologio, giornoRoma } from '../lib/centralino/sla';
@@ -20,7 +20,7 @@ export default function KpiTrasferimenti({ d, da, a, base, trend }: { d: Dataset
     return [...m.entries()];
   }, [trend, d.trasf]);
   const max = Math.max(1, ...giorni.map(g => g[1]));
-  const riga = (nome: string, f: { dest?: string; arg?: string; stato?: string }, g: { tot: number; minuti: number; fatti: number }) => (
+  const riga = (nome: string, f: { dest?: string; arg?: string; stato?: string; chi?: string }, g: { tot: number; minuti: number; fatti: number }) => (
     <tr key={nome}><td>{nome}</td><td><Cifra id="trasferite" d={d} da={da} a={a} f={f} /></td>
       <td><Cifra id="trasf_in_tempo" d={d} da={da} a={a} f={f} pct /></td><td>{g.fatti ? orologio((g.minuti / g.fatti) * 60) : '—'}</td><td><Cifra id="trasf_da_richiamare" d={d} da={da} a={a} f={f} /></td></tr>);
   return (
@@ -52,7 +52,9 @@ export default function KpiTrasferimenti({ d, da, a, base, trend }: { d: Dataset
         <div><h3 className="ct-h3">Per argomento</h3>
           <table className="ct-tab"><thead><tr><th>Argomento</th><th>Chiamate</th><th>In tempo</th><th>Medio</th><th>Aperti</th></tr></thead>
             <tbody>{Object.entries(k.perArgomento).sort((x, y) => y[1].tot - x[1].tot).map(([n, g]) => riga(n, { arg: n }, g))}</tbody></table>
-          <h3 className="ct-h3">Per stato del cliente</h3>
+          <h3 className="ct-h3">Chi chiama</h3>
+          <table className="ct-tab"><tbody>{Object.entries(k.perTipoContatto).map(([n, g]) => riga(nomeTipoContatto(n), { chi: n }, g))}</tbody></table>
+          <h3 className="ct-h3">Per stato del cliente <span className="sub">(solo clienti)</span></h3>
           <table className="ct-tab"><tbody>{Object.entries(k.perStatoCliente).map(([n, g]) => riga(STATI_CLIENTE[n as 'nuovo']?.[1] ?? 'Non indicato', { stato: n }, g))}</tbody></table></div>
       </div>
       <h3 className="ct-h3">Ultimi 30 giorni</h3>

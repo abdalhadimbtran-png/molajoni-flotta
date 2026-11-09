@@ -7,7 +7,7 @@ import { useSessione } from '../admin/Shell';
 import { Campanella } from '../formazione/ShellFormazione';
 import { NOME_TIPO, type Pratica } from '../lib/centralino/tipi';
 import { cerca } from './comune';
-import { Ic } from './componenti';
+import { ChiBadge, Ic } from './componenti';
 import { Modal, toast } from '../ui';
 import { SCORCIATOIE, sequenzaVai, staScrivendo } from './tastiera';
 
@@ -212,7 +212,7 @@ function Ricerca({ base }: { base: string }) {
           {r.length === 0 && <div className="sub" style={{ padding: 12 }}>Nessuna pratica trovata</div>}
           {r.map((p, i) => (
             <button key={p.id} role="option" aria-selected={i === sel} className={i === sel ? 'sel' : ''} onMouseEnter={() => setSel(i)} onClick={() => apri(p)}>
-              <b>{p.cliente_nome}</b><span className="sub">{p.numero} · {NOME_TIPO[p.tipo]}{p.telefono ? ` · ${p.telefono}` : ''}{p.esito !== 'aperta' ? ' · chiusa' : ''}</span>
+              <b>{p.cliente_nome} <ChiBadge t={p.tipo_contatto} soloNonClienti /></b><span className="sub">{p.numero} · {NOME_TIPO[p.tipo]}{p.telefono ? ` · ${p.telefono}` : ''}{p.esito !== 'aperta' ? ' · chiusa' : ''}</span>
             </button>))}
         </div>)}
     </div>

@@ -95,6 +95,7 @@
 .ct-ac-pop button:hover { background:var(--surface-2); }
 .ct-ac-nuovo { padding:8px 12px; }
 .ct-ac-tag { display:inline-block; margin-top:4px; font-size:12px; color:var(--ok); font-weight:600; }
+.ct-forn-nuovo { display:block; margin-top:6px; }
 .ct-stato-cli { margin-top:4px; margin-inline-end:6px; }
 .ct-proc { font-size:13px; color:var(--ink-2); background:var(--surface-2); border-radius:8px; padding:8px 10px; margin:0; }
 .ct-salva { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; border-top:1px solid var(--line); padding-top:12px; position:sticky; bottom:0; background:var(--surface); }
@@ -204,6 +205,8 @@
 .ct-trascorso { font-size:12px; color:var(--ink-3); font-variant-numeric:tabular-nums; }
 .ct-regola { margin-top:2px; }
 .ct-mini { font-size:11px; font-weight:600; border-radius:6px; padding:0 6px; background:var(--surface-2); color:var(--ink-2); }
+.ct-mini.chi-cliente { background:var(--info-bg); color:var(--info); } .ct-mini.chi-fornitore { background:var(--warn-bg); color:var(--warn); } .ct-mini.chi-collega { background:var(--ok-bg); color:var(--ok); } .ct-mini.chi-altro { background:var(--surface-2); color:var(--ink-2); outline:1px solid var(--line, currentColor); outline-offset:-1px; }
+.ct-chi-sel button { min-height:44px; }
 .ct-mini.attivo { background:var(--ok-bg); color:var(--ok); } .ct-mini.ex_cliente { background:var(--warn-bg); color:var(--warn); } .ct-mini.nuovo { background:var(--info-bg); color:var(--info); }
 .ct-fase { font-size:11.5px; color:var(--ink-3); background:var(--surface-2); border-radius:6px; padding:0 6px; font-variant-numeric:tabular-nums; }
 .ct-tessera { cursor:pointer; } .ct-tessera .num { transition:color .3s; } .ct-tessera:hover .lbl { text-decoration:underline; }

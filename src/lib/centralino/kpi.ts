@@ -2,7 +2,7 @@
 export interface PraticaKpi {
   id: number; tipo: string; sottotipo: string | null; canale: string; esito: string; esito_offerta: string | null;
   importo_stimato: number | null; sla_rispettato: boolean | null; stato_corrente: string; created_at: string; closed_at: string | null;
-  stato_cliente?: string | null;
+  stato_cliente?: string | null; tipo_contatto?: string | null;
 }
 export interface EventoKpi { pratica_id: number; tipo: string; a_stato: string | null; dati: Record<string, unknown>; at: string }
 
@@ -36,8 +36,12 @@ export function calcolaKpi(pr: PraticaKpi[], ev: EventoKpi[]) {
   const sop1 = pr.filter(p => p.tipo === 'sopralluogo').map(p => slaEv(p.id, 'cliente')).filter(Boolean);
   const valore = (l: PraticaKpi[]): number => l.reduce((s, p) => s + Number(p.importo_stimato ?? 0), 0);
 
+  // gli indicatori sullo stato del cliente contano solo i clienti (non fornitori, colleghi, altri)
+  const cli = pr.filter(p => (p.tipo_contatto ?? 'cliente') === 'cliente');
+  const offCli = off.filter(p => (p.tipo_contatto ?? 'cliente') === 'cliente');
   return {
     totale: pr.length,
+    perTipoContatto: conta(pr, p => p.tipo_contatto ?? 'cliente'),
     aperte: pr.filter(p => p.esito === 'aperta').length,
     chiuse: chiuse.length,
     perCanale: conta(pr, p => p.canale),
@@ -47,9 +51,9 @@ export function calcolaKpi(pr: PraticaKpi[], ev: EventoKpi[]) {
     offerte60Pct: pct(piccole.filter(e => e!.dati.sla_rispettato === true).length, piccole.length),
     interventi1hPct: pct(int1.filter(e => e!.dati.sla_rispettato === true).length, int1.length),
     sopralluoghi1hPct: pct(sop1.filter(e => e!.dati.sla_rispettato === true).length, sop1.length),
-    perStatoCliente: conta(pr, p => p.stato_cliente ?? 'nuovo'),
+    perStatoCliente: conta(cli, p => p.stato_cliente ?? 'nuovo'),
     funnelPerStato: Object.fromEntries(['nuovo', 'ex_cliente', 'attivo'].map(k => {
-      const o = off.filter(p => (p.stato_cliente ?? 'nuovo') === k);
+      const o = offCli.filter(p => (p.stato_cliente ?? 'nuovo') === k);
       return [k, { richieste: o.length, inviate: o.filter(p => inviate.includes(p)).length, valore: valore(o) }];
     })),
     funnel: { richieste: off.length, inviate: inviate.length, valoreRichieste: valore(off), valoreInviate: valore(inviate) },
@@ -68,7 +72,7 @@ export const durata = (min: number | null | undefined) => {
 export interface TrasfKpi {
   destinatario_nome: string; esito: string; modalita?: string; richiamo_scadenza: string | null; richiamato_at: string | null; at?: string;
   email_riepilogo_at?: string | null; email_non_disponibile?: string | null; email_referente_inviata_at?: string | null; email_cliente_inviata_at?: string | null;
-  tipo_argomento?: string | null; stato_cliente?: string | null;
+  tipo_argomento?: string | null; stato_cliente?: string | null; tipo_contatto?: string | null;
 }
 export interface Gruppo { tot: number; risposti: number; trasferite: number; richiami: number; inTempo: number; fatti: number; minuti: number; aperti: number }
 const nuovoG = (): Gruppo => ({ tot: 0, risposti: 0, trasferite: 0, richiami: 0, inTempo: 0, fatti: 0, minuti: 0, aperti: 0 });
@@ -87,8 +91,8 @@ export function calcolaTrasf(l: TrasfKpi[], ora = new Date()) {
       else d.aperti++;
     }
   };
-  const dest: Record<string, Gruppo> = {}, arg: Record<string, Gruppo> = {}, stato: Record<string, Gruppo> = {};
-  for (const t of l) { aggiungi(dest, t.destinatario_nome, t); aggiungi(arg, t.tipo_argomento || 'Non indicato', t); aggiungi(stato, t.stato_cliente || 'non indicato', t); }
+  const dest: Record<string, Gruppo> = {}, arg: Record<string, Gruppo> = {}, stato: Record<string, Gruppo> = {}, chi: Record<string, Gruppo> = {};
+  for (const t of l) { aggiungi(dest, t.destinatario_nome, t); aggiungi(arg, t.tipo_argomento || 'Non indicato', t); aggiungi(chi, t.tipo_contatto || 'cliente', t); if ((t.tipo_contatto ?? 'cliente') === 'cliente') aggiungi(stato, t.stato_cliente || 'non indicato', t); }
   const conCliente = (t: TrasfKpi) => !!(t.email_cliente_inviata_at || t.email_riepilogo_at);
   return {
     totale: l.length,
@@ -97,7 +101,7 @@ export function calcolaTrasf(l: TrasfKpi[], ora = new Date()) {
     emailPct: pct(l.filter(conCliente).length, l.length), senzaEmail: l.filter(t => !conCliente(t) && !t.email_non_disponibile).length,
     referentePct: pct(l.filter(t => t.email_referente_inviata_at).length, l.length), clientePct: pct(l.filter(conCliente).length, l.length),
     tempoMedioRichiamo: fatti.length ? Math.round(fatti.reduce((s, t) => s + (new Date(t.richiamato_at!).getTime() - new Date(t.at ?? t.richiamato_at!).getTime()) / 60000, 0) / fatti.length) : null,
-    perDestinatario: dest, perArgomento: arg, perStatoCliente: stato,
+    perDestinatario: dest, perArgomento: arg, perStatoCliente: stato, perTipoContatto: chi,
   };
 }
 export const pctG = (a: number, b: number) => pct(a, b);

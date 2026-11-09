@@ -5,12 +5,12 @@
 export type Fonte = 'pratiche' | 'aperte' | 'chiuse' | 'trasferimenti' | 'contatti' | 'anagrafica';
 export interface RecPratica {
   id: number; numero: string; tipo: string; sottotipo: string | null; canale: string; esito: string; esito_offerta: string | null; stato_corrente: string;
-  cliente_nome: string; stato_cliente?: string | null; importo_stimato: number | null; sla_rispettato: boolean | null; sla_scadenza: string | null;
+  cliente_nome: string; stato_cliente?: string | null; tipo_contatto?: string | null; importo_stimato: number | null; sla_rispettato: boolean | null; sla_scadenza: string | null;
   created_at: string; closed_at: string | null; assegnato_nome?: string | null;
 }
 export interface RecTrasf {
   id: number; pratica_id: number | null; destinatario_nome: string; esito: string; modalita?: string; richiamo_scadenza: string | null; richiamato_at: string | null; at: string; solo_commerciale?: boolean;
-  cliente_nome: string | null; telefono?: string | null; tipo_argomento?: string | null; stato_cliente?: string | null;
+  cliente_nome: string | null; telefono?: string | null; tipo_argomento?: string | null; stato_cliente?: string | null; tipo_contatto?: string | null;
   email_referente_inviata_at?: string | null; email_cliente_inviata_at?: string | null; email_riepilogo_at?: string | null; email_non_disponibile?: string | null;
 }
 export interface RecEvento { pratica_id: number; tipo: string; a_stato: string | null; dati: Record<string, unknown>; at: string }
@@ -18,7 +18,7 @@ export interface RecInfo { id: number; canale: string; nota: string | null; at: 
 /** modifica di un contatto in rubrica (una riga per contatto e giorno) */
 export interface RecAgg { contatto_id: number; at: string; campo: string; a: string | null; autore_nome: string | null }
 export interface Dataset { pratiche: RecPratica[]; aperte: RecPratica[]; trasf: RecTrasf[]; eventi: RecEvento[]; info: RecInfo[]; /** chiuse nel periodo (data di chiusura) */ chiuse: RecPratica[]; agg?: RecAgg[] }
-export type Filtri = Partial<Record<'canale' | 'tipo' | 'stato' | 'dest' | 'arg' | 'giorno', string>>;
+export type Filtri = Partial<Record<'canale' | 'tipo' | 'stato' | 'chi' | 'dest' | 'arg' | 'giorno', string>>;
 type Rec = RecPratica | RecTrasf | RecInfo | RecAgg;
 interface Ctx { ora: Date; slaEv: (id: number, stadio: string) => RecEvento | undefined }
 
@@ -92,12 +92,15 @@ export function base(def: Def, d: Dataset, f: Filtri): Rec[] {
   const l: Rec[] = def.fonte === 'trasferimenti' ? d.trasf : def.fonte === 'aperte' ? d.aperte : def.fonte === 'chiuse' ? d.chiuse
     : def.fonte === 'anagrafica' ? [...d.pratiche, ...unaAlGiorno(d.agg ?? [])] : def.conInfo ? [...d.pratiche, ...d.info] : d.pratiche;
   return l.filter(r => {
-    if ('contatto_id' in r) return !f.canale && !f.tipo && !f.stato && !f.dest && !f.arg && (!f.giorno || giorno(r.at) === f.giorno);
+    if ('contatto_id' in r) return !f.canale && !f.tipo && !f.stato && !f.chi && !f.dest && !f.arg && (!f.giorno || giorno(r.at) === f.giorno);
     const isT = 'destinatario_nome' in r, isI = !('cliente_nome' in r);
     if (f.giorno && giorno(isT ? T(r).at : isI ? (r as RecInfo).at : def.fonte === 'chiuse' ? P(r).closed_at! : P(r).created_at) !== f.giorno) return false;
     if (f.canale && (isT || (isI ? (r as RecInfo).canale : P(r).canale) !== f.canale)) return false;
     if (f.tipo && (isT || isI || P(r).tipo !== f.tipo)) return false;
-    if (f.stato && (isI || ((isT ? T(r).stato_cliente : P(r).stato_cliente) ?? 'nuovo') !== f.stato)) return false;
+    const chi = isI ? null : ((isT ? T(r).tipo_contatto : P(r).tipo_contatto) ?? 'cliente');
+    if (f.chi && chi !== f.chi) return false;
+    // lo stato cliente vale solo per i clienti
+    if (f.stato && (isI || chi !== 'cliente' || ((isT ? T(r).stato_cliente : P(r).stato_cliente) ?? 'nuovo') !== f.stato)) return false;
     if (f.dest && (!isT || T(r).destinatario_nome !== f.dest)) return false;
     if (f.arg && (!isT || (T(r).tipo_argomento || 'Non indicato') !== f.arg)) return false;
     return true;

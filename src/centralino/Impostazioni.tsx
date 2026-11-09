@@ -6,6 +6,7 @@ import type { Flusso } from '../lib/centralino/tipi';
 import { config as ricaricaConfig } from './comune';
 import { useCtx } from './ShellCentralino';
 import ImportaClienti from './ImportaClienti';
+import AzzeraDati from './AzzeraDati';
 
 interface Riga { chiave: string; valore: unknown; descrizione: string | null }
 const NOMI: Record<string, string> = {
@@ -45,6 +46,7 @@ export default function Impostazioni() {
           if (o.stadi[0].key !== 'ricevuta') throw new Error('Il primo stadio deve restare «ricevuta».');
           const x = await supabase.from('pratiche_flussi').update(o).eq('tipo', f.tipo); if (x.error) throw x.error; fatto();
         }} />)}</div>
+      {ctx.admin && <AzzeraDati />}
     </>
   );
 }

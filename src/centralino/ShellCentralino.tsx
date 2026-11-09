@@ -25,7 +25,7 @@ import NuovoContatto from './NuovoContatto';
 import './centralino.css';
 
 export interface ClientePreset { codice: string | null; nome: string; fonte?: 'taylor' | 'pratiche' }
-export interface CtxCentralino { scrive: boolean; base: string; nuovo: (cliente?: ClientePreset) => void; versione: number; aggiorna: () => void }
+export interface CtxCentralino { scrive: boolean; admin?: boolean; base: string; nuovo: (cliente?: ClientePreset) => void; versione: number; aggiorna: () => void }
 export const useCtx = () => useOutletContext<CtxCentralino>();
 
 /**
@@ -104,7 +104,7 @@ export default function ShellCentralino() {
       { to: '/centralino/referenti', label: 'Referenti', icona: 'account' },
       { to: '/centralino/impostazioni', label: 'Impostazioni', icona: 'impostazioni' }] },
   ];
-  const ctx: CtxCentralino = { scrive, base, nuovo: c => { setPreset(c); setAperto(true); }, versione, aggiorna: () => setVersione(v => v + 1) };
+  const ctx: CtxCentralino = { scrive, admin: s.admin, base, nuovo: c => { setPreset(c); setAperto(true); }, versione, aggiorna: () => setVersione(v => v + 1) };
   return (
     <div className="hr-area ct-area">
       <Layout prodotto={direzione ? 'Direzione' : 'Centralino'} gruppi={gruppi} email={s.sessione?.user.email ?? ''}

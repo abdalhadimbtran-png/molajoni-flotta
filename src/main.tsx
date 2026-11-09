@@ -64,6 +64,9 @@ import DirezioneCentralino from './centralino/Direzione';
 import AnalisiCentralino from './centralino/Analisi';
 import ClientiCentralino from './centralino/Clienti';
 import ReferentiCentralino from './centralino/Referenti';
+import ShellDirezione from './direzione/ShellDirezione';
+import PanoramicaDirezione from './direzione/Panoramica';
+import CentralinoDirezione from './direzione/Centralino';
 
 function App() {
   if (!configurato) return <div className="wrap"><div className="banner ko">Configurazione mancante: VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.</div></div>;
@@ -120,10 +123,14 @@ function App() {
           <Route path="/centralino/referenti" element={<ReferentiCentralino />} />
           <Route path="/centralino/nuovo" element={<HomeCentralino />} />
           <Route path="/centralino/*" element={<Navigate to="/centralino" replace />} />
-          <Route path="/direzione/centralino" element={<DirezioneCentralino />} />
+        </Route>
+        {/* Area Direzione (sola lettura): /direzione, /direzione/centralino, dettaglio KPI e scheda pratica */}
+        <Route element={<ShellDirezione />}>
+          <Route path="/direzione" element={<PanoramicaDirezione />} />
+          <Route path="/direzione/centralino" element={<CentralinoDirezione />} />
           <Route path="/direzione/centralino/pratica/:id" element={<PraticheCentralino />} />
           <Route path="/direzione/centralino/analisi" element={<AnalisiCentralino />} />
-          <Route path="/direzione/*" element={<Navigate to="/direzione/centralino" replace />} />
+          <Route path="/direzione/*" element={<Navigate to="/direzione" replace />} />
         </Route>
         <Route element={<Shell />}>
           <Route path="/cruscotto" element={<Cruscotto />} />

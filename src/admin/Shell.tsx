@@ -51,7 +51,7 @@ export function homeDi(r: Ruoli): string | null {
   if (r.hr) return '/hr';
   if (r.formazione) return '/formazione';
   if (r.centralino) return '/centralino';
-  if (r.direzione) return '/direzione/centralino';
+  if (r.direzione) return '/direzione';
   return null;
 }
 
@@ -112,7 +112,7 @@ export default function Shell() {
   if (stato === 'non_abilitato' && hr) return <Navigate to="/hr" replace />;
   if (stato === 'non_abilitato' && formazione) return <Navigate to="/formazione" replace />;
   if (stato === 'non_abilitato' && centralino) return <Navigate to="/centralino" replace />;
-  if (stato === 'non_abilitato' && direzione) return <Navigate to="/direzione/centralino" replace />;
+  if (stato === 'non_abilitato' && direzione) return <Navigate to="/direzione" replace />;
   if (stato === 'non_abilitato') return (
     <div className="wrap narrow">
       <h1>{t('Account non abilitato')}</h1>

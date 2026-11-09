@@ -4,10 +4,12 @@
 // /documento (app tecnico) restituisce un link temporaneo a un documento del veicolo
 // /attestato (app dipendente) link temporaneo a un proprio attestato
 // /carica-attestato (app dipendente) carica l'attestato richiesto dal responsabile (da verificare)
-// /account   (amministratore) elenco, creazione, password e stato degli account responsabile
+// /account   (amministratore) elenco, creazione con invito, link password, pannelli e stato degli account
+// /recupero  (pubblico) «Password dimenticata?»: link sicuro via email (Resend), risposta sempre uguale
 // Le chiavi stanno nella tabella privata config_privata, letta con la chiave di servizio.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { componiEmail, type Saluto } from "./invito.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -166,6 +168,76 @@ async function caricaAttestato(req: Request) {
 }
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const SITO = "https://molajoni-flotta.vercel.app";
+const PANNELLI = ["admin", "flotta", "hr", "formazione", "centralino", "direzione"] as const;
+type Pann = Record<(typeof PANNELLI)[number], boolean>;
+const pannelliDa = (x: unknown): Pann => Object.fromEntries(PANNELLI.map(k => [k, !!(x as Record<string, unknown>)?.[k]])) as Pann;
+const pannelliDi = (r: Record<string, unknown>) => r.ruolo === "admin" ? ["admin"] : PANNELLI.filter(k => k !== "admin" && r[k]);
+const attesa = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/** Stato leggibile di un'email della coda. In modalità test Resend rifiuta (403) gli indirizzi diversi dal proprietario. */
+function statoEmail(r: { stato: string; errore: string | null } | null) {
+  if (!r) return "in_coda";
+  if (r.stato === "inviata") return "inviata";
+  if (r.stato === "errore" && /Resend 403|testing emails|own email|verify a domain/i.test(r.errore ?? "")) return "non_consegnabile_test";
+  if (r.stato === "errore") return "errore";
+  return "in_coda";
+}
+
+/** Link sicuro (invito o recupero) verso la nostra pagina /imposta-password; nessuna email da Supabase. */
+async function creaLink(email: string, nome: string, preferisci: "invite" | "recovery") {
+  const tenta = async (type: "invite" | "recovery") =>
+    // deno-lint-ignore no-explicit-any
+    await db.auth.admin.generateLink({ type, email, ...(type === "invite" ? { options: { data: { nome } } } : {}) } as any);
+  let tipo = preferisci;
+  let r = await tenta(tipo);
+  if (r.error && tipo === "invite") { tipo = "recovery"; r = await tenta(tipo); }
+  if (r.error || !r.data?.properties?.hashed_token) return { errore: r.error?.message ?? "link non creato" };
+  const link = `${SITO}/imposta-password?th=${encodeURIComponent(r.data.properties.hashed_token)}&t=${tipo}`;
+  return { link, tipo, user: r.data.user };
+}
+
+/** Mette l'email nella coda (notifica-email / Resend), la avvia e aspetta qualche secondo l'esito. */
+async function accoda(dest: string, c: { oggetto: string; html: string; testo: string }, dati: Record<string, unknown>) {
+  const { data: riga, error } = await db.from("email_in_uscita").insert({ destinatario: dest, oggetto: c.oggetto, html: c.html, testo: c.testo, dati, stato: "in_coda" }).select("id").single();
+  if (error || !riga) return { id: null, stato: "errore" };
+  await db.rpc("email_avvia_coda");
+  let r: { stato: string; errore: string | null } | null = null;
+  for (let i = 0; i < 6; i++) {
+    await attesa(1200);
+    const q = await db.from("email_in_uscita").select("stato,errore").eq("id", riga.id).single();
+    r = q.data;
+    if (r && r.stato !== "in_coda") break;
+  }
+  return { id: riga.id, stato: statoEmail(r) };
+}
+
+async function inviaLink(r: { user_id: string; nome: string; email: string; ruolo: string } & Record<string, unknown>, preferisci: "invite" | "recovery", saluto?: Saluto) {
+  const l = await creaLink(r.email, r.nome, preferisci);
+  if ("errore" in l) return { errore: "Link non creato. Riprova tra poco." };
+  const c = componiEmail(l.tipo === "invite" ? "invito" : "recupero", { nome: r.nome, email: r.email, link: l.link, saluto, pannelli: pannelliDi(r) });
+  const e = await accoda(r.email, c, { tipo: l.tipo === "invite" ? "invito_account" : "recupero_password", user_id: r.user_id });
+  return { link: l.link, tipo: l.tipo, oggetto: c.oggetto, testo: c.testo, email: e };
+}
+
+/** Pubblico: «Password dimenticata?». Risponde sempre allo stesso modo (non rivela se l'email esiste). */
+async function recupero(req: Request) {
+  const b = await req.json().catch(() => ({}));
+  const email = String(b.email ?? "").trim().toLowerCase();
+  if (!EMAIL.test(email)) return json({ errore: "Email non valida" }, 400);
+  const { data: r } = await db.from("responsabili").select("user_id,nome,email,ruolo,attivo,flotta,hr,formazione,centralino,direzione").ilike("email", email).maybeSingle();
+  if (r?.attivo) {
+    const dieciMin = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { count } = await db.from("email_in_uscita").select("id", { count: "exact", head: true })
+      .eq("destinatario", r.email).gte("creato_il", dieciMin).contains("dati", { tipo: "recupero_password" });
+    if ((count ?? 0) < 3) {
+      await inviaLink(r, "recovery");
+      await db.from("audit_log").insert({ tabella: "account", record_id: r.user_id, azione: "RECUPERO_RICHIESTO", dopo: {}, utente: r.user_id });
+    }
+  }
+  return json({ ok: true });
+}
+
 async function account(req: Request) {
   const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const { data: io, error: e1 } = await db.auth.getUser(jwt);
@@ -175,48 +247,90 @@ async function account(req: Request) {
   const b = await req.json().catch(() => ({}));
   const traccia = (azione: string, record: string, dopo: unknown) =>
     db.from("audit_log").insert({ tabella: "account", record_id: record, azione, dopo, utente: io.user.id });
+  const COLS = "user_id,nome,email,ruolo,area,dipendente_id,attivo,creato_il,flotta,hr,formazione,centralino,direzione,cambio_password,invitato_il";
+  const leggi = async (id: string) => (await db.from("responsabili").select(COLS).eq("user_id", id).maybeSingle()).data;
 
   if (b.azione === "elenco") {
-    const { data: rs, error } = await db.from("responsabili").select("user_id,nome,email,ruolo,area,dipendente_id,attivo,creato_il").order("creato_il");
+    const { data: rs, error } = await db.from("responsabili").select(COLS).order("creato_il");
     if (error) return json({ errore: "Errore del server" }, 500);
     const out = [];
     for (const r of rs ?? []) {
       const { data: u } = await db.auth.admin.getUserById(r.user_id);
-      out.push({ ...r, email: u?.user?.email ?? r.email, ultimo_accesso: u?.user?.last_sign_in_at ?? null, io: r.user_id === io.user.id });
+      const ultimo = u?.user?.last_sign_in_at ?? null;
+      const stato = !r.attivo ? "disattivato" : ultimo ? "attivo" : "invitato";
+      out.push({ ...r, email: u?.user?.email ?? r.email, ultimo_accesso: ultimo, stato, io: r.user_id === io.user.id });
     }
     return json({ account: out });
   }
   if (b.azione === "crea") {
-    const email = String(b.email ?? "").trim().toLowerCase(), nome = String(b.nome ?? "").trim(), password = String(b.password ?? "");
-    const ruolo = b.ruolo === "admin" ? "admin" : "responsabile";
+    const email = String(b.email ?? "").trim().toLowerCase(), nome = String(b.nome ?? "").trim();
+    const p = pannelliDa(b.pannelli);
+    const saluto: Saluto = ["Benvenuta", "Benvenuto"].includes(b.saluto) ? b.saluto : "Benvenuta/o";
+    const dip = b.dipendente_id == null || b.dipendente_id === "" ? null : Number(b.dipendente_id);
     if (!EMAIL.test(email)) return json({ errore: "Email non valida" }, 400);
     if (nome.length < 2 || nome.length > 80) return json({ errore: "Scrivi nome e cognome" }, 400);
-    if (password.length < 10 || password.length > 72) return json({ errore: "La password deve avere almeno 10 caratteri." }, 400);
-    const { data: nu, error } = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { nome } });
-    if (error || !nu?.user) return json({ errore: /already|registered|exists/i.test(error?.message ?? "") ? "Esiste già un account con questa email." : "Creazione account non riuscita" }, 400);
-    const ins = await db.from("responsabili").insert({ user_id: nu.user.id, nome, email, ruolo, attivo: true });
-    if (ins.error) { await db.auth.admin.deleteUser(nu.user.id); return json({ errore: "Creazione account non riuscita" }, 500); }
-    await traccia("CREA", nu.user.id, { email, nome, ruolo });
-    return json({ ok: true });
+    if (!PANNELLI.some(k => p[k])) return json({ errore: "Scegli almeno un pannello" }, 400);
+    if (dip !== null && !Number.isInteger(dip)) return json({ errore: "Dipendente non valido" }, 400);
+    const { data: gia } = await db.from("responsabili").select("user_id").ilike("email", email).maybeSingle();
+    if (gia) return json({ errore: "Esiste già un account con questa email." }, 400);
+    const l = await creaLink(email, nome, "invite");
+    if ("errore" in l || !l.user) return json({ errore: /already|registered|exists/i.test(("errore" in l && l.errore) || "") ? "Esiste già un account con questa email." : "Creazione account non riuscita" }, 400);
+    const uid = l.user.id;
+    const riga = {
+      user_id: uid, nome, email, attivo: true, ruolo: p.admin ? "admin" : "responsabile",
+      flotta: !p.admin && p.flotta, hr: !p.admin && p.hr, area: !p.admin && p.hr ? "hr" : "flotta",
+      formazione: !p.admin && p.formazione, centralino: !p.admin && p.centralino, direzione: !p.admin && p.direzione,
+      dipendente_id: dip, invitato_il: new Date().toISOString(),
+    };
+    const ins = await db.from("responsabili").insert(riga);
+    if (ins.error) {
+      await db.auth.admin.deleteUser(uid);
+      return json({ errore: /dipendente/i.test(ins.error.message) ? "Questo dipendente è già collegato a un altro account." : "Creazione account non riuscita" }, 500);
+    }
+    await traccia("CREA", uid, { email, nome, pannelli: pannelliDi(riga), dipendente_id: dip });
+    const c = componiEmail("invito", { nome, email, link: l.link, saluto, pannelli: pannelliDi(riga) });
+    const e = await accoda(email, c, { tipo: "invito_account", user_id: uid });
+    await traccia("INVITO", uid, { email_id: e.id, stato: e.stato });
+    return json({ ok: true, user_id: uid, link: l.link, oggetto: c.oggetto, testo: c.testo, email: e });
+  }
+  if (b.azione === "invito") {
+    // reinvia l'invito (mai entrato) o manda il link per reimpostare la password
+    const r = await leggi(String(b.user_id ?? ""));
+    if (!r) return json({ errore: "Account non trovato" }, 404);
+    if (!r.attivo) return json({ errore: "Account disattivato: riattivalo prima." }, 400);
+    const { data: u } = await db.auth.admin.getUserById(r.user_id);
+    const mai = !u?.user?.last_sign_in_at;
+    const out = await inviaLink(r, mai ? "invite" : "recovery", ["Benvenuta", "Benvenuto"].includes(b.saluto) ? b.saluto : undefined);
+    if ("errore" in out) return json({ errore: out.errore }, 400);
+    if (mai) await db.from("responsabili").update({ invitato_il: new Date().toISOString() }).eq("user_id", r.user_id);
+    await traccia(mai ? "INVITO" : "LINK_PASSWORD", r.user_id, { email_id: out.email.id, stato: out.email.stato });
+    return json({ ok: true, ...out });
+  }
+  if (b.azione === "stato_email") {
+    const { data: r } = await db.from("email_in_uscita").select("stato,errore").eq("id", Number(b.id)).maybeSingle();
+    return json({ stato: statoEmail(r) });
   }
   if (b.azione === "password") {
+    // password temporanea: l'utente deve cambiarla al primo accesso
     const id = String(b.user_id ?? ""), password = String(b.password ?? "");
     if (password.length < 10 || password.length > 72) return json({ errore: "La password deve avere almeno 10 caratteri." }, 400);
-    const { data: r } = await db.from("responsabili").select("user_id").eq("user_id", id).maybeSingle();
+    const r = await leggi(id);
     if (!r) return json({ errore: "Account non trovato" }, 404);
-    const { error } = await db.auth.admin.updateUserById(id, { password });
+    const { error } = await db.auth.admin.updateUserById(id, { password, email_confirm: true });
     if (error) return json({ errore: "Cambio password non riuscito" }, 400);
-    await traccia("PASSWORD", id, { cambiata: true });
+    const obbligo = b.obbligo !== false && id !== io.user.id;
+    await db.from("responsabili").update({ cambio_password: obbligo }).eq("user_id", id);
+    await traccia("PASSWORD_TEMPORANEA", id, { cambio_obbligatorio: obbligo });
     return json({ ok: true });
   }
   if (b.azione === "stato") {
-    const id = String(b.user_id ?? ""), attivo = b.attivo === true, ruolo = b.ruolo === "admin" ? "admin" : "responsabile";
+    const id = String(b.user_id ?? ""), attivo = b.attivo === true;
     if (id === io.user.id) return json({ errore: "Non puoi modificare il tuo stesso account" }, 400);
-    const up = await db.from("responsabili").update({ attivo, ruolo }).eq("user_id", id).select("user_id");
+    const up = await db.from("responsabili").update({ attivo }).eq("user_id", id).select("user_id");
     if (up.error || !up.data?.length) return json({ errore: "Account non trovato" }, 404);
-    // account disattivato: bloccato anche l'accesso
+    // account disattivato: bloccato anche l'accesso (ban, nessuna cancellazione)
     await db.auth.admin.updateUserById(id, { ban_duration: attivo ? "none" : "876000h" });
-    await traccia("STATO", id, { attivo, ruolo });
+    await traccia("STATO", id, { attivo });
     return json({ ok: true });
   }
   return json({ errore: "Richiesta non valida" }, 400);
@@ -233,6 +347,7 @@ Deno.serve(async (req) => {
     if (p.endsWith("/carica-attestato")) return await caricaAttestato(req);
     if (p.endsWith("/attestato")) return await attestato(req);
     if (p.endsWith("/account")) return await account(req);
+    if (p.endsWith("/recupero")) return await recupero(req);
     return json({ errore: "percorso sconosciuto" }, 404);
   } catch (e) {
     console.error(e);

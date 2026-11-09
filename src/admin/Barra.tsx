@@ -1,5 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { NESSUN_PANNELLO, PANNELLI, pannelliAperti, pannelloDi, type Pannelli } from '../lib/account';
 import { useT } from '../lib/i18n';
 
 /** Icone di navigazione: tratto 1.75, stessa griglia 24×24. */
@@ -36,7 +38,7 @@ export const Icona = ({ n }: { n: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{P[n]}</svg>
 );
 
-export interface Voce { to: string; label: string; icona: string; end?: boolean; badge?: number }
+export interface Voce { to: string; label: string; icona: string; end?: boolean; badge?: number; /** voce visibile ma non cliccabile (es. «Prossimamente») */ disabilitata?: string }
 export interface Gruppo { titolo: string; voci: Voce[] }
 
 /** Struttura delle aree di gestione: barra laterale chiara + barra superiore con utilità e menu utente. */
@@ -47,7 +49,10 @@ export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children 
   const loc = useLocation();
   useEffect(() => { setAperto(false); }, [loc.pathname]);
   const corrente = gruppi.flatMap(g => g.voci).filter(v => v.end ? loc.pathname === v.to : loc.pathname === v.to || loc.pathname.startsWith(v.to + '/')).sort((a, b) => b.to.length - a.to.length)[0];
+  const io = useMioAccount();
   const iniziali = (email.split('@')[0].split(/[._-]/).filter(Boolean).slice(0, 2).map(x => x[0]).join('') || '?').toUpperCase();
+  // password temporanea: cambio obbligatorio prima di usare il portale
+  if (io?.cambio) return <Navigate to="/imposta-password?obbligo=1" replace />;
   return (
     <div className={`gest ${aperto ? 'menu-aperto' : ''}`}>
       <aside className="side no-print">
@@ -59,7 +64,9 @@ export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children 
           {gruppi.map(g => (
             <div key={g.titolo} className="side-gruppo">
               <div className="side-gtit">{t(g.titolo)}</div>
-              {g.voci.map(v => (
+              {g.voci.map(v => v.disabilitata ? (
+                <span key={v.to} className="side-voce side-off" aria-disabled="true" title={t(v.disabilitata)}><Icona n={v.icona} /><span>{t(v.label)}</span><span className="side-prox">{t(v.disabilitata)}</span></span>
+              ) : (
                 <NavLink key={v.to} to={v.to} end={v.end} className={({ isActive }) => `side-voce ${isActive ? 'attiva' : ''}`}>
                   <Icona n={v.icona} /><span>{t(v.label)}</span>{v.badge ? <span className="side-badge" aria-label={t('{n} da decidere', { n: v.badge })}>{v.badge}</span> : null}
                 </NavLink>
@@ -75,6 +82,7 @@ export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children 
           <img className="logo gest-top-logo" src="/logo-molajoni.png" alt="Molajoni Antincendi" />
           <div className="gest-crumb">{prodotto}{corrente && <><span aria-hidden="true">/</span><b>{t(corrente.label)}</b></>}</div>
           <span className="gest-top-sp" />
+          {io && <SceltaPannello pannelli={io.pannelli} />}
           {utilita}
           <details className="utente">
             <summary aria-label={t('Account')}><span className="avatar">{iniziali}</span></summary>
@@ -87,5 +95,41 @@ export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children 
         <main className="gest-main"><div className="wrap">{children}</div></main>
       </div>
     </div>
+  );
+}
+
+/** Pannelli e obbligo di cambio password dell'account collegato (riga propria di responsabili). */
+function useMioAccount() {
+  const [v, setV] = useState<{ pannelli: Pannelli; cambio: boolean } | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return;
+      const { data } = await supabase.from('responsabili').select('ruolo,flotta,hr,formazione,centralino,direzione,cambio_password,attivo').eq('user_id', s.session.user.id).maybeSingle();
+      if (!vivo || !data || !data.attivo) return;
+      setV({ cambio: !!data.cambio_password, pannelli: { ...NESSUN_PANNELLO, admin: data.ruolo === 'admin', flotta: !!data.flotta, hr: !!data.hr,
+        formazione: !!data.formazione, centralino: !!data.centralino, direzione: !!data.direzione } });
+    })();
+    return () => { vivo = false; };
+  }, []);
+  return v;
+}
+
+/** Selettore del pannello per chi ne ha più di uno (es. Centralino + Ufficio personale). */
+function SceltaPannello({ pannelli }: { pannelli: Pannelli }) {
+  const { t } = useT();
+  const loc = useLocation();
+  const nav = useNavigate();
+  const aperti = pannelliAperti(pannelli);
+  if (aperti.length < 2) return null;
+  const qui = pannelloDi(loc.pathname);
+  return (
+    <select className="scelta-pannello" aria-label={t('Cambia pannello')} value={aperti.includes(qui) ? qui : ''}
+      onChange={e => { const p = PANNELLI.find(x => x.v === e.target.value); if (p) nav(p.home); }}
+      style={{ maxWidth: 200, marginInlineEnd: 8 }}>
+      {!aperti.includes(qui) && <option value="">{t('Pannello…')}</option>}
+      {PANNELLI.filter(x => aperti.includes(x.v)).map(x => <option key={x.v} value={x.v}>{t(x.v === 'admin' ? 'Amministrazione' : x.l)}</option>)}
+    </select>
   );
 }

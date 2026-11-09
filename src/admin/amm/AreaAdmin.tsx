@@ -8,7 +8,7 @@ import { URL_FUNZIONI } from '../../lib/push';
 
 const GRUPPI: Gruppo[] = [
   { titolo: 'Amministrazione', voci: [
-    { to: '/admin', label: 'Panoramica', icona: 'panoramica', end: true }, { to: '/admin/account', label: 'Account', icona: 'account' },
+    { to: '/admin', label: 'Panoramica', icona: 'panoramica', end: true }, { to: '/admin/account', label: 'Account e ruoli', icona: 'account' },
     { to: '/admin/tecnici', label: 'Tecnici', icona: 'tecnici' }, { to: '/admin/sicurezza', label: 'Sicurezza', icona: 'sicurezza' },
     { to: '/admin/report', label: 'Report', icona: 'report' }, { to: '/admin/registro', label: 'Registro movimenti', icona: 'registro' }] },
 ];

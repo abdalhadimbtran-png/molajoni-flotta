@@ -14,6 +14,7 @@ import { configurato } from './lib/supabase';
 import { LinguaProvider } from './lib/i18n';
 import Shell, { Smistamento } from './admin/Shell';
 import Accesso from './admin/Accesso';
+import ImpostaPassword from './admin/ImpostaPassword';
 import Cruscotto from './admin/Cruscotto';
 import Piano from './admin/Piano';
 import Flotta from './admin/Flotta';
@@ -73,6 +74,7 @@ function App() {
         <Route path="/t/*" element={<Tecnico />} />
         <Route path="/ferie" element={<Navigate to="/t/ferie/nuova" replace />} />
         <Route path="/accesso" element={<Accesso />} />
+        <Route path="/imposta-password" element={<ImpostaPassword />} />
         <Route element={<AreaAdmin />}>
           <Route path="/admin" element={<Panoramica />} />
           <Route path="/admin/account" element={<Account />} />

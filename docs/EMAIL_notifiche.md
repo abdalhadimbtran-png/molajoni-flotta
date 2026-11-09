@@ -26,3 +26,10 @@ Finché non si verifica un dominio, il mittente è `onboarding@resend.dev` e **R
 1. Resend › **Domains › Add domain** (es. `molajoni.it`, meglio un sottodominio come `notifiche.molajoni.it`).
 2. Aggiungere al DNS (chi gestisce il dominio) i record TXT/MX/DKIM indicati; attendere lo stato *Verified*.
 3. In `impostazioni_portale` impostare `email_mittente`, es. `Molajoni Portale <portale@molajoni.it>` (RPC `admin_salva_impostazione('email_mittente', ...)`), e `email_hr` con l'indirizzo reale dell'ufficio personale dalla pagina Sicurezza.
+
+## 5. Inviti account e «Password dimenticata?»
+- **Amministrazione › Account e ruoli**: «Nuovo account» crea l'utente (funzione `flotta/account`, `generateLink` tipo *invite*) e mette in coda l'email «Benvenuta/o nel Portale Molajoni» con il pulsante *Imposta la tua password* → `/imposta-password`. Nessuna password per email.
+- In modalità test Resend l'email verso altri indirizzi risulta «Non consegnabile in modalità test»: usare **Apri in Outlook** (stesso testo + link) o **Copia link d'invito**.
+- «Password dimenticata?» (pagina di accesso) → `flotta/recupero` (risposta sempre uguale, massimo 3 email ogni 10 minuti).
+- Durata del link: impostare in Supabase › Authentication › Email › *Email OTP Expiration* = `86400` (24 ore), altrimenti vale il valore del progetto (predefinito 1 ora).
+- Password temporanea (alternativa): `responsabili.cambio_password = true` → cambio obbligatorio al primo accesso.

@@ -111,7 +111,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
 
   // email del passo (precompilata, anteprima chiusa)
   const tEmail = has('email') || has('informato') || (girata && !!destEff) ? modello(s?.template) : undefined;
-  const aEmail = !tEmail ? '' : girata ? (destPersona?.email ?? '') : tEmail.codice.endsWith('_coordinatore') ? (coordSel?.email ?? '') : tEmail.codice === 'riepilogo_commerciale' ? (p.commerciale_email ?? '') : (p.email ?? '');
+  const aEmail = !tEmail ? '' : girata ? (destPersona?.email ?? '') : tEmail.codice.endsWith('_coordinatore') ? (coordSel?.email ?? '') : tEmail.codice === 'riepilogo_commerciale' ? (p.commerciale_email || elencoComm.find(c => c.nome === p.commerciale_nome)?.email || '') : (p.email ?? '');
   const ccOff = (config?.impostazioni.cc_offerte_grandi ?? []).map(x => x.email).filter(Boolean) as string[];
   const telTec = tecnici.find(t => t.id === p.tecnico_dipendente_id)?.telefono ?? null;
   const extraDati = { tecnico_telefono: telTec, ...(girata && destEff ? { assegnato_nome: destEff } : {}) } as Partial<Pratica>;

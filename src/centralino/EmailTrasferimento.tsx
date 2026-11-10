@@ -6,6 +6,7 @@ import { NOME_TIPO, STATI_CLIENTE, nomeCanale, type Pratica, type Trasferimento 
 import { compila, guscioEmail, inTesto, segnaposto, type Valori } from '../lib/centralino/modelli';
 import { partiRoma } from '../lib/centralino/sla';
 import { useConfig } from './comune';
+import { avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
@@ -20,7 +21,8 @@ type Valori2 = Valori & Record<string, string>;
  * Dopo ogni chiamata passata a un responsabile: DUE email, in anteprima modificabile.
  *  1) al referente: chi ha chiamato, di cosa, cosa deve fare ed entro quando, link alla pratica
  *  2) al cliente: presa in carico («la contatterà entro …») o riepilogo se la chiamata è già passata
- * «Invia entrambe» le mette in coda; per ognuna anche «Apri in Outlook» / «Copia» (Resend in prova).
+ * Per ognuna «Outlook → referente» / «Outlook → cliente» (dalla casella di Jennifer) e «Copia testo»;
+ * «Invia entrambe» (Resend) solo con invio_email = 'automatico'.
  */
 export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }: { trasf: Trasferimento; pratica?: Pratica | null; onClose: () => void; onFatto: () => void }) {
   const { config } = useConfig();
@@ -32,6 +34,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
   const [motivo, setMotivo] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
+  const automatico = config?.impostazioni.invio_email === 'automatico';
   useEffect(() => { if (!p && trasf.pratica_id) supabase.from('pratiche').select('*').eq('id', trasf.pratica_id).maybeSingle().then(r => setP((r.data as Pratica) ?? null)); }, [trasf.pratica_id, p]);
 
   const refEmail = useMemo(() => {
@@ -86,21 +89,26 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
   async function entrambe() {
     setErr(null);
     const problemi: string[] = [];
-    if (!inviataRef && !emailOk(ref?.a ?? '')) problemi.push(`Aggiungi l'email di ${trasf.destinatario_nome} in Impostazioni (Destinatari dei trasferimenti).`);
+    if (automatico && !inviataRef && !emailOk(ref?.a ?? '')) problemi.push(`Aggiungi l'email di ${trasf.destinatario_nome} in Impostazioni (Destinatari dei trasferimenti).`);
     if (!inviataCli && !emailOk(cli?.a ?? '') && !motivo) problemi.push('Scrivi l\'email del cliente oppure scegli «Email non disponibile» con il motivo.');
     setInvio(true);
     try {
-      if (!inviataRef && emailOk(ref?.a ?? '')) await inviaRef('resend');
-      if (!inviataCli && emailOk(cli?.a ?? '')) await inviaCli('resend');
+      if (automatico && !inviataRef && emailOk(ref?.a ?? '')) await inviaRef('resend');
+      if (automatico && !inviataCli && emailOk(cli?.a ?? '')) await inviaCli('resend');
       else if (!inviataCli && motivo) await rpc('centralino_trasf_senza_email', { p_id: trasf.id, p_motivo: motivo });
-      if (problemi.length) { setErr(problemi.join(' ')); } else { toast('Email in invio: referente e cliente'); onFatto(); }
+      if (problemi.length) { setErr(problemi.join(' ')); } else { toast(automatico ? 'Email in invio: referente e cliente' : 'Registrato'); if (automatico || inviataRef) onFatto(); }
     } catch (e) { setErr(testoErrore(e)); } finally { setInvio(false); }
   }
   async function outlook(chi: 'ref' | 'cli') {
     const b = chi === 'ref' ? ref : cli; if (!b || !emailOk(b.a)) { setErr(chi === 'ref' ? `Aggiungi l'email di ${trasf.destinatario_nome} in Impostazioni.` : 'Scrivi l\'email del cliente.'); return; }
+    setErr(null);
+    const m = costruisciMailto({ a: b.a, oggetto: b.oggetto, testo: inTesto(b.corpo) });
+    if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
     try {
       await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook'));
-      window.location.href = `mailto:${encodeURIComponent(b.a.trim())}?subject=${encodeURIComponent(b.oggetto)}&body=${encodeURIComponent(inTesto(b.corpo))}`;
+      window.location.href = m.url; toast(avvisoOutlook(m.troncato));
+      const altra = chi === 'ref' ? inviataCli : inviataRef;
+      if (altra) onFatto();
     } catch (e) { setErr(testoErrore(e)); }
   }
   async function copia(chi: 'ref' | 'cli') {
@@ -118,7 +126,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
         {chi === 'ref' && !refEmail && !fatta && <p className="ct-err-email">Aggiungi l'email di {trasf.destinatario_nome} in Impostazioni › Destinatari dei trasferimenti. Il trasferimento è comunque registrato.</p>}
         <div className="field"><label>Oggetto</label><input value={b.oggetto} disabled={fatta} onChange={e => set({ ...b, oggetto: e.target.value })} /></div>
         <div className="ct-anteprima" contentEditable={!fatta} suppressContentEditableWarning onBlur={e => set({ ...b, corpo: (e.target as HTMLDivElement).innerHTML })} dangerouslySetInnerHTML={{ __html: b.corpo }} />
-        {!fatta && <div className="row-flex"><button type="button" className="btn-ghost btn-sm" onClick={() => outlook(chi)}>Apri in Outlook</button><button type="button" className="btn-ghost btn-sm" onClick={() => copia(chi)}>Copia testo</button></div>}
+        {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => copia(chi)}>Copia testo</button></div>}
       </>}
     </section>
   );
@@ -136,10 +144,11 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
             <select aria-label="Motivo" value={motivo} onChange={e => setMotivo(e.target.value)}><option value="">— Email non disponibile: motivo —</option>{(config?.impostazioni.motivi_senza_email ?? ['Altro']).map(m => <option key={m}>{m}</option>)}</select></div>)}
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex">
-          <button className="btn" disabled={invio || (inviataRef && inviataCli)} onClick={entrambe}>{invio ? 'Invio…' : inviataRef && inviataCli ? 'Inviate' : 'Invia entrambe'}</button>
+          {automatico && <button className="btn" disabled={invio || (inviataRef && inviataCli)} onClick={entrambe}>{invio ? 'Invio…' : inviataRef && inviataCli ? 'Inviate' : 'Invia entrambe'}</button>}
+          {!automatico && !inviataCli && !emailOk(cli?.a ?? '') && motivo && <button className="btn" disabled={invio} onClick={entrambe}>Registra «email non disponibile»</button>}
           <button type="button" className="btn-ghost" onClick={inviataRef && inviataCli ? onFatto : onClose}>{inviataRef && inviataCli ? 'Chiudi' : 'Più tardi'}</button>
         </div>
-        <p className="hint">Resend è in prova: se l'email non arriva usa «Apri in Outlook». Finché manca un'email resta il segnale rosso.</p>
+        <p className="hint">Ogni pulsante Outlook apre un nuovo messaggio già compilato dalla tua casella e registra l'email come inviata. Finché manca un'email resta il segnale rosso.</p>
       </div>
     </Modal>
   );

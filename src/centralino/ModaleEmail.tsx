@@ -5,13 +5,15 @@ import { fmtOra } from '../lib/format';
 import { prossimoStadio, type Pratica, type Template, type Trasferimento } from '../lib/centralino/tipi';
 import { compila, guscioEmail, inTesto, segnaposto, type Valori } from '../lib/centralino/modelli';
 import { useConfig } from './comune';
+import { avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const lista = (s: string) => s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
 
 /**
- * Email da modello: segnaposto compilati, anteprima modificabile, A/CC, invio dalla coda (Resend)
- * oppure «Copia testo» / «Apri in Outlook» (Resend in prova). Ogni invio resta nella storia.
+ * Email da modello: segnaposto compilati, anteprima modificabile, A/CC. Invio principale «Apri in Outlook»
+ * (dalla casella di Jennifer), secondario «Copia testo»; «Invia» automatico solo con invio_email = 'automatico'.
+ * Ogni invio resta nella storia.
  * Con `trasf` è l'email di riepilogo dopo una chiamata trasferita (obbligatoria).
  */
 export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }: { pratica?: Pratica | null; trasf?: Trasferimento | null; codice?: string; onClose: () => void; onFatto: () => void }) {
@@ -79,15 +81,17 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
       return true;
     } catch (x) { setErr(testoErrore(x)); return false; } finally { setInvio(false); }
   }
-  async function invia(e: FormEvent) { e.preventDefault(); if (await registra('resend')) { toast('Email in invio'); onFatto(); } }
+  const automatico = config?.impostazioni.invio_email === 'automatico';
+  async function invia(e: FormEvent) { e.preventDefault(); if (!automatico) { await outlook(); return; } if (await registra('resend')) { toast('Email in invio'); onFatto(); } }
   async function copia() {
     const testo = `${ogg}\n\n${inTesto(corpo)}`;
     try { await navigator.clipboard.writeText(testo); } catch { /* il browser può negarlo: il testo resta visibile */ }
     if (await registra('copia')) { toast('Testo copiato e registrato'); onFatto(); }
   }
   async function outlook() {
-    const u = `mailto:${encodeURIComponent(a.trim())}?${new URLSearchParams({ ...(cc ? { cc: lista(cc).join(',') } : {}), subject: ogg, body: inTesto(corpo) }).toString().replace(/\+/g, '%20')}`;
-    if (await registra('outlook')) { window.location.href = u; toast('Aperta in Outlook e registrata'); onFatto(); }
+    const m = costruisciMailto({ a, cc: lista(cc), oggetto: ogg, testo: inTesto(corpo) });
+    if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
+    if (await registra('outlook')) { window.location.href = m.url; toast(avvisoOutlook(m.troncato)); onFatto(); }
   }
   async function senzaEmail() {
     if (!trasf || !motivo.trim()) { setErr('Scrivi il motivo.'); return; }
@@ -115,12 +119,12 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
         {pratica && prossimo && <label className="check"><input type="checkbox" checked={avanza} onChange={e => setAvanza(e.target.checked)} /> Segna anche «{prossimo.nome}» come fatto</label>}
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex">
-          <button className="btn" disabled={invio}>{invio ? 'Invio…' : 'Invia'}</button>
+          <button className="btn" disabled={invio}>{invio ? 'Apertura…' : automatico ? 'Invia' : 'Apri in Outlook'}</button>
+          {automatico && <button type="button" className="btn-ghost" onClick={outlook} disabled={invio}>Apri in Outlook</button>}
           <button type="button" className="btn-ghost" onClick={copia} disabled={invio}>Copia testo</button>
-          <button type="button" className="btn-ghost" onClick={outlook} disabled={invio}>Apri in Outlook</button>
           <button type="button" className="btn-ghost" onClick={onClose}>Più tardi</button>
         </div>
-        <p className="hint">Resend è ancora in prova: se l'invio non arriva al cliente usa «Apri in Outlook». In tutti i casi l'email resta nella storia.</p>
+        <p className="hint">Si apre un nuovo messaggio in Outlook già compilato (A, CC, oggetto, testo e firma): controlla e premi Invia. L'email è registrata nella storia della pratica.</p>
         {trasf && (
           <details open={senza} onToggle={e => setSenza((e.target as HTMLDetailsElement).open)}>
             <summary>Email non disponibile</summary>

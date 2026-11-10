@@ -64,6 +64,8 @@ export interface Impostazioni {
   amministrazione: Persona; fornitori: Persona & { giorni?: string }; commerciali: Persona[]; responsabili_info: Persona[];
   firma: string; sostituto: string; destinatari_trasferimento: Destinatario[]; trasferimento_sla: RegolaSla; mesi_cliente_attivo: number;
   commerciali_offerte_grandi: Persona[]; motivi_annullamento: string[]; motivi_senza_email: string[]; motivi_spostamento: string[];
+  /** 'outlook' (predefinito): email dalla casella di Jennifer; 'automatico': coda → Resend. */
+  invio_email?: 'outlook' | 'automatico';
 }
 
 export const CANALI: { v: Canale; l: string; ic: string }[] = [

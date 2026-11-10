@@ -6,6 +6,7 @@ import { prossimoStadio, type Commerciale, type Flusso, type PersonaDisp, type P
 import { giornoRoma } from '../lib/centralino/sla';
 import { compila, guscioEmail, inTesto, segnaposto } from '../lib/centralino/modelli';
 import { useConfig } from './comune';
+import { avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
 
 export interface Prossimo { key: string; nome: string; mancanti: string[] }
 export const prossimoDi = (id: number) => rpc<Prossimo | null>('centralino_prossimo', { p_id: id });
@@ -110,8 +111,18 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
 
   if (!s) return null;
 
-  const inviaEmail = (e: { a: string; cc: string[]; oggetto: string; html: string; testo: string }, codice: string) =>
-    rpc('centralino_invia_email', { p_id: p.id, p_template: codice, p_a: e.a.trim(), p_cc: e.cc, p_oggetto: e.oggetto, p_html: e.html, p_testo: e.testo, p_modo: 'resend', p_avanza: null });
+  const automatico = config?.impostazioni.invio_email === 'automatico';
+  // modalità Outlook: l'email è registrata come inviata (modo 'outlook') e il messaggio si apre nella casella di Jennifer
+  let daAprire: ReturnType<typeof costruisciMailto> | null = null;
+  const inviaEmail = async (e: { a: string; cc: string[]; oggetto: string; html: string; testo: string }, codice: string) => {
+    if (!automatico) {
+      const m = costruisciMailto({ a: e.a, cc: e.cc, oggetto: e.oggetto, testo: e.testo });
+      if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
+      daAprire = m;
+    }
+    return rpc('centralino_invia_email', { p_id: p.id, p_template: codice, p_a: e.a.trim(), p_cc: e.cc, p_oggetto: e.oggetto, p_html: e.html, p_testo: e.testo, p_modo: automatico ? 'resend' : 'outlook', p_avanza: null });
+  };
+  const apriSeServe = () => { const m = daAprire as ReturnType<typeof costruisciMailto> | null; if (m) { window.location.href = m.url; toast(avvisoOutlook(m.troncato)); } return !!m; };
   const avanza = (key: string, dati: Record<string, unknown>) => rpc('centralino_avanza', { p_id: p.id, p_stadio: key, p_dati: dati, p_testo: nota || null });
 
   async function salva(e?: FormEvent) {
@@ -151,23 +162,26 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       }
       if (tCliente && dopo) {
         if (voce) { await avanza(dopo.key, { informato_voce: true }); toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato a voce`); }
-        else if (emailOk(p.email)) {
+        else if (emailOk(p.email) && !automatico) {
+          // una sola finestra Outlook per clic: la seconda email (al cliente) si apre subito dopo nel compositore
+          apriSeServe(); toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Ora l'email al cliente: «Apri in Outlook».`); onFatto(); onEmail?.(dopo.template); return;
+        } else if (emailOk(p.email)) {
           const ec = componi(tCliente, p, firma, p.email!, { tecnico_nome: String(dati.tecnico_nome), tecnico_quando: String(dati.tecnico_quando) });
           await inviaEmail(ec, tCliente.codice);
           await avanza(dopo.key, {});
           toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato`);
         } else { toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Manca l'email del cliente: informalo per telefono o scrivi l'email.`); onFatto(); onEmail?.(dopo.template); return; }
-      } else toast(ultimo ? `${p.numero}: pratica chiusa` : `${p.numero}: ${s.nome}`);
+      } else if (!apriSeServe()) toast(ultimo ? `${p.numero}: pratica chiusa` : `${p.numero}: ${s.nome}`);
       onFatto();
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
 
   const etichetta = invio ? 'Invio…'
-    : has('coordinatore') ? (emailOk(destEmail) ? (tecDiretto ? 'Invia email al tecnico e avanti' : 'Invia email al coordinatore e avanti') : 'Avanti')
+    : has('coordinatore') ? (emailOk(destEmail) ? (automatico ? (tecDiretto ? 'Invia email al tecnico e avanti' : 'Invia email al coordinatore e avanti') : (tecDiretto ? 'Apri in Outlook (tecnico) e avanti' : 'Apri in Outlook (coordinatore) e avanti')) : 'Avanti')
     : has('informato') && voce ? (ultimo ? 'Chiudi la pratica' : 'Avanti')
     : tCliente ? 'Conferma e informa il cliente'
-    : ultimo ? (email ? 'Invia e chiudi' : 'Chiudi la pratica')
-    : email ? 'Invia e avanti' : `Fatto: ${s.nome}`;
+    : ultimo ? (email ? (automatico ? 'Invia e chiudi' : 'Apri in Outlook e chiudi') : 'Chiudi la pratica')
+    : email ? (automatico ? 'Invia e avanti' : 'Apri in Outlook e avanti') : `Fatto: ${s.nome}`;
 
   return (
     <Modal titolo={`Passo ${idx + 1} di ${f.stadi.length}: ${s.nome}`} onClose={onClose}>
@@ -231,6 +245,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             {email.cc.length > 0 && <p className="hint">CC: {email.cc.join(', ')}</p>}
             <div className="ct-anteprima" dangerouslySetInnerHTML={{ __html: email.corpo }} />
             <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Modifica il testo</button>
+            {!automatico && <p className="hint">Con il pulsante principale si apre il messaggio in Outlook già compilato e l'email è registrata come inviata.</p>}
           </details>)}
         {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Email non disponibile: cliente informato a voce</label>}
         {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? `Manca l'email di ${coordNome || 'questa persona'}: aggiungila in ${tecDiretto ? 'Dipendenti' : 'Referenti'} oppure basta «Telefonato».` : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}

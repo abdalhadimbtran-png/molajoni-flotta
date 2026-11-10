@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, TIPI_CONTATTO, eCliente, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
+import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, eCliente, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento, type Commerciale } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 import { ESTENSIONI, apriAllegato, caricaAllegato, pratica, useAdesso, useAggiornamento, useConfig } from './comune';
 import { ChiBadge, Ic, SlaChip, Trascorso, regolaDi, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
@@ -26,7 +26,7 @@ export default function Pratica() {
     return { ...d, tr, pr };
   }, [id, ctx.versione]);
   const r = useCallback(() => { reload(); }, [reload]); useAggiornamento(r);
-  const [modale, setModale] = useState<'' | 'avanza' | 'nota' | 'chiamata' | 'email' | 'dati' | 'chiudi' | 'trasf' | 'sposta'>('');
+  const [modale, setModale] = useState<'' | 'avanza' | 'nota' | 'chiamata' | 'email' | 'dati' | 'chiudi' | 'trasf' | 'sposta' | 'commerciale'>('');
   const [codiceEmail, setCodiceEmail] = useState<string | undefined>(undefined);
   const [riep, setRiep] = useState<Trasferimento | null>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -74,9 +74,6 @@ export default function Pratica() {
     for (const x of Array.from(l)) { try { await caricaAllegato(p.id, x); toast(`Allegato: ${x.name}`); } catch (e) { toast(testoErrore(e)); } }
     if (file.current) file.current.value = ''; reload();
   }
-  async function tipoContatto(v: string) {
-    try { await rpc('centralino_tipo_contatto', { p_pratica_id: p.id, p_trasf_id: null, p_tipo: v }); reload(); } catch (e) { toast(testoErrore(e)); }
-  }
   async function statoCliente(v: string) {
     try { await rpc('centralino_imposta_stato_cliente', { p_id: p.id, p_stato: v || null }); reload(); } catch (e) { toast(testoErrore(e)); }
   }
@@ -110,7 +107,6 @@ export default function Pratica() {
         </div>
         <div className="ct-stato-sel">
           {eCliente(p) && p.stato_cliente && <span className={`pill ${STATI_CLIENTE[p.stato_cliente][0]}`}>{STATI_CLIENTE[p.stato_cliente][1]}</span>}
-          {ctx.scrive && <select aria-label="Chi chiama" value={p.tipo_contatto ?? 'cliente'} onChange={e => tipoContatto(e.target.value)}>{TIPI_CONTATTO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>}
           {ctx.scrive && eCliente(p) && <select aria-label="Stato del cliente" value={p.stato_cliente_manuale ? p.stato_cliente ?? '' : ''} onChange={e => statoCliente(e.target.value)}>
             <option value="">{p.stato_cliente_manuale ? 'Torna a proposta automatica' : 'Proposta automatica'}</option>
             {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
@@ -127,6 +123,7 @@ export default function Pratica() {
           <button className="btn-ghost" onClick={() => { setCodiceEmail(prossimo?.template); setModale('email'); }}><Ic n="email" size={16} /> Invia email</button>
           {aperta && p.appuntamento_data && <button className="btn-ghost" onClick={() => setModale('sposta')}>Sposta appuntamento</button>}
           <button className="btn-ghost" onClick={() => setModale('chiamata')}><Ic n="telefono" size={16} /> Registra chiamata</button>
+          {aperta && p.tipo === 'offerta_piccola' && <button className="btn-ghost" onClick={() => setModale('commerciale')}>Passa al Tecnico Commerciale</button>}
           <button className="btn-ghost" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
           <button className="btn-ghost" onClick={() => setModale('nota')}>Aggiungi nota</button>
           <button className="btn-ghost" onClick={() => setModale('dati')}>Dati e assegnazione</button>
@@ -183,6 +180,7 @@ export default function Pratica() {
       {modale === 'email' && <ModaleEmail pratica={p} codice={codiceEmail} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'dati' && <ModaleDati p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'chiudi' && <ModaleChiudi p={p} onClose={() => setModale('')} onFatto={fatto} />}
+      {modale === 'commerciale' && <ModalePassaCommerciale p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'trasf' && <ModaleTrasferimento pratica={p} onClose={() => setModale('')} onFatto={fatto} />}
       {riep && <EmailTrasferimento trasf={riep} pratica={p} onClose={() => { setRiep(null); reload(); }} onFatto={() => { setRiep(null); reload(); }} />}
     </div>
@@ -277,6 +275,29 @@ function ModaleChiudi({ p, onClose, onFatto }: { p: P; onClose: () => void; onFa
         <div className="field"><label htmlFor="ch-t">{m === 'Altro' ? 'Spiega (obbligatorio)' : 'Dettaglio (facoltativo)'}</label><input id="ch-t" value={t} onChange={x => setT(x.target.value)} /></div>
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex"><button className="btn">Annulla la pratica</button><button type="button" className="btn-ghost" onClick={onClose}>Indietro</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Offerta gestita da Jennifer che si rivela complessa: passa al Tecnico Commerciale (ripartono i passi dalla «ricevuta»). */
+function ModalePassaCommerciale({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatto: () => void }) {
+  const [comms, setComms] = useState<Commerciale[]>([]); const [c, setC] = useState(''); const [err, setErr] = useState<string | null>(null); const [invio, setInvio] = useState(false);
+  useEffect(() => { rpc<Commerciale[]>('centralino_commerciali', {}).then(l => { setComms(l); setC((l.find(x => x.disponibile) ?? l[0])?.nome ?? ''); }, e => setErr(testoErrore(e))); }, []);
+  async function salva(x: FormEvent) {
+    x.preventDefault(); if (!c) { setErr('Scegli il Tecnico Commerciale.'); return; }
+    setInvio(true);
+    try { await rpc('centralino_passa_commerciale', { p_id: p.id, p_commerciale: c }); toast(`Passata a ${c}`); onFatto(); } catch (y) { setErr(testoErrore(y)); setInvio(false); }
+  }
+  return (
+    <Modal titolo="Passa al Tecnico Commerciale" onClose={onClose}>
+      <form className="form" onSubmit={salva}>
+        <p className="hint">L'offerta passa al Tecnico Commerciale: email al cliente («entro 2 ore la contatterà…»), riepilogo al commerciale e richiamo entro 2 ore per lui.</p>
+        <div className="field"><label htmlFor="pc-c">Tecnico Commerciale</label>
+          <select id="pc-c" value={c} onChange={e => setC(e.target.value)} autoFocus><option value="">— scegli —</option>
+            {comms.map(x => <option key={x.nome} value={x.nome}>{x.nome} · {x.disponibile ? 'disponibile' : x.assente ? 'assente oggi' : 'occupato'}</option>)}</select></div>
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex"><button className="btn" disabled={invio}>Passa al Tecnico Commerciale</button><button type="button" className="btn-ghost" onClick={onClose}>Indietro</button></div>
       </form>
     </Modal>
   );

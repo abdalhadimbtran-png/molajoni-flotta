@@ -37,8 +37,8 @@ export function righeReport(d: Dataset, p: Dataset, ora = new Date()): Riga[] {
   const pr = primaRisposta(d.pratiche, d.eventi), prp = primaRisposta(p.pratiche, p.eventi);
   out.push({ sezione: 'Servizio', voce: 'Prima risposta (media)', valore: durata(pr.media), dettaglio: `${pr.n} pratiche`, prec: durata(prp.media), var: '—', def: 'Minuti medi tra la chiamata e il primo passo fatto.' });
   const vp = (l: Dataset['pratiche'], t: string) => fmtEuro(valore(l.filter(x => x.tipo === t)));
-  out.push({ sezione: 'Offerte', voce: 'Valore offerte fino a 1.000 €', valore: vp(d.pratiche, 'offerta_piccola'), dettaglio: '', prec: vp(p.pratiche, 'offerta_piccola'), var: '—', def: 'Somma degli importi stimati.' });
-  out.push({ sezione: 'Offerte', voce: 'Valore offerte oltre 1.000 €', valore: vp(d.pratiche, 'offerta_grande'), dettaglio: '', prec: vp(p.pratiche, 'offerta_grande'), var: '—', def: 'Somma degli importi stimati.' });
+  out.push({ sezione: 'Offerte', voce: 'Valore offerte gestite dal centralino', valore: vp(d.pratiche, 'offerta_piccola'), dettaglio: '', prec: vp(p.pratiche, 'offerta_piccola'), var: '—', def: 'Somma degli importi stimati.' });
+  out.push({ sezione: 'Offerte', voce: 'Valore offerte del Tecnico Commerciale', valore: vp(d.pratiche, 'offerta_grande'), dettaglio: '', prec: vp(p.pratiche, 'offerta_grande'), var: '—', def: 'Somma degli importi stimati.' });
   for (const [n, x] of Object.entries(perCommerciale(d.trasf, ora)))
     out.push({ sezione: 'Offerte', voce: `Richiami entro 2 ore – ${n}`, valore: x.pct == null ? '—' : `${x.pct}%`, dettaglio: `${x.inTempo} / ${x.val}`, prec: '', var: '—', def: `${x.scaduti} scaduti non richiamati.` });
   return out;

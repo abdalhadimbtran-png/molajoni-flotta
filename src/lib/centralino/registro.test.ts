@@ -6,7 +6,7 @@ const ora = new Date('2026-11-05T15:00:00Z');
 const P = (id: number, x: Partial<Dataset['pratiche'][0]>): Dataset['pratiche'][0] => ({ id, numero: `CT-2026-${id}`, tipo: 'manutenzione', sottotipo: null, canale: 'telefono', esito: 'aperta', esito_offerta: null,
   stato_corrente: 'ricevuta', cliente_nome: `Cliente ${id}`, stato_cliente: 'nuovo', importo_stimato: null, sla_rispettato: null, sla_scadenza: null, created_at: '2026-11-05T08:00:00Z', closed_at: null, ...x });
 const T = (id: number, x: Partial<Dataset['trasf'][0]>): Dataset['trasf'][0] => ({ id, pratica_id: null, destinatario_nome: 'A. Querini', esito: 'risposto', modalita: 'trasferita', richiamo_scadenza: null, richiamato_at: null,
-  at: '2026-11-05T09:00:00Z', cliente_nome: 'X', tipo_argomento: 'Offerta > 1.000 €', stato_cliente: 'attivo', ...x });
+  at: '2026-11-05T09:00:00Z', cliente_nome: 'X', tipo_argomento: 'Offerta del Tecnico Commerciale', stato_cliente: 'attivo', ...x });
 const pr = [
   P(1, { tipo: 'offerta_piccola', esito: 'chiusa_ok', esito_offerta: 'accettata', stato_corrente: 'contratto', sla_rispettato: true, closed_at: '2026-11-05T10:00:00Z' }),
   P(2, { tipo: 'offerta_piccola', stato_corrente: 'offerta', canale: 'tablet_tmq' }),

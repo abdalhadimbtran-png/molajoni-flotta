@@ -6,8 +6,8 @@ import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
 
 export const RESPONSABILITA: { k: string; l: string; d: string }[] = [
-  { k: 'offerte_grandi', l: 'Offerte oltre 1.000 €', d: 'Ricevono le offerte oltre 1.000 € (chi è disponibile) e sono in copia nelle prese in carico' },
-  { k: 'offerte_piccole', l: 'Offerte fino a 1.000 €', d: 'Le prepara e invia il centralino' },
+  { k: 'offerte_grandi', l: 'Offerte del Tecnico Commerciale', d: 'Ricevono le offerte passate dal centralino (chi è disponibile) e sono in copia nelle prese in carico' },
+  { k: 'offerte_piccole', l: 'Offerte gestite dal centralino', d: 'Le prepara e invia il centralino' },
   { k: 'sopralluoghi', l: 'Sopralluoghi', d: 'Tecnici commerciali che fanno il sopralluogo (in copia alla conferma)' },
   { k: 'amministrazione', l: 'Fatture / amministrazione', d: 'Tasto 2 del risponditore; al pomeriggio sul cellulare' },
   { k: 'fornitori', l: 'Fornitori', d: 'Tasto 3 del risponditore; lunedì e venerdì' },

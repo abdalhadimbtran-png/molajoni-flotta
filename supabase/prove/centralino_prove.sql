@@ -68,18 +68,32 @@ begin
   perform public.centralino_avanza(pid2, 'cliente', '{"informato_voce":true}');
   perform public.centralino_avanza(pid2, 'avviso', '{"alert_taylor":true}');
   if (select esito from public.pratiche where id = pid2) <> 'chiusa_ok' then raise exception 'Sopralluogo minimo non chiuso'; end if;
-  -- soglia: 999,99 resta al centralino, 1.000 va al Tecnico Commerciale
-  r := public.centralino_crea('{"canale":"tablet_tmq","tipo":"offerta","importo_stimato":1000,"cliente_nome":"ZZ Bar Prova"}');
-  if r->>'tipo' <> 'offerta_piccola' then raise exception 'Soglia 999,99: %', r; end if;
+  -- offerte: instradate per «chi la gestisce», l'importo non conta
+  r := public.centralino_crea('{"canale":"tablet_tmq","tipo":"offerta","gestione":"centralino","importo_stimato":50000,"cliente_nome":"ZZ Bar Prova"}');
+  if r->>'tipo' <> 'offerta_piccola' then raise exception 'Gestita da Jennifer: %', r; end if;
   begin
-    perform public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","importo_stimato":1000,"cliente_nome":"X"}');
-    raise exception 'offerta da 1.000 senza commerciale: doveva fallire';
-  exception when others then if sqlerrm not like 'Offerta da 1.000%' then raise; end if; end;
-  r := public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","importo_stimato":1000.01,"cliente_nome":"ZZ Ditta Prova","commerciale_nome":"A. Querini"}');
+    perform public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","importo_stimato":1500,"cliente_nome":"X"}');
+    raise exception 'offerta senza gestione: doveva fallire';
+  exception when others then if sqlerrm <> 'Scegli chi gestisce l''offerta' then raise; end if; end;
+  begin
+    perform public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","gestione":"commerciale","cliente_nome":"X"}');
+    raise exception 'offerta commerciale senza commerciale: doveva fallire';
+  exception when others then if sqlerrm not like 'Offerta passata al Tecnico Commerciale%' then raise; end if; end;
+  r := public.centralino_crea('{"canale":"whatsapp","tipo":"offerta","gestione":"commerciale","importo_stimato":10,"cliente_nome":"ZZ Ditta Prova","commerciale_nome":"A. Querini"}');
   pid2 := (r->>'id')::bigint;
-  if r->>'tipo' <> 'offerta_grande' then raise exception 'Soglia 1000: %', r; end if;
+  if r->>'tipo' <> 'offerta_grande' then raise exception 'Passata al commerciale: %', r; end if;
   if not exists (select 1 from public.chiamate_trasferite where pratica_id = pid2 and modalita = 'richiamo' and destinatario_nome = 'A. Querini'
-                 and richiamo_scadenza is not null) then raise exception 'Offerta da 1.000: richiamo 2 ore non creato'; end if;
+                 and richiamo_scadenza is not null) then raise exception 'Offerta commerciale: richiamo 2 ore non creato'; end if;
+  -- compatibilità: vecchio client con tipo offerta_piccola e importo alto resta a Jennifer
+  r := public.centralino_crea('{"canale":"email","tipo":"offerta_piccola","importo_stimato":9999,"cliente_nome":"ZZ Vecchio Client"}');
+  if r->>'tipo' <> 'offerta_piccola' then raise exception 'Compatibilità importo: %', r; end if;
+  -- passa al Tecnico Commerciale durante la preparazione
+  perform public.centralino_passa_commerciale((r->>'id')::bigint, 'A. Querini');
+  if (select tipo || '/' || stato_corrente from public.pratiche where id = (r->>'id')::bigint) <> 'offerta_grande/ricevuta' then raise exception 'Passaggio al commerciale non riuscito'; end if;
+  if not exists (select 1 from public.pratiche_eventi where pratica_id = (r->>'id')::bigint and tipo = 'modifica' and dati->>'a_tipo' = 'offerta_grande') then raise exception 'Passaggio: evento mancante'; end if;
+  if not exists (select 1 from public.chiamate_trasferite where pratica_id = (r->>'id')::bigint and modalita = 'richiamo' and richiamo_scadenza is not null) then raise exception 'Passaggio: richiamo mancante'; end if;
+  begin perform public.centralino_passa_commerciale((r->>'id')::bigint, 'A. Querini'); raise exception 'doppio passaggio permesso';
+  exception when others then if sqlerrm not like 'Solo le offerte gestite da Jennifer%' then raise; end if; end;
   perform public.centralino_crea('{"canale":"email","tipo":"modifica","sottotipo":"Anagrafica","cliente_nome":"ZZ Studio Prova"}');
   perform public.centralino_chiamata_info('telefono', 'orari ufficio');
 
@@ -108,12 +122,12 @@ begin
   if not ok then raise exception 'Chiusura automatica all''ultimo passo mancata'; end if;
   select count(*) into n from public.pratiche_eventi where pratica_id = pid;
   if n < 6 then raise exception 'Storia incompleta: % eventi', n; end if;
-  -- offerta da 1.000: email al cliente, riepilogo al commerciale, poi chiusa (nessun esito)
+  -- offerta al Tecnico Commerciale: email al cliente, riepilogo al commerciale, poi chiusa (nessun esito)
   begin perform public.centralino_avanza(pid2, 'email_cliente'); raise exception 'email cliente non inviata: passo permesso';
   exception when others then if sqlerrm not like 'Per «%» manca%' then raise; end if; end;
   perform public.centralino_avanza(pid2, 'email_cliente', '{"informato_voce":true}');  -- email non disponibile, informato a voce
   perform public.centralino_invia_email(pid2, 'riepilogo_commerciale', 'querini@prova.invalid', '{}', 'Riepilogo', '<p>x</p>', 'x', 'copia', 'riepilogo');
-  if (select esito from public.pratiche where id = pid2) <> 'chiusa_ok' then raise exception 'Offerta da 1.000 non chiusa dopo il riepilogo'; end if;
+  if (select esito from public.pratiche where id = pid2) <> 'chiusa_ok' then raise exception 'Offerta commerciale non chiusa dopo il riepilogo'; end if;
   if exists (select 1 from public.pratiche_flussi f, jsonb_array_elements(f.stadi) s where f.attivo and (s->>'key' = 'esito' or s->'requisiti' ? 'esito')) then raise exception 'Passo «esito» ancora presente'; end if;
   -- email solo registrata (copia)
   pid2 := (select id from public.pratiche where cliente_nome = 'ZZ Uffici Prova');
@@ -280,3 +294,4 @@ begin
   execute 'reset role';
   raise exception 'PROVE TRASFERIMENTI OK';
 end $$;
+

@@ -10,9 +10,9 @@ import AzzeraDati from './AzzeraDati';
 
 interface Riga { chiave: string; valore: unknown; descrizione: string | null }
 const NOMI: Record<string, string> = {
-  orario: 'Orario d\'ufficio', soglia_arancio: 'Soglia arancio', cc_offerte_grandi: 'Copia per offerte oltre 1.000 €', amministrazione: 'Amministrazione', fornitori: 'Fornitori',
+  orario: 'Orario d\'ufficio', soglia_arancio: 'Soglia arancio', cc_offerte_grandi: 'Copia per offerte del Tecnico Commerciale', amministrazione: 'Amministrazione', fornitori: 'Fornitori',
   commerciali: 'Commerciali', responsabili_info: 'Responsabili (informazioni)', firma: 'Firma email', sostituto: 'Sostituto del centralino',
-  mesi_cliente_attivo: 'Mesi per «cliente attivo»', commerciali_offerte_grandi: 'Commerciali per offerte oltre 1.000 € (email = account)', motivi_annullamento: 'Motivi di annullamento', motivi_senza_email: 'Motivi «email non disponibile»', motivi_spostamento: 'Motivi di spostamento', trasferimento_sla: 'Tempo per richiamare (trasferimenti)', destinatari_trasferimento: 'Destinatari dei trasferimenti',
+  mesi_cliente_attivo: 'Mesi per «cliente attivo»', commerciali_offerte_grandi: 'Tecnici Commerciali per le offerte (email = account)', motivi_annullamento: 'Motivi di annullamento', motivi_senza_email: 'Motivi «email non disponibile»', motivi_spostamento: 'Motivi di spostamento', trasferimento_sla: 'Tempo per richiamare (trasferimenti)', destinatari_trasferimento: 'Destinatari dei trasferimenti',
 };
 const DERIVATE = ['mappa_import_clienti', 'commerciali_offerte_grandi', 'cc_offerte_grandi', 'commerciali', 'amministrazione', 'fornitori', 'sostituto', 'destinatari_trasferimento', 'responsabili_info'];
 const DESC_SLA = 'sla: {"tipo":"minuti|ore|stesso_giorno|giorni_lav","valore":N,"da":"creazione|ingresso"}';

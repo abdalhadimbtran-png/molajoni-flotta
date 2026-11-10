@@ -1,17 +1,17 @@
 import { FormEvent, useCallback, useRef, useState } from 'react';
-import { tabRoving, tastiRadio, useListaTastiera } from './tastiera';
+import { useListaTastiera } from './tastiera';
 import { Link } from 'react-router-dom';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { NOME_TIPO, TIPI_CONTATTO, senzaCliente, senzaReferente, senzaRiepilogo, type Commerciale, type Pratica, type TipoContatto, type Trasferimento } from '../lib/centralino/tipi';
+import { NOME_TIPO, senzaCliente, senzaReferente, senzaRiepilogo, type Commerciale, type Pratica, type TipoContatto, type Trasferimento } from '../lib/centralino/tipi';
 import { daRoma, giornoRoma, partiRoma, prossimoLavorativo, scadenzaSla, semaforo, testoResiduo } from '../lib/centralino/sla';
 import { useAdesso, useAggiornamento, useConfig } from './comune';
 import EmailTrasferimento from './EmailTrasferimento';
 import { useCtx } from './ShellCentralino';
 import { ChiBadge, Conto } from './componenti';
 
-const ARGOMENTI = ['Offerta fino a 1.000 €', 'Offerta oltre 1.000 €', 'Sopralluogo', 'Manutenzione / guasto', 'Fatture / amministrazione', 'Fornitori', 'Reclamo', 'Informazione'];
+const ARGOMENTI = ['Offerta gestita dal centralino', 'Offerta del Tecnico Commerciale', 'Sopralluogo', 'Manutenzione / guasto', 'Reclamo', 'Informazione'];
 type Entro = '30m' | '1h' | '2h' | 'pom' | 'dom' | 'scelta';
 const ENTRO: { v: Entro; l: string }[] = [
   { v: '30m', l: '30 minuti' }, { v: '1h', l: '1 ora' }, { v: '2h', l: '2 ore' }, { v: 'pom', l: 'Oggi pomeriggio' }, { v: 'dom', l: 'Domani mattina' }, { v: 'scelta', l: 'Quando preferisce il cliente' },
@@ -48,7 +48,7 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
   const [arg, setArg] = useState('');
   const [entro, setEntro] = useState<Entro | ''>('2h');
   const [scelta, setScelta] = useState('');
-  const [chi, setChi] = useState<TipoContatto>(pratica?.tipo_contatto ?? 'cliente');
+  const [chi] = useState<TipoContatto>(pratica?.tipo_contatto ?? 'cliente');
   const [cli, setCli] = useState({ nome: pratica?.cliente_nome ?? '', telefono: pratica?.telefono ?? '', email: pratica?.email ?? '' });
   const [err, setErr] = useState<string | null>(null); const [invio, setInvio] = useState(false);
   const [riepilogo, setRiepilogo] = useState<Trasferimento | null>(null);
@@ -80,11 +80,8 @@ export function ModaleTrasferimento({ pratica, onClose, onFatto }: { pratica?: P
           <button type="button" className={modo === 'trasferita' ? 'on' : ''} onClick={() => setModo('trasferita')}>Trasferita</button>
           <button type="button" className={modo === 'richiamo' ? 'on' : ''} onClick={() => setModo('richiamo')}>Responsabile non disponibile</button>
         </div>
-        {!pratica && <div className="segmented ct-chips" role="radiogroup" aria-label="Chi chiama" onKeyDown={tastiRadio}>
-          {TIPI_CONTATTO.map((x, i) => <button type="button" key={x.v} role="radio" aria-checked={chi === x.v} tabIndex={tabRoving(chi === x.v, i, true)} className={chi === x.v ? 'on' : ''} onClick={() => setChi(x.v)}><span className="k-n" aria-hidden>{i + 1}</span>{x.l}</button>)}
-        </div>}
         {!pratica && <div className="ct-griglia">
-          <div className="field"><label htmlFor="tr-cli">{chi === 'cliente' ? 'Cliente' : TIPI_CONTATTO.find(x => x.v === chi)!.campo}</label><input id="tr-cli" value={cli.nome} onChange={e => setCli({ ...cli, nome: e.target.value })} /></div>
+          <div className="field"><label htmlFor="tr-cli">Cliente</label><input id="tr-cli" value={cli.nome} onChange={e => setCli({ ...cli, nome: e.target.value })} /></div>
           <div className="field"><label htmlFor="tr-tel">Telefono</label><input id="tr-tel" type="tel" value={cli.telefono} onChange={e => setCli({ ...cli, telefono: e.target.value })} /></div>
           <div className="field"><label htmlFor="tr-em">Email (per il riepilogo)</label><input id="tr-em" type="email" value={cli.email} onChange={e => setCli({ ...cli, email: e.target.value })} /></div>
         </div>}
@@ -114,7 +111,7 @@ export async function trasferimenti(da?: string, praticaId?: number): Promise<Tr
   if (praticaId) q = q.eq('pratica_id', praticaId);
   const { data, error } = await q; if (error) throw error; return (data ?? []) as Trasferimento[];
 }
-/** Coda del centralino: esclusi i richiami del commerciale (offerte oltre 1.000 €). */
+/** Coda del centralino: esclusi i richiami del commerciale (offerte passate al Tecnico Commerciale). */
 export const daRichiamare = (l: Trasferimento[]) => l.filter(t => t.richiamo_scadenza && !t.richiamato_at && !t.solo_commerciale);
 
 export function RigaTrasf({ t, ora, onRichiamato, onRiepilogo, base }: { t: Trasferimento; ora: Date; onRichiamato?: (t: Trasferimento) => void; onRiepilogo?: (t: Trasferimento) => void; base: string }) {
@@ -177,7 +174,7 @@ export default function Trasferimenti() {
   );
 }
 
-/** Disponibilità di L. Esposito, A. Chiaradonna, A. Querini per le offerte oltre 1.000 € (le imposta il centralino o la persona stessa). */
+/** Disponibilità di L. Esposito, A. Chiaradonna, A. Querini per le offerte passate al Tecnico Commerciale (le imposta il centralino o la persona stessa). */
 function Disponibilita() {
   const { data, reload } = useLoad(() => rpc<Commerciale[]>('centralino_commerciali', {}).catch(() => null));
   if (!data?.length) return null;
@@ -185,7 +182,7 @@ function Disponibilita() {
     try { await rpc('centralino_imposta_disponibile', { p_nome: c.nome, p_disponibile: c.occupato }); reload(); } catch (e) { toast(testoErrore(e)); }
   }
   return (
-    <section className="ct-blocco"><h2>Commerciali per offerte oltre 1.000 €</h2>
+    <section className="ct-blocco"><h2>Tecnici Commerciali per le offerte</h2>
       <div className="ct-disp">{data.map(c => (
         <div key={c.nome} className={`ct-disp-i ${c.disponibile ? 'si' : 'no'}`}>
           <b>{c.nome}</b><span className="sub">{c.assente ? 'assente oggi (ferie/permesso)' : c.occupato ? 'occupato' : c.disponibile ? 'disponibile' : 'non disponibile'}{!c.email ? ' · email da inserire' : ''}</span>

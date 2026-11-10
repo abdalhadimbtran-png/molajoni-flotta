@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { fmtOra } from '../lib/format';
 import { conto, orologio, semaforo, testoRegola } from '../lib/centralino/sla';
 import { useAdesso, useConfig } from './comune';
-import { ESITI, FASCE, NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, nomeCanale, prossimoStadio, stadioDi, type Evento, type Flusso, type Pratica } from '../lib/centralino/tipi';
+import { ESITI, FASCE, NOME_TIPO, STATI_CLIENTE, nomeCanale, prossimoStadio, stadioDi, type Evento, type Flusso, type Pratica } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 
 /** Icone del centralino (canali e tipi di richiesta), tratto 1.75. */
@@ -66,10 +66,9 @@ export function SlaChip({ p, soglia, regola }: { p: Pick<Pratica, 'created_at' |
 }
 
 /** Badge «Chi chiama». `soloNonClienti`: negli elenchi il caso normale (cliente) non si mostra se non serve. */
-export function ChiBadge({ t, soloNonClienti }: { t?: string | null; soloNonClienti?: boolean }) {
-  const x = TIPI_CONTATTO.find(k => k.v === (t ?? 'cliente')) ?? TIPI_CONTATTO[0];
-  if (soloNonClienti && x.v === 'cliente') return null;
-  return <span className={`ct-mini ct-chi chi-${x.v}`} title={`Chi chiama: ${x.l}`}>{x.l}</span>;
+/** Il centralino gestisce solo clienti: il badge «chi chiama» non si mostra più. */
+export function ChiBadge(_: { t?: string | null; soloNonClienti?: boolean }) {
+  return null;
 }
 export const nomeStadio = (f: Flusso | undefined, k: string | null) => stadioDi(f, k)?.nome ?? k ?? '';
 

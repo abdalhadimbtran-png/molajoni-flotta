@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Errore, useLoad } from '../ui';
-import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, type Pratica } from '../lib/centralino/tipi';
+import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, type Pratica } from '../lib/centralino/tipi';
 import { CAMPI_PRATICA, useAdesso, useConfig } from './comune';
 import { ChiBadge, Ic, SlaChip, iconaTipo, nomeStadio, regolaDi } from './componenti';
 import { Scheletro } from './Scheletro';
@@ -28,7 +28,7 @@ export default function Pratiche() {
   const [vista, setVista] = useState<Vista>('aperte');
   const [da, setDa] = useState(new Date(oggi.getFullYear(), oggi.getMonth(), 1).toISOString().slice(0, 10));
   const [a, setA] = useState(oggi.toISOString().slice(0, 10));
-  const [tipo, setTipo] = useState(''); const [esito, setEsito] = useState(''); const [canale, setCanale] = useState(''); const [q, setQ] = useState(''); const [stato, setStato] = useState(''); const [chi, setChi] = useState('');
+  const [tipo, setTipo] = useState(''); const [esito, setEsito] = useState(''); const [canale, setCanale] = useState(''); const [q, setQ] = useState(''); const [stato, setStato] = useState(''); const [chi] = useState('');
   const { data, errore, reload } = useLoad(async () => {
     let x = supabase.from('pratiche').select(CAMPI_PRATICA);
     if (vista === 'aperte') x = x.eq('esito', 'aperta').order('sla_scadenza', { ascending: true, nullsFirst: false });
@@ -53,7 +53,6 @@ export default function Pratiche() {
           <div className="ct-split-f">
             <select aria-label="Tipo" value={tipo} onChange={e => setTipo(e.target.value)}><option value="">Tutti i tipi</option>{Object.entries(NOME_TIPO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
             <select aria-label="Canale" value={canale} onChange={e => setCanale(e.target.value)}><option value="">Canali</option>{CANALI.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}</select>
-            <select aria-label="Chi chiama" value={chi} onChange={e => setChi(e.target.value)}><option value="">Chi chiama</option>{TIPI_CONTATTO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
             <select aria-label="Stato cliente" value={stato} onChange={e => setStato(e.target.value)}><option value="">Clienti</option>{Object.entries(STATI_CLIENTE).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>
             {vista !== 'aperte' && <select aria-label="Stato" value={esito} onChange={e => setEsito(e.target.value)}><option value="">Stato</option>{Object.entries(ESITI).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>}
           </div>

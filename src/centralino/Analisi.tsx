@@ -4,7 +4,7 @@ import { supabase, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Errore, toast, useLoad } from '../ui';
 import { testoCella, type Col, type Report, type Riga } from '../admin/report/catalogo';
-import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, eCliente, nomeCanale, nomeTipoContatto, type Esito } from '../lib/centralino/tipi';
+import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, eCliente, nomeCanale, nomeTipoContatto, type Esito } from '../lib/centralino/tipi';
 import { KPI, kpi, valuta, type Filtri, type RecInfo, type RecPratica, type RecTrasf } from '../lib/centralino/registro';
 import { orologio } from '../lib/centralino/sla';
 import { datiPeriodo } from './Direzione';
@@ -14,9 +14,9 @@ import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
 
 const c = (k: string, l: string, t: Col['t'], w: number, tot?: boolean): Col => ({ k, l, t, w, tot });
-const COL_PRATICHE: Col[] = [c('numero', 'Numero', 'testo', 15), c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 11), c('tipo', 'Tipo', 'testo', 20), c('chi', 'Chi chiama', 'testo', 12), c('cliente', 'Nome', 'testo', 24),
+const COL_PRATICHE: Col[] = [c('numero', 'Numero', 'testo', 15), c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 11), c('tipo', 'Tipo', 'testo', 20), c('cliente', 'Nome', 'testo', 24),
   c('stato_cliente', 'Cliente è', 'testo', 11), c('referente', 'Assegnata a', 'testo', 15), c('stadio', 'Passo', 'testo', 18), c('scadenza', 'Scadenza', 'dataora', 15), c('ritardo', 'Ritardo', 'testo', 10), c('esito', 'Stato', 'testo', 12), c('importo', 'Importo', 'euro', 11, true)];
-const COL_TRASF: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('chi', 'Chi chiama', 'testo', 12), c('cliente', 'Nome', 'testo', 22), c('stato_cliente', 'Cliente è', 'testo', 11), c('referente', 'Referente', 'testo', 16), c('argomento', 'Argomento', 'testo', 18),
+const COL_TRASF: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('cliente', 'Nome', 'testo', 22), c('stato_cliente', 'Cliente è', 'testo', 11), c('referente', 'Referente', 'testo', 16), c('argomento', 'Argomento', 'testo', 18),
   c('esito', 'Modalità', 'testo', 16), c('scadenza', 'Richiamo entro', 'dataora', 15), c('richiamato', 'Richiamato', 'dataora', 15), c('ritardo', 'Ritardo', 'testo', 10), c('email_ref', 'Email referente', 'testo', 10), c('email_cli', 'Email cliente', 'testo', 10)];
 const COL_INFO: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 12), c('cliente', 'Cliente / nota', 'testo', 40), c('tipo', 'Tipo', 'testo', 20)];
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -101,7 +101,6 @@ export default function Analisi() {
           <select aria-label="Destinatario" value={f.dest ?? ''} onChange={e => imposta('dest', e.target.value)}><option value="">Tutti i destinatari</option>{dest.map(x => <option key={x}>{x}</option>)}</select>
           <select aria-label="Argomento" value={f.arg ?? ''} onChange={e => imposta('arg', e.target.value)}><option value="">Tutti gli argomenti</option>{arg.map(x => <option key={x}>{x}</option>)}</select>
         </>}
-        {!def.conInfo && <select aria-label="Chi chiama" value={f.chi ?? ''} onChange={e => imposta('chi', e.target.value)}><option value="">Chi chiama: tutti</option>{TIPI_CONTATTO.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>}
         {!def.conInfo && <select aria-label="Stato cliente" value={f.stato ?? ''} onChange={e => imposta('stato', e.target.value)}><option value="">Tutti i clienti</option>{Object.entries(STATI_CLIENTE).map(([k, x]) => <option key={k} value={k}>{x[1]}</option>)}</select>}
         <button className="btn btn-sm" onClick={() => esporta('pdf')} disabled={!righe.length || !!esporto}>{esporto === 'pdf' ? 'Preparo…' : 'PDF'}</button>
         <button className="btn-ghost btn-sm" onClick={() => esporta('xlsx')} disabled={!righe.length || !!esporto}>{esporto === 'xlsx' ? 'Preparo…' : 'Excel'}</button>

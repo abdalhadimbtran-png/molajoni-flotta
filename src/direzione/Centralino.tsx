@@ -11,7 +11,7 @@ import { nomeStadio } from '../centralino/componenti';
 import KpiTrasferimenti from '../centralino/KpiTrasferimenti';
 import { calcolaKpi, durata } from '../lib/centralino/kpi';
 import { kpi, linkAnalisi, valuta, type RecPratica } from '../lib/centralino/registro';
-import { CANALI, NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, nomeCanale, type StatoCliente } from '../lib/centralino/tipi';
+import { CANALI, NOME_TIPO, STATI_CLIENTE, nomeCanale, type StatoCliente } from '../lib/centralino/tipi';
 import { testoResiduo } from '../lib/centralino/sla';
 import { giorniTra, heatmap, intervallo, perCommerciale, piuGiorni, precedente, primaRisposta, slaPerPasso, trend, valore, type Periodo } from '../lib/direzione/analisi';
 import { BASE, Barre, Cella, Delta, Info, Kpi, Sezione, oggiRoma } from './comuni';
@@ -92,7 +92,6 @@ export default function CentralinoDirezione() {
         <div className="dz-g4">
           <div className="dz-card"><h3>Per canale</h3><Barre v={CANALI.map(c => ({ l: nomeCanale(c.v), n: k.perCanale[c.v] ?? 0, prec: kp.perCanale[c.v] ?? 0, to: L('pratiche', { canale: c.v }) }))} /></div>
           <div className="dz-card"><h3>Per tipo di richiesta</h3><Barre v={tipi.map(t => ({ l: NOME_TIPO[t as 'manutenzione'], n: k.perTipo[t] ?? 0, prec: kp.perTipo[t] ?? 0, to: L('pratiche', { tipo: t }) }))} /></div>
-          <div className="dz-card"><h3>Chi chiama</h3><Barre v={TIPI_CONTATTO.map(x => ({ l: x.l, n: k.perTipoContatto[x.v] ?? 0, prec: kp.perTipoContatto[x.v] ?? 0, to: L('pratiche', { chi: x.v }) }))} /></div>
           <div className="dz-card"><h3>Stato del cliente <span className="sub">solo clienti</span></h3><Barre v={(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(s => ({ l: STATI_CLIENTE[s][1], n: k.perStatoCliente[s] ?? 0, prec: kp.perStatoCliente[s] ?? 0, to: L('pratiche', { stato: s }) }))} /></div>
         </div>
         <div className="dz-g2">
@@ -143,15 +142,15 @@ export default function CentralinoDirezione() {
           {scadute.length > 15 && <Link className="sub" to={L('in_ritardo')}>Tutte le {scadute.length} →</Link>}</div>
       </Sezione>
 
-      <Sezione id="offerte" titolo="Offerte" sub="Fino a 1.000 € le fa Jennifer; oltre 1.000 € passano ai Tecnici Commerciali">
+      <Sezione id="offerte" titolo="Offerte" sub="Jennifer le gestisce o le passa a un Tecnico Commerciale">
         <div className="dz-g2">
-          <div className="dz-card"><h3>Fino a 1.000 €</h3>
+          <div className="dz-card"><h3>Gestite da Jennifer</h3>
             <div className="kpis dz-kpis dz-k2">
               <Kpi id="off_piccole" titolo="Richieste" d={d} prev={p} da={da} a={a} sub={<>valore {fmtEuro(valore(piccole))}</>} />
               <Kpi id="offerte60" titolo="Inviate entro 60 min" d={d} prev={p} da={da} a={a} soglia={80} />
               <Kpi id="off_piccole_inviate" titolo="Inviate" d={d} prev={p} da={da} a={a} sub={<>valore {fmtEuro(valore(piccole.filter(x => valuta(kpi('off_piccole_inviate')!, d).righe.includes(x))))}</>} />
             </div></div>
-          <div className="dz-card"><h3>Oltre 1.000 €</h3>
+          <div className="dz-card"><h3>Passate al Tecnico Commerciale</h3>
             <div className="kpis dz-kpis dz-k2">
               <Kpi id="off_grandi" titolo="Richieste" d={d} prev={p} da={da} a={a} sub={<>valore {fmtEuro(valore(grandi))}</>} />
               <Kpi id="off_grandi_passate" d={d} prev={p} da={da} a={a} soglia={90} />

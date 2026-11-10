@@ -34,7 +34,7 @@ export interface Def {
 const P = (r: Rec) => r as RecPratica;
 const T = (r: Rec) => r as RecTrasf;
 const offerta = (t: string) => t === 'offerta_piccola' || t === 'offerta_grande';
-/** offerta ≤ 1.000 € inviata dal centralino; offerta oltre 1.000 € passata al commerciale (email al cliente fatta) */
+/** offerta gestita dal centralino inviata; offerta passata al commerciale (email al cliente fatta) */
 const inviata = (p: RecPratica) => ['offerta', 'email_cliente', 'riepilogo'].includes(p.stato_corrente) || (p.esito === 'chiusa_ok');
 const conCliente = (t: RecTrasf) => !!(t.email_cliente_inviata_at || t.email_riepilogo_at);
 const richiamoValutabile = (t: RecTrasf, ora: Date) => !!t.richiamo_scadenza && (!!t.richiamato_at || new Date(t.richiamo_scadenza) < ora);
@@ -52,15 +52,15 @@ export const KPI: Def[] = [
   { id: 'chiuse', titolo: 'Chiuse', spiegazione: 'Pratiche del periodo chiuse (tutti i passi fatti), annullate escluse.', fonte: 'pratiche', num: r => P(r).esito === 'chiusa_ok' || P(r).esito === 'chiusa_ko' },
   { id: 'sla', titolo: 'SLA rispettati', spiegazione: 'Numeratore: pratiche con SLA rispettato. Denominatore: pratiche con SLA già valutato (chiuse o con una scadenza superata).', fonte: 'pratiche', num: r => P(r).sla_rispettato === true, den: r => P(r).sla_rispettato != null },
   { id: 'sla_mancati', titolo: 'SLA mancati', spiegazione: 'Pratiche del periodo con almeno una scadenza non rispettata.', fonte: 'pratiche', num: r => P(r).sla_rispettato === false },
-  { id: 'offerte60', titolo: 'Offerte ≤ 1.000 € entro 60 min', spiegazione: 'Numeratore: offerte ≤ 1.000 € con il passo «Offerta inviata» fatto entro 60 minuti dalla richiesta. Denominatore: offerte ≤ 1.000 € già inviate.', fonte: 'pratiche',
+  { id: 'offerte60', titolo: 'Offerte del centralino entro 60 min', spiegazione: 'Numeratore: offerte gestite dal centralino con il passo «Offerta inviata» fatto entro 60 minuti dalla richiesta. Denominatore: offerte gestite dal centralino già inviate.', fonte: 'pratiche',
     num: (r, c) => P(r).tipo === 'offerta_piccola' && c.slaEv(P(r).id, 'offerta')?.dati?.sla_rispettato === true, den: (r, c) => P(r).tipo === 'offerta_piccola' && !!c.slaEv(P(r).id, 'offerta') },
   { id: 'interventi1h', titolo: 'Interventi: cliente informato entro 1 ora', spiegazione: 'Numeratore: interventi con il passo «Cliente informato» fatto entro 60 minuti dalla chiamata. Denominatore: interventi con il cliente già informato.', fonte: 'pratiche',
     num: (r, c) => P(r).tipo === 'manutenzione' && c.slaEv(P(r).id, 'cliente')?.dati?.sla_rispettato === true, den: (r, c) => P(r).tipo === 'manutenzione' && !!c.slaEv(P(r).id, 'cliente') },
   { id: 'sopralluoghi1h', titolo: 'Sopralluoghi: cliente informato entro 1 ora', spiegazione: 'Numeratore: sopralluoghi con il cliente informato entro 60 minuti. Denominatore: sopralluoghi con il cliente già informato.', fonte: 'pratiche',
     num: (r, c) => P(r).tipo === 'sopralluogo' && c.slaEv(P(r).id, 'cliente')?.dati?.sla_rispettato === true, den: (r, c) => P(r).tipo === 'sopralluogo' && !!c.slaEv(P(r).id, 'cliente') },
   { id: 'urgenti', titolo: 'Richieste urgenti', spiegazione: 'Interventi e sopralluoghi valutati «urgente» (da fare oggi).', fonte: 'pratiche', num: r => (r as RecPratica & { urgenza?: string | null }).urgenza === 'urgente' },
-  { id: 'off_richieste', titolo: 'Offerte richieste', spiegazione: 'Pratiche di offerta (≤ e > 1.000 €) del periodo.', fonte: 'pratiche', num: r => offerta(P(r).tipo) },
-  { id: 'off_inviate', titolo: 'Offerte evase dal centralino', spiegazione: 'Offerte fino a 1.000 € inviate dal centralino e offerte oltre 1.000 € passate al Tecnico Commerciale (email al cliente fatta).', fonte: 'pratiche', num: r => offerta(P(r).tipo) && inviata(P(r)) },
+  { id: 'off_richieste', titolo: 'Offerte richieste', spiegazione: 'Pratiche di offerta (gestite dal centralino e passate al Tecnico Commerciale) del periodo.', fonte: 'pratiche', num: r => offerta(P(r).tipo) },
+  { id: 'off_inviate', titolo: 'Offerte evase dal centralino', spiegazione: 'Offerte del centralino inviate dal centralino e offerte passate al Tecnico Commerciale passate al Tecnico Commerciale (email al cliente fatta).', fonte: 'pratiche', num: r => offerta(P(r).tipo) && inviata(P(r)) },
   // direzione: servizio, offerte, qualità
   { id: 'cliente1h', titolo: 'Cliente informato entro 1 ora', spiegazione: 'Numeratore: interventi e sopralluoghi con il passo «Cliente informato» fatto entro 60 minuti dalla chiamata. Denominatore: interventi e sopralluoghi con il cliente già informato.', fonte: 'pratiche',
     num: (r, c) => assistito(P(r)) && c.slaEv(P(r).id, 'cliente')?.dati?.sla_rispettato === true, den: (r, c) => assistito(P(r)) && !!c.slaEv(P(r).id, 'cliente') },
@@ -69,10 +69,10 @@ export const KPI: Def[] = [
   { id: 'urgenti_giornata', titolo: 'Urgenze gestite in giornata', spiegazione: 'Numeratore: richieste urgenti con il cliente informato (o la pratica chiusa) lo stesso giorno della chiamata. Denominatore: richieste urgenti del periodo, annullate escluse.', fonte: 'pratiche',
     num: (r, c) => { const p = P(r); if (p.urgenza !== 'urgente' || annullata(p)) return false; const e = c.slaEv(p.id, 'cliente'); const g = gR(p.created_at); return (!!e && gR(e.at) === g) || (!!p.closed_at && gR(p.closed_at) === g); },
     den: r => P(r).urgenza === 'urgente' && !annullata(P(r)) },
-  { id: 'off_piccole', titolo: 'Offerte fino a 1.000 €', spiegazione: 'Richieste di offerta fino a 1.000 € (gestite dal centralino) nel periodo.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_piccola' },
-  { id: 'off_piccole_inviate', titolo: 'Offerte fino a 1.000 € inviate', spiegazione: 'Offerte fino a 1.000 € con il passo «Offerta inviata» fatto o chiuse.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_piccola' && inviata(P(r)) },
-  { id: 'off_grandi', titolo: 'Offerte oltre 1.000 €', spiegazione: 'Richieste di offerta oltre 1.000 € (per il Tecnico Commerciale) nel periodo.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_grande' },
-  { id: 'off_grandi_passate', titolo: 'Passate ai commerciali', spiegazione: 'Numeratore: offerte oltre 1.000 € con l\'email al cliente fatta (passate al commerciale). Denominatore: offerte oltre 1.000 € non annullate.', fonte: 'pratiche',
+  { id: 'off_piccole', titolo: 'Offerte gestite dal centralino', spiegazione: 'Richieste di offerta gestite dal centralino nel periodo.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_piccola' },
+  { id: 'off_piccole_inviate', titolo: 'Offerte del centralino inviate', spiegazione: 'Offerte gestite dal centralino con il passo «Offerta inviata» fatto o chiuse.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_piccola' && inviata(P(r)) },
+  { id: 'off_grandi', titolo: 'Offerte del Tecnico Commerciale', spiegazione: 'Richieste di offerta passate al Tecnico Commerciale nel periodo.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_grande' },
+  { id: 'off_grandi_passate', titolo: 'Passate ai commerciali', spiegazione: 'Numeratore: offerte passate al Tecnico Commerciale con l\'email al cliente fatta (passate al commerciale). Denominatore: offerte passate al Tecnico Commerciale non annullate.', fonte: 'pratiche',
     num: r => P(r).tipo === 'offerta_grande' && inviata(P(r)), den: r => P(r).tipo === 'offerta_grande' && !annullata(P(r)) },
   { id: 'qual_email', titolo: 'Pratiche con email al cliente', spiegazione: 'Numeratore: pratiche con almeno un\'email inviata dal centralino. Denominatore: pratiche del periodo, annullate escluse.', fonte: 'pratiche',
     num: (r, c) => !annullata(P(r)) && c.email.has(P(r).id), den: r => !annullata(P(r)) },
@@ -100,11 +100,11 @@ export const KPI: Def[] = [
   { id: 'trasf_in_tempo', titolo: 'Richiamati entro la scadenza', spiegazione: 'Numeratore: richiami fatti entro la scadenza promessa. Denominatore: richiami già fatti o con scadenza superata.', fonte: 'trasferimenti',
     num: r => inTempo(T(r)), den: (r, c) => richiamoValutabile(T(r), c.ora) },
   { id: 'trasf_da_richiamare', titolo: 'Ancora da richiamare', spiegazione: 'Richiami promessi e non ancora fatti.', fonte: 'trasferimenti', num: r => !!T(r).richiamo_scadenza && !T(r).richiamato_at },
-  { id: 'richiami_dovuti', titolo: 'Richiami dovuti', spiegazione: 'Richiami del centralino (tutti i giorni) con scadenza già superata o entro 60 minuti; esclusi quelli del Tecnico Commerciale (offerte oltre 1.000 €).', fonte: 'trasferimenti', num: (r, c) => !T(r).solo_commerciale && !!T(r).richiamo_scadenza && !T(r).richiamato_at && new Date(T(r).richiamo_scadenza!).getTime() - c.ora.getTime() <= 3600e3 },
+  { id: 'richiami_dovuti', titolo: 'Richiami dovuti', spiegazione: 'Richiami del centralino (tutti i giorni) con scadenza già superata o entro 60 minuti; esclusi quelli del Tecnico Commerciale (offerte passate al Tecnico Commerciale).', fonte: 'trasferimenti', num: (r, c) => !T(r).solo_commerciale && !!T(r).richiamo_scadenza && !T(r).richiamato_at && new Date(T(r).richiamo_scadenza!).getTime() - c.ora.getTime() <= 3600e3 },
   { id: 'trasf_scadute', titolo: 'Scadute non richiamate', spiegazione: 'Richiami non fatti con la scadenza già superata.', fonte: 'trasferimenti', num: (r, c) => !!T(r).richiamo_scadenza && !T(r).richiamato_at && new Date(T(r).richiamo_scadenza!) < c.ora },
   { id: 'trasf_email_ref', titolo: 'Con email al referente', spiegazione: 'Numeratore: trasferimenti con l\'email inviata al referente. Denominatore: tutti i trasferimenti.', fonte: 'trasferimenti', num: r => !!T(r).email_referente_inviata_at, den: tutto },
   { id: 'trasf_email_cli', titolo: 'Con email al cliente', spiegazione: 'Numeratore: trasferimenti con l\'email di riepilogo al cliente. Denominatore: tutti i trasferimenti.', fonte: 'trasferimenti', num: r => conCliente(T(r)), den: tutto },
-  { id: 'comm_in_tempo', titolo: 'Richiami commerciali entro 2 ore', spiegazione: 'Numeratore: richiami dei Tecnici Commerciali (offerte oltre 1.000 €) fatti entro la scadenza. Denominatore: richiami dei commerciali già fatti o con scadenza superata.', fonte: 'trasferimenti',
+  { id: 'comm_in_tempo', titolo: 'Richiami commerciali entro 2 ore', spiegazione: 'Numeratore: richiami dei Tecnici Commerciali (offerte passate al Tecnico Commerciale) fatti entro la scadenza. Denominatore: richiami dei commerciali già fatti o con scadenza superata.', fonte: 'trasferimenti',
     num: r => !!T(r).solo_commerciale && inTempo(T(r)), den: (r, c) => !!T(r).solo_commerciale && richiamoValutabile(T(r), c.ora) },
   { id: 'comm_scaduti', titolo: 'Richiami commerciali scaduti', spiegazione: 'Richiami dei Tecnici Commerciali non ancora fatti con la scadenza (2 ore) già superata.', fonte: 'trasferimenti',
     num: (r, c) => !!T(r).solo_commerciale && !!T(r).richiamo_scadenza && !T(r).richiamato_at && new Date(T(r).richiamo_scadenza!) < c.ora },

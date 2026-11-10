@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Errore, useLoad } from '../ui';
 import { useT } from '../lib/i18n';
-import { NOME_TIPO, STATI_CLIENTE, TIPI_CONTATTO, nomeCanale, type Evento, type Pratica, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
+import { NOME_TIPO, STATI_CLIENTE, nomeCanale, type Evento, type Pratica, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
 import { linkAnalisi } from '../lib/centralino/registro';
 import { calcolaKpi, durata } from '../lib/centralino/kpi';
 import { Scheletro } from './Scheletro';
@@ -23,12 +23,12 @@ export interface DatiPeriodo extends Dataset { pratiche: Pratica[]; eventi: (Eve
 export async function datiPeriodo(da: string, a: string): Promise<DatiPeriodo> {
   const fine = `${a}T23:59:59`, ini = `${da}T00:00:00`;
   const [p, e, ap, t, inf, ch, ag] = await Promise.all([
-    supabase.from('pratiche').select(CAMPI_PRATICA).gte('created_at', ini).lte('created_at', fine).limit(5000),
+    supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').gte('created_at', ini).lte('created_at', fine).limit(5000),
     supabase.from('pratiche_eventi').select('*, pratiche(numero,cliente_nome)').gte('at', ini).lte('at', fine).order('at', { ascending: false }).limit(5000),
-    supabase.from('pratiche').select(CAMPI_PRATICA).eq('esito', 'aperta').limit(2000),
+    supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').eq('esito', 'aperta').limit(2000),
     supabase.from('chiamate_trasferite').select('*').gte('at', ini).lte('at', fine).order('at', { ascending: false }).limit(5000),
     supabase.from('centralino_chiamate_info').select('*').gte('at', ini).lte('at', fine).limit(5000),
-    supabase.from('pratiche').select(CAMPI_PRATICA).gte('closed_at', ini).lte('closed_at', fine).limit(5000),
+    supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').gte('closed_at', ini).lte('closed_at', fine).limit(5000),
     supabase.from('clienti_contatti_storia').select('contatto_id,at,campo,a,autore_nome').gte('at', ini).lte('at', fine).neq('campo', 'nuovo').limit(5000),
   ]);
   const err = p.error || e.error || ap.error || t.error || inf.error || ch.error || ag.error; if (err) throw err;
@@ -82,7 +82,6 @@ export default function Direzione() {
       <div className="ct-dir-g">
         <section className="ct-blocco"><h2>Per canale</h2><Barre v={Object.entries(k.perCanale).map(([x, n]) => [nomeCanale(x), n, linkAnalisi(ctx.base, 'pratiche', da, a, { canale: x })])} /></section>
         <section className="ct-blocco"><h2>Per tipo</h2><Barre v={Object.entries(k.perTipo).map(([x, n]) => [NOME_TIPO[x as 'manutenzione'] ?? x, n, linkAnalisi(ctx.base, 'pratiche', da, a, { tipo: x })])} /></section>
-        <section className="ct-blocco"><h2>Chi chiama</h2><Barre v={TIPI_CONTATTO.map(x => [x.l, k.perTipoContatto[x.v] ?? 0, linkAnalisi(ctx.base, 'pratiche', da, a, { chi: x.v })])} /></section>
         <section className="ct-blocco"><h2>Per stato del cliente <span className="sub">(solo clienti)</span></h2><Barre v={(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(x => [STATI_CLIENTE[x][1], k.perStatoCliente[x] ?? 0, linkAnalisi(ctx.base, 'pratiche', da, a, { stato: x })])} /></section>
         <section className="ct-blocco"><h2>Tempi medi per passo</h2>
           <table className="ct-tab"><tbody>{stadi.filter(s => k.tempiMedi[s] != null).map(s => <tr key={s}><td>{nomeSt(s)}</td><td className="num">{durata(k.tempiMedi[s])}</td></tr>)}</tbody></table>
@@ -94,7 +93,7 @@ export default function Direzione() {
           {([['Richieste', F.richieste, 'off_richieste'], ['Inviate', F.inviate, 'off_inviate']] as const).map(([l, n, id]) => (
             <Link key={l} to={linkAnalisi(ctx.base, id, da, a)} className="ct-funnel-r ct-clic"><span>{l}</span><span className="ct-funnel-b"><i style={{ width: `${(n / maxF) * 100}%` }} /></span><b>{n}</b></Link>))}
         </div>
-        <p className="sub">Valore richiesto {fmtEuro(F.valoreRichieste)} · evaso {fmtEuro(F.valoreInviate)} · offerte fino a 1.000 € in 60 min: <b>{pc(k.offerte60Pct)}</b></p>
+        <p className="sub">Valore richiesto {fmtEuro(F.valoreRichieste)} · evaso {fmtEuro(F.valoreInviate)} · offerte gestite dal centralino in 60 min: <b>{pc(k.offerte60Pct)}</b></p>
         <table className="ct-tab"><thead><tr><th>Cliente</th><th>Richieste</th><th>Evase</th><th>Valore</th></tr></thead>
           <tbody>{(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(s => { const x = k.funnelPerStato[s]; const L = (id: string, n: number) => <Link to={linkAnalisi(ctx.base, id, da, a, { stato: s })}>{n}</Link>; return <tr key={s}><td>{STATI_CLIENTE[s][1]}</td><td>{L('off_richieste', x.richieste)}</td><td>{L('off_inviate', x.inviate)}</td><td>{fmtEuro(x.valore)}</td></tr>; })}</tbody></table>
       </section>

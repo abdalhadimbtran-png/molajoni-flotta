@@ -1,6 +1,6 @@
 # Centralino (front office) e monitoraggio Direzione
 
-Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0053` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte > 1.000 €).
+Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0053` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte al Tecnico Commerciale).
 
 ## Struttura (rifacimento)
 Menu: **Oggi** (plancia: grande «Nuovo contatto», contatori del giorno cliccabili, coda «Adesso» per urgenza con conti alla rovescia, richiami dovuti, email da inviare, movimenti di oggi) · **Nuovo contatto** · **Pratiche** (vista divisa: elenco a sinistra, scheda a destra; `/centralino/pratica/:id`) · **Trasferimenti e richiami** · **Clienti** (ricerca, scheda con contatti, sedi, storico pratiche e chiamate, «Nuovo contatto per questo cliente») · **Analisi** (`/centralino/monitoraggio`) · Report · Modelli email · **Referenti** · Impostazioni. Barra in alto: stato in diretta (in scadenza 60 min, scadute, richiami dovuti → elenco).
@@ -11,7 +11,7 @@ Primo passo del Nuovo contatto: **Chi chiama** (Cliente · Fornitore · Collega 
 Badge «Chi chiama» in elenchi, scheda, ricerca (anche scrivendo «fornitore»/«collega»), Analisi (filtro `chi`) e report; Direzione: KPI «Chi chiama» per pratiche e trasferimenti; i KPI per stato cliente contano solo i clienti.
 
 ## Referenti e responsabilità (0053)
-`/centralino/referenti`: tabella `referenti` (nome, ruolo, email, telefono, cellulare, attivo, responsabilità: offerte > 1.000 €, ≤ 1.000 €, sopralluoghi, amministrazione, fornitori, interventi, sostituto, formazione, flotta, trasferte, abbigliamento). **Fonte unica**: un trigger riscrive le impostazioni derivate (`commerciali_offerte_grandi`, `cc_offerte_grandi`, `commerciali`, `destinatari_trasferimento`, `amministrazione`, `fornitori`, `sostituto`), non più modificabili a mano. Avvisi per responsabilità senza email o senza nessuno.
+`/centralino/referenti`: tabella `referenti` (nome, ruolo, email, telefono, cellulare, attivo, responsabilità: offerte del Tecnico Commerciale, offerte gestite dal centralino, sopralluoghi, amministrazione, fornitori, interventi, sostituto, formazione, flotta, trasferte, abbigliamento). **Fonte unica**: un trigger riscrive le impostazioni derivate (`commerciali_offerte_grandi`, `cc_offerte_grandi`, `commerciali`, `destinatari_trasferimento`, `amministrazione`, `fornitori`, `sostituto`), non più modificabili a mano. Avvisi per responsabilità senza email o senza nessuno.
 
 ## Import clienti da Taylor (formato reale)
 Intestazioni «Codice», «Ragione sociale», «Località», «Telefono», «Email» (spazi, maiuscole, accenti non contano; sinonimi Cod. cli., Cliente, Loc., Città, Tel, E-mail, Mail, PEC…). Colonne sconosciute mostrate come «non importate». Più numeri per cella (/ ; - ,): fisso → telefono, che inizia con 3 → cellulare, altri in rubrica; più email: prima → email, PEC → pec, altre in rubrica. «00186 ROMA (RM)» → CAP, comune, provincia. Doppioni per Codice: vince l'ultima riga. Blocchi da 500 righe con barra di avanzamento (10.000 righe ok). Logica in `src/lib/centralino/importa.ts` (test `importa.test.ts`).
@@ -27,7 +27,7 @@ Intestazioni «Codice», «Ragione sociale», «Località», «Telefono», «Ema
 | `/centralino/report` | centralino | Registro giornaliero, Pratiche per periodo, SLA, Funnel offerte, Chiamate trasferite (PDF/Excel) |
 | `/centralino/impostazioni` | centralino | Impostazioni e flussi (stadi/SLA) in JSON controllato |
 | `/direzione` | direzione, admin | Area Direzione (shell propria, `src/direzione/`): Panoramica di oggi (contatti, aperte, scadute, richiami commerciali scaduti, % SLA, cliente informato entro 1 ora, movimenti in diretta); Flotta/Personale/Formazione/Interventi «Prossimamente» |
-| `/direzione/centralino` | direzione, admin | Periodo Oggi/Settimana/Mese/Personalizzato con confronto ▲▼; Volumi (canale, tipo, chi chiama, stato cliente, heatmap giorno×ora, trend 30/90), Servizio (SLA per tipo e passo, tempi, prima risposta, scadute, urgenze in giornata), Offerte (≤/> 1.000 €, richiami per commerciale), Trasferimenti, Qualità, Registro di Jennifer, Movimenti; «Report direzione» PDF/Excel; interruttore email delle 18:00 |
+| `/direzione/centralino` | direzione, admin | Periodo Oggi/Settimana/Mese/Personalizzato con confronto ▲▼; Volumi (canale, tipo, chi chiama, stato cliente, heatmap giorno×ora, trend 30/90), Servizio (SLA per tipo e passo, tempi, prima risposta, scadute, urgenze in giornata), Offerte (gestite da Jennifer / passate al Tecnico Commerciale, richiami per commerciale), Trasferimenti, Qualità, Registro di Jennifer, Movimenti; «Report direzione» PDF/Excel; interruttore email delle 18:00 |
 | `/direzione/centralino/pratica/:id` | direzione | Stessa scheda, sola lettura |
 
 Scorciatoia **N** = nuovo contatto (fuori dai campi). Ricerca in alto: cliente, contatto, telefono (ultime 6 cifre), email, `CT-…`. Scheda «Centralino oggi» nella Panoramica dell'amministratore.
@@ -46,13 +46,13 @@ Giorni lavorativi lun–ven, festività (`festivita`) escluse, orario d'ufficio 
 |---|---|---|
 | Manutenzione (rev2, 0056) | Ricevuta (urgenza) → ★Inviato al coordinatore (email + «Telefonato») → ★Tecnico individuato (tecnico + quando) → ★Cliente informato (email «La contatterà il nostro tecnico {tecnico} {quando}») → Buono creato e tecnico avvisato (n. buono + Taylor + WhatsApp, avviso app facoltativo) → chiusa | **10 / 45 / 60 min** dalla chiamata; obiettivo: urgente = oggi, ordinario = entro 2 gg lav. |
 | Sopralluogo (rev2) | Stessi passi: coordinatore sopralluoghi → tecnico/commerciale → cliente informato (cc commerciale) → avviso inviato | 10 / 45 / 60 min |
-| Offerta fino a 1.000 € (gestita da Jennifer) | come da flusso in `pratiche_flussi` (0055), senza passo «Esito» | conferma 10 min, offerta 60 min dalla richiesta |
-| Offerta oltre 1.000 € (L. Esposito / A. Chiaradonna / A. Querini, il primo disponibile) | Ricevuta (commerciale) → ★Email al cliente «Entro 2 ore la contatterà il nostro Tecnico Commerciale {nome}» → ★Email di riepilogo al commerciale → chiusa per Jennifer | **10 / 15 min**; richiamo 2 ore per il commerciale sempre creato |
+| Offerta gestita da Jennifer (`offerta_piccola`) | come da flusso in `pratiche_flussi` (0055), senza passo «Esito» | conferma 10 min, offerta 60 min dalla richiesta |
+| Offerta passata al Tecnico Commerciale (`offerta_grande`; L. Esposito / A. Chiaradonna / A. Querini, il primo disponibile) | Ricevuta (commerciale) → ★Email al cliente «Entro 2 ore la contatterà il nostro Tecnico Commerciale {nome}» → ★Email di riepilogo al commerciale → chiusa per Jennifer | **10 / 15 min**; richiamo 2 ore per il commerciale sempre creato |
 | Modifica / anagrafica / disdetta | Ricevuta → ★Registrata → ★Evasione comunicata → Chiusa | in giornata; email entro giorno lav. successivo |
 | Amministrazione · Fornitori · Informazione (anche info@) | Ricevuta → ★Girata a Simona Colagrossi / Roberta Felci (lun/ven) / responsabile → Chiusa | in giornata |
 | Trasferta (alloggio TMQ) · Abbigliamento di lavoro | Ricevuta → ★Prenotato / Ordinato → Comunicata / Consegnato → Chiusa | 1 / 2 gg lav. |
 
-Regole: **un passo alla volta** (mai salti), ogni passo con i suoi requisiti (`requisiti`: urgenza, coordinatore, tecnico, buono, avviso, email, commerciale, destinatario, appuntamento, taylor); «Prossimo passo: … · manca: …» nella scheda (`centralino_prossimo`). Prima della fine si può solo **annullare** con motivo dall'elenco. Soglia: importo ≥ 1.000 € → Tecnico Commerciale; fino a 1.000 € → Jennifer. Nessun appuntamento al primo contatto per interventi e sopralluoghi. **Nessun «esito»**: la pratica si chiude quando l'ultimo passo è fatto, oppure si annulla con motivo. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
+Regole: **un passo alla volta** (mai salti), ogni passo con i suoi requisiti (`requisiti`: urgenza, coordinatore, tecnico, buono, avviso, email, commerciale, destinatario, appuntamento, taylor); «Prossimo passo: … · manca: …» nella scheda (`centralino_prossimo`). Prima della fine si può solo **annullare** con motivo dall'elenco. Offerte: **nessuna soglia di importo** (Jennifer non conosce l'importo prima di preparare l'offerta). Al primo contatto sceglie **«Gestita da Jennifer»** o **«Passa al Tecnico Commerciale»** (`centralino_crea` con `gestione` = `centralino` | `commerciale`; l'importo è facoltativo e non instrada). Un'offerta gestita da Jennifer ancora aperta si può **passare al Tecnico Commerciale** dalla scheda (`centralino_passa_commerciale`: tipo → `offerta_grande`, stadio → ricevuta, evento `modifica`, richiamo 2 ore). Nessun appuntamento al primo contatto per interventi e sopralluoghi. **Nessun «esito»**: la pratica si chiude quando l'ultimo passo è fatto, oppure si annulla con motivo. Semaforo: verde, **arancio** sotto il 25% del tempo (`soglia_arancio`), **rosso** scaduto. Controllo `privato.centralino_controlla_sla()` con pg_cron ogni 5 minuti (job `centralino_sla`) e all'apertura dell'area: evento `sla_scaduto` + campanella a centralino, direzione e admin (una volta per stadio).
 
 ### Modificare un flusso
 `/centralino/impostazioni` › Flussi: JSON `stadi` = `[{key, nome, sla?, azione?, template?}]`, `sla` = `{"tipo":"minuti|ore|stesso_giorno|giorni_lav","valore":N,"da":"creazione|ingresso"}`, `azione` = `appuntamento|taylor`, `template` = codice modello suggerito. `sla_sottotipi` per SLA diversi per sottotipo. Il primo stadio resta `ricevuta`; non rinominare chiavi già usate (la storia le conserva).
@@ -69,26 +69,26 @@ Tabella `appunti` (chiave `bozza` nel nuovo contatto, `p:<id>` nella pratica), s
 | Tecnico individuato (45 min) | `centralino_tecnici`: assenze e interventi di oggi; tecnico meno carico preselezionato; «quando» a scelta rapida (default da urgenza) o data/ora |
 | Cliente informato (60 min) | Inviato insieme alla conferma del tecnico («Conferma e informa il cliente») |
 | Buono creato e tecnico avvisato | N. buono + «Taylor + WhatsApp»; «Avviso urgente nell'app» facoltativo (`centralino_avviso_tecnico`, campanella al tecnico, registrato); poi chiusura automatica |
-| Offerte ≥ 1.000 € | Commerciale disponibile preselezionato; email al cliente (10 min) e riepilogo al commerciale (15 min) da un pulsante ciascuno; richiamo 2 ore per il commerciale |
-| Offerte ≤ 1.000 € | Restano a Jennifer |
+| Offerte passate al Tecnico Commerciale | Commerciale disponibile preselezionato; email al cliente (10 min) e riepilogo al commerciale (15 min) da un pulsante ciascuno; richiamo 2 ore per il commerciale |
+| Offerte gestite da Jennifer | Le prepara e invia Jennifer |
 | Mai l'anagrafica completa per email | Avviso nel nuovo contatto |
 
 **Clic dopo la chiamata** (salvata la pratica si apre il primo passo e, fatto un passo, si apre da solo il successivo; scorciatoia `A` = prossimo passo, Invio = conferma):
 - Manutenzione standard: coordinatore 1–2 (Invia e avanti; + Telefonato se fatto) · tecnico 2 (scelta tecnico + Conferma e informa il cliente; 1 se va bene quello proposto) · buono 2 (Taylor+WhatsApp + Chiudi; il numero si digita) → **6 clic** (5 col tecnico proposto).
 - Sopralluogo: uguale → **6 clic**.
-- Offerta oltre 1.000 €: Invia e avanti (cliente) + Invia e chiudi (riepilogo) → **2 clic** dopo il salvataggio.
+- Offerta passata al Tecnico Commerciale: Invia e avanti (cliente) + Invia e chiudi (riepilogo) → **2 clic** dopo il salvataggio.
 
 ## Campi obbligatori (0059)
 | Dove | Obbligatorio | Perché |
 |---|---|---|
 | Nuovo contatto | Canale, tipo, cliente **o** telefono | Senza non si richiama nessuno |
 | Intervento / sopralluogo | Urgenza (già proposta: allarme = Urgente, altrimenti Ordinario) | Decide l'obiettivo oggi / 2 gg lav. |
-| Offerta | Importo o pulsante «Oltre 1.000 €»; commerciale (primo disponibile già scelto) | Decide chi la fa |
+| Offerta | «Gestita da Jennifer» / «Passa al Tecnico Commerciale»; commerciale (primo disponibile già scelto) | Decide chi la fa |
 | Inviato al coordinatore | Coordinatore (già scelto) + email **o** «Telefonato» | Prova che è stato avvisato |
 | Tecnico individuato | Tecnico | «Quando» facoltativo (default «entro 1 ora» / «entro 2 giorni lavorativi») |
-| Cliente informato / email al cliente (offerta oltre 1.000 €) / evasione modifica | Email **o** «Informato a voce» | Promessa al cliente mantenuta |
+| Cliente informato / email al cliente (offerta passata al Tecnico Commerciale) / evasione modifica | Email **o** «Informato a voce» | Promessa al cliente mantenuta |
 | Avviso al tecnico | Almeno uno: Taylor, WhatsApp, app | N. buono facoltativo |
-| Riepilogo al commerciale, offerte fino a 1.000 € | Email | È il lavoro stesso del passo |
+| Riepilogo al commerciale, offerte passate al Tecnico Commerciale | Email | È il lavoro stesso del passo |
 | Girate | Destinatario (già proposto dai Referenti) | — |
 | Annulla | Motivo | Tracciabilità |
 
@@ -142,8 +142,8 @@ Oggetti: parola chiave in MAIUSCOLO come nella procedura + cliente + numero prat
 | Manutenzione (facoltativo) | `presa_intervento` | RICHIESTA INTERVENTO – PRESA IN CARICO – … |
 | Sopralluogo · coordinatore | `sopralluogo_coordinatore` | [Centralino] Sopralluogo da assegnare – … |
 | Sopralluogo · cliente (cc commerciale) | `sopralluogo_cliente` | CONFERMA APPUNTAMENTO – … (quando, Tecnico Commerciale, tel.) |
-| Offerta ≤ 1.000 € · conferma / offerta | `presa_offerta_piccola` / `invio_offerta` | PREVENTIVO – … («entro 60 minuti» / in allegato) |
-| Offerta > 1.000 € · cliente / commerciale | `presa_offerta_grande` / `riepilogo_commerciale` | RICHIESTA PREVENTIVO – PRESA IN CARICO – … / [Centralino] Preventivo oltre 1.000 € – … – richiamare entro le hh:mm |
+| Offerta gestita da Jennifer · conferma / offerta | `presa_offerta_piccola` / `invio_offerta` | PREVENTIVO – … («entro 60 minuti» / in allegato) |
+| Offerta al Tecnico Commerciale · cliente / commerciale | `presa_offerta_grande` / `riepilogo_commerciale` | RICHIESTA PREVENTIVO – PRESA IN CARICO – … / [Centralino] Preventivo da gestire – … – richiamare entro le hh:mm |
 | Offerta da tablet TMQ · inviato | `preventivo_tmq` (firma TMQ) | PREVENTIVO DA PARTE DEL TMQ VVF – … |
 | Modifica · evasione | `modifica_evasa` (Anagrafica → `conferma_anagrafica`, Disdetta → `conferma_disdetta`, `src/lib/centralino/passi.ts`) | RICHIESTA EVASA / AGGIORNAMENTO DATI / DISDETTA – CONFERMA DI RICEZIONE – … |
 | Girate | `girata_ufficio` | RICHIESTA INOLTRATA – … |
@@ -171,7 +171,7 @@ Il Centralino si usa tutto senza mouse. Helper in `src/centralino/tastiera.ts` (
 - <kbd>G</kbd> poi <kbd>O</kbd>/<kbd>P</kbd>/<kbd>T</kbd>/<kbd>C</kbd> → Oggi / Pratiche / Trasferimenti / Clienti (entro 1,2 s)
 - <kbd>Esc</kbd> chiude la finestra; in un campo toglie il focus; sulla scheda pratica torna indietro
 
-**Nuovo contatto**: all'apertura il focus è sul Canale. Canale, Cosa chiede, Dettaglio (sottotipo), Urgenza e Fino a/Oltre 1.000 € sono gruppi a scelta (`role="radiogroup"`, roving tabindex): <kbd>←</kbd><kbd>→</kbd>/<kbd>↑</kbd><kbd>↓</kbd> spostano, <kbd>Invio</kbd>/<kbd>Spazio</kbd> scelgono e portano al gruppo successivo, <kbd>1</kbd>–<kbd>9</kbd> scelgono la n-esima voce (il numero compare sulla voce quando il gruppo ha il focus). <kbd>Tab</kbd>/<kbd>Maiusc</kbd>+<kbd>Tab</kbd> tra gruppi e campi. Cliente: <kbd>↑</kbd><kbd>↓</kbd> nei suggerimenti, <kbd>Invio</kbd> sceglie, <kbd>Esc</kbd> chiude l'elenco. <kbd>Ctrl</kbd>+<kbd>Invio</kbd> salva da qualunque punto.
+**Nuovo contatto**: all'apertura il focus è sul Canale. Canale, Cosa chiede, Dettaglio (sottotipo), Urgenza e Gestita da Jennifer / Passa al Tecnico Commerciale sono gruppi a scelta (`role="radiogroup"`, roving tabindex): <kbd>←</kbd><kbd>→</kbd>/<kbd>↑</kbd><kbd>↓</kbd> spostano, <kbd>Invio</kbd>/<kbd>Spazio</kbd> scelgono e portano al gruppo successivo, <kbd>1</kbd>–<kbd>9</kbd> scelgono la n-esima voce (il numero compare sulla voce quando il gruppo ha il focus). <kbd>Tab</kbd>/<kbd>Maiusc</kbd>+<kbd>Tab</kbd> tra gruppi e campi. Cliente: <kbd>↑</kbd><kbd>↓</kbd> nei suggerimenti, <kbd>Invio</kbd> sceglie, <kbd>Esc</kbd> chiude l'elenco. <kbd>Ctrl</kbd>+<kbd>Invio</kbd> salva da qualunque punto.
 
 **Passo (Avanza)**: focus sul primo campo; tendine con le frecce; caselle e «Telefonato» con <kbd>Spazio</kbd>; «Quando» è un gruppo a scelta; <kbd>Invio</kbd> = Avanti; <kbd>Esc</kbd> = chiudi.
 
@@ -184,7 +184,7 @@ Anello di focus: `--info` 2px + alone `--info-bg` (token Apple Light). Suggerime
 
 ## Prove
 - `npm test` → `src/lib/centralino/sla.test.ts` (SLA con weekend, festività, orario, ora legale; semaforo; modelli; KPI; trasferimenti).
-- `supabase/prove/centralino_prove.sql`: blocco DO annullato (RLS per ruolo incl. anon, storia solo in aggiunta, SLA, contatori, SLA scaduto, **ordine rigido dei passi**, requisiti Taylor/email, annullo, spostamento, **appunti solo dell'autore**, **offerte > 1.000 €** con richiamo 2 ore) + secondo blocco «PROVE TRASFERIMENTI OK» (richiamo, email al referente/cliente, richiamato, rubrica con storia e +39, import clienti con prova e protezione, permessi direzione/anon).
+- `supabase/prove/centralino_prove.sql`: blocco DO annullato (RLS per ruolo incl. anon, storia solo in aggiunta, SLA, contatori, SLA scaduto, **ordine rigido dei passi**, requisiti Taylor/email, annullo, spostamento, **appunti solo dell'autore**, **offerte per gestione** (Jennifer / Tecnico Commerciale, importo ignorato, compatibilità vecchi client, passaggio al commerciale) con richiamo 2 ore) + secondo blocco «PROVE TRASFERIMENTI OK» (richiamo, email al referente/cliente, richiamato, rubrica con storia e +39, import clienti con prova e protezione, permessi direzione/anon).
 - QA visivo: Playwright con dati finti a 1440, 1280 e 1024 px (home, pratica, direzione, dettaglio, trasferimenti, impostazioni, nuovo contatto, email doppia): nessun elemento fuori larghezza. Da eseguire in SQL editor: risultato atteso `PROVE CENTRALINO OK`. Il calcolo SLA è stato verificato sul database con 8 casi (tutti ok).
 
 ## Azzera dati di prova (solo admin)
@@ -193,3 +193,9 @@ Impostazioni › «Zona pericolosa»: conteggi esatti (`admin_centralino_contegg
 
 ## Area Direzione
 KPI nuovi nel registro: `cliente1h`, `sla_passo` (filtro `passo`), `urgenti_giornata`, `off_piccole(_inviate)`, `off_grandi(_passate)`, `comm_in_tempo`, `comm_scaduti`, `qual_email`, `annullate(_motivo)`, `senza_contatti`; filtri `ora`/`dow` (heatmap). Calcoli in `src/lib/direzione/analisi.ts` (test `analisi.test.ts`). Email delle 18:00: `supabase/da_confermare/direzione_digest.sql` (tabella `direzione_preferenze`, RPC `direzione_digest_imposta/stato`, job pg_cron `direzione_digest` lun–ven) **da applicare a mano**; finché manca, l'interruttore mostra «in attesa di attivazione». Resend in prova: l'email arriva solo all'indirizzo del titolare Resend. Prove RLS: `supabase/prove/direzione_prove.sql` (atteso `PROVE DIREZIONE OK`).
+
+## Solo richieste dei clienti (0071–0073, 10/11/2026)
+
+- Il centralino gestisce **solo richieste dei clienti**: niente selettore «Chi chiama» (nuovo contatto, liste, badge, filtri, KPI, Direzione). Colonna `tipo_contatto` e dati restano (predefinito `cliente`). «Collega / Tecnico» e «Tablet TMQ» restano come **canali** (fonte), il soggetto è sempre un cliente.
+- Cosa chiede: Intervento manutenzione, Sopralluogo, Offerta (Gestita da Jennifer / Passata al Tecnico Commerciale), Offerta da tablet TMQ, Modifica calendario/anagrafica/disdetta, Informazione al cliente. «Chiamata per un responsabile» resta, solo clienti.
+- **Fatture e Fornitori non sono pratiche**: flussi `amministrazione` e `fornitori` disattivati (dati conservati), esclusi da registro, KPI, Direzione e report. Restano solo le indicazioni del risponditore (tasto 2 → Simona Colagrossi, tasto 3 → Roberta Felci). `centralino_chiamata_girata` (0072) non è più eseguibile (0073); la colonna `centralino_chiamate_info.categoria` resta inutilizzata.

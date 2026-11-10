@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
-import { STATI_CLIENTE, nomeTipoContatto } from '../lib/centralino/tipi';
+import { STATI_CLIENTE } from '../lib/centralino/tipi';
 import { calcolaTrasf } from '../lib/centralino/kpi';
 import { linkAnalisi, valuta, kpi, type Dataset } from '../lib/centralino/registro';
 import { orologio, giornoRoma } from '../lib/centralino/sla';
@@ -52,8 +52,6 @@ export default function KpiTrasferimenti({ d, da, a, base, trend }: { d: Dataset
         <div><h3 className="ct-h3">Per argomento</h3>
           <table className="ct-tab"><thead><tr><th>Argomento</th><th>Chiamate</th><th>In tempo</th><th>Medio</th><th>Aperti</th></tr></thead>
             <tbody>{Object.entries(k.perArgomento).sort((x, y) => y[1].tot - x[1].tot).map(([n, g]) => riga(n, { arg: n }, g))}</tbody></table>
-          <h3 className="ct-h3">Chi chiama</h3>
-          <table className="ct-tab"><tbody>{Object.entries(k.perTipoContatto).map(([n, g]) => riga(nomeTipoContatto(n), { chi: n }, g))}</tbody></table>
           <h3 className="ct-h3">Per stato del cliente <span className="sub">(solo clienti)</span></h3>
           <table className="ct-tab"><tbody>{Object.entries(k.perStatoCliente).map(([n, g]) => riga(STATI_CLIENTE[n as 'nuovo']?.[1] ?? 'Non indicato', { stato: n }, g))}</tbody></table></div>
       </div>

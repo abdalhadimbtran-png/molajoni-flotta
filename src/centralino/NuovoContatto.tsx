@@ -23,11 +23,11 @@ function primoSla(f: Flusso | undefined, sottotipo: string): RegolaSla | null {
 /** Nuovo contatto: una schermata, pochi tocchi (obiettivo < 30 secondi). */
 export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?: { codice: string | null; nome: string; fonte?: 'taylor' | 'pratiche' }; onClose: () => void; onCreata: (id: number, dopo: string) => void }) {
   const { config } = useConfig();
-  const [chi, setChiStato] = useState<TipoContatto>('cliente');
+  const chi = 'cliente' as TipoContatto; // il centralino gestisce solo clienti
   const [canale, setCanale] = useState<Canale>('telefono');
   const [richiesta, setRichiesta] = useState<TipoPratica | 'offerta' | null>(null);
   const [sottotipo, setSottotipo] = useState('');
-  const [grande, setGrande] = useState(false);
+  const [gestione, setGestione] = useState<'centralino' | 'commerciale' | null>(null);
   const [importo, setImporto] = useState('');
   const [cli, setCli] = useState<Cliente | null>(null);
   const [q, setQ] = useState('');
@@ -54,21 +54,13 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [suggSel, setSuggSel] = useState(-1);
   const cliente_ = chi === 'cliente';
   const infoChi = TIPI_CONTATTO.find(x => x.v === chi)!;
-  // all'apertura: focus su «Chi chiama»
+  // all'apertura: focus sul Canale
   useEffect(() => { const k = window.setTimeout(() => focusGruppo(chiRef.current), 30); return () => window.clearTimeout(k); }, []);
 
-  /** «Chi chiama» ↔ «Cosa chiede»: Fornitore ⇄ Fornitori. */
-  function setChi(v: TipoContatto) {
-    if (v === chi) return;
-    setChiStato(v); setCli(null); setSugg([]); setSedi([]); setSede(''); setContatti([]); setContattoId(null); setStato(null); setStatoMan(false);
-    if (v === 'fornitore') { setRichiesta('fornitori'); setSottotipo(''); }
-    else if (richiesta === 'fornitori') { setRichiesta(null); setSottotipo(''); }
-  }
   function setRichiestaChi(v: TipoPratica | 'offerta') {
     setRichiesta(v); setSottotipo('');
-    if (v === 'fornitori' && chi !== 'fornitore') setChi('fornitore');
   }
-  const tipo: TipoPratica | null = richiesta === 'offerta' ? (canale === 'tablet_tmq' ? 'offerta_tablet' : grande || Number(importo) > 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
+  const tipo: TipoPratica | null = richiesta === 'offerta' ? (canale === 'tablet_tmq' ? 'offerta_tablet' : gestione === 'commerciale' ? 'offerta_grande' : 'offerta_piccola') : richiesta;
   const flusso = config?.flussi.find(x => x.tipo === tipo);
   const allarme = tipo === 'manutenzione' && sottotipo === 'Allarme sonoro attivo';
   const fest = config?.festivi ?? new Set<string>();
@@ -82,7 +74,6 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const urgente = urgenza === 'urgente';
   // urgenza proposta dal sottotipo (allarme sonoro → urgente)
   useEffect(() => { if (!conUrgenza) { setUrgenza(''); return; } if (allarme || (sottotipo && flusso?.sottotipi_urgenti.includes(sottotipo))) setUrgenza('urgente'); else setUrgenza('ordinario'); }, [sottotipo, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (richiesta === 'offerta' && importo) setGrande(Number(importo) > 1000); }, [importo, richiesta]);
   // commerciale: il primo disponibile già scelto
   useEffect(() => { if (tipo === 'offerta_grande' && !f.commerciale && comms.length) setF(x => ({ ...x, commerciale: (comms.find(c => c.disponibile) ?? comms[0]).nome })); }, [comms, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -145,11 +136,12 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const manca = useMemo(() => {
     const l: string[] = [];
     if (!tipo) l.push('cosa chiede');
+    if (richiesta === 'offerta' && canale !== 'tablet_tmq' && !gestione) l.push('chi gestisce l\'offerta');
     if (!q.trim() && !f.telefono.trim()) l.push(cliente_ ? 'cliente o telefono' : 'nome o telefono');
     if (conUrgenza && !urgenza) l.push('urgenza');
     if (tipo === 'offerta_grande' && !f.commerciale) l.push('commerciale');
     return l;
-  }, [tipo, q, f.telefono, urgenza, conUrgenza, f.commerciale]);
+  }, [tipo, gestione, richiesta, canale, q, f.telefono, urgenza, conUrgenza, f.commerciale]);
 
   async function salva(e?: FormEvent) {
     e?.preventDefault(); setErr(null);
@@ -157,7 +149,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     setInvio(true);
     try {
       const r = await rpc<{ id: number }>('centralino_crea', { p: {
-        canale, tipo, sottotipo: sottotipo || null, priorita: urgente ? 'urgente' : 'normale', urgenza: conUrgenza ? urgenza : null,
+        canale, tipo, gestione: tipo === 'offerta_grande' ? 'commerciale' : tipo === 'offerta_piccola' ? 'centralino' : null, sottotipo: sottotipo || null, priorita: urgente ? 'urgente' : 'normale', urgenza: conUrgenza ? urgenza : null,
         cliente_codice: cli?.codice ?? null, cliente_nome: q.trim(), sede: sede || null,
         contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, indirizzo: f.indirizzo, cap: f.cap, comune: f.comune, descrizione: f.descrizione,
         importo_stimato: richiesta === 'offerta' && importo ? Number(importo) : null,
@@ -168,7 +160,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
       if (!cliente_) await rpc('centralino_tipo_contatto', { p_pratica_id: r.id, p_trasf_id: null, p_tipo: chi });
       if (cliente_ && cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
       if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
-      // oltre 1.000 €: subito il passo «email al cliente» (richiamo 2 ore per il commerciale già creato)
+      // passata al Tecnico Commerciale: subito il passo «email al cliente» (richiamo 2 ore per il commerciale già creato)
       onCreata(r.id, tipo === 'offerta_grande' ? 'avanza=1' : conUrgenza ? 'avanza=1' : trasf ? 'trasferisci=1' : '');
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
@@ -180,22 +172,16 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         {canale === 'telefono' && <p className="ct-proc"><b>Risponditore:</b> 1 Manutenzione e Commerciale · 2 Fatture (pomeriggio: cellulare di Simona Colagrossi) · 3 Fornitori lun/ven (Roberta Felci) · <b>4 Emergenze tecniche h24</b> (tel. da definire)</p>}
         {canale === 'tablet_tmq' && tipo === 'offerta_tablet' && <p className="ct-proc"><b>Offerta da tablet TMQ:</b> verifica il preventivo in tutte le sue parti e invialo al cliente entro le 12:00 del giorno lavorativo successivo («PREVENTIVO DA PARTE DEL TMQ VVF», firma del TMQ).</p>}
 
-        <div className="ct-sez"><span className="ct-sez-n">1</span><b>Chi chiama?</b><span className="k-hint"><kbd>←</kbd><kbd>→</kbd> per scegliere · <kbd>Invio</kbd> per confermare · <kbd>1</kbd>–<kbd>9</kbd> scelta rapida</span></div>
-        <div className="segmented ct-chips ct-chi-sel" role="radiogroup" aria-label="Chi chiama" ref={chiRef} onKeyDown={tastiRadio}>
-          {TIPI_CONTATTO.map((x, i) => (
-            <button type="button" key={x.v} role="radio" aria-checked={chi === x.v} tabIndex={tabRoving(chi === x.v, i, true)} className={chi === x.v ? 'on' : ''} onClick={() => setChi(x.v)} title={x.breve}>
-              <span className="k-n" aria-hidden>{i + 1}</span>{x.l}</button>))}
-        </div>
 
-        <div className="ct-sez"><span className="ct-sez-n">2</span><b>Canale</b></div>
-        <div className="ct-big ct-big-canali" role="radiogroup" aria-label="Canale" onKeyDown={tastiRadio}>
+        <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b><span className="k-hint"><kbd>←</kbd><kbd>→</kbd> per scegliere · <kbd>Invio</kbd> per confermare · <kbd>1</kbd>–<kbd>9</kbd> scelta rapida</span></div>
+        <div className="ct-big ct-big-canali" role="radiogroup" aria-label="Canale" ref={chiRef} onKeyDown={tastiRadio}>
           {CANALI.map((c, i) => (
             <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} tabIndex={tabRoving(canale === c.v, i, true)} className={canale === c.v ? 'on' : ''} onClick={() => setCanale(c.v)}>
               <span className="k-n" aria-hidden>{i + 1}</span>
               <Ic n={iconaCanale(c.v)} size={22} /><span>{c.l}</span></button>))}
         </div>
 
-        <div className="ct-sez"><span className="ct-sez-n">3</span><b>Cosa chiede?</b></div>
+        <div className="ct-sez"><span className="ct-sez-n">2</span><b>Cosa chiede il cliente?</b></div>
         <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta" onKeyDown={tastiRadio}>
           {RICHIESTE.map((r, i) => (
             <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} tabIndex={tabRoving(richiesta === r.v, i, !!richiesta)} className={richiesta === r.v ? 'on' : ''}
@@ -203,7 +189,6 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
               <span className="k-n" aria-hidden>{i + 1}</span>
               <Ic n={r.ic} size={22} /><span><b>{r.l}</b><span className="sub">{r.breve}</span></span></button>))}
         </div>
-        {tipo === 'fornitori' && <p className="ct-proc"><b>Fornitori:</b> girata a {config?.impostazioni.fornitori?.nome || 'Roberta Felci'}{config?.impostazioni.fornitori?.giorni ? ` · ${config.impostazioni.fornitori.giorni}` : ' · lunedì e venerdì'}. Negli altri giorni: prendi nome e numero e registra il richiamo.</p>}
         {flusso && flusso.sottotipi.length > 0 && (
           <div className="field"><label id="ct-sotto-l">Dettaglio</label>
             <div className="segmented ct-chips" role="radiogroup" aria-labelledby="ct-sotto-l" onKeyDown={tastiRadio}>
@@ -226,18 +211,19 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             </div></div>
           <p className="ct-script">Nessun appuntamento ora. Di' al cliente: «Entro 1 ora la ricontattiamo per confermarle l'appuntamento».</p>
         </>)}
-        {richiesta === 'offerta' && (
+        {richiesta === 'offerta' && canale !== 'tablet_tmq' && (
           <div className="ct-riga">
-            <div className="segmented" role="radiogroup" aria-label="Valore" onKeyDown={tastiRadio}>
-              <button type="button" role="radio" aria-checked={!grande} tabIndex={tabRoving(!grande, 0, true)} className={!grande ? 'on' : ''} onClick={() => { setGrande(false); if (Number(importo) > 1000) setImporto(''); }}><span className="k-n" aria-hidden>1</span>Fino a 1.000 €</button>
-              <button type="button" role="radio" aria-checked={grande} tabIndex={tabRoving(grande, 1, true)} className={grande ? 'on' : ''} onClick={() => setGrande(true)}><span className="k-n" aria-hidden>2</span>Oltre 1.000 €</button>
+            <div className="ct-big ct-big-gestione" role="radiogroup" aria-label="Chi gestisce l'offerta" onKeyDown={tastiRadio}>
+              {([['centralino', 'Gestita da Jennifer', 'Conferma «entro 60 minuti» e invio dell\'offerta'], ['commerciale', 'Passa al Tecnico Commerciale', 'Lo contatterà il commerciale entro 2 ore']] as const).map(([v, l, d], i) => (
+                <button type="button" key={v} role="radio" aria-checked={gestione === v} tabIndex={tabRoving(gestione === v, i, !!gestione)} className={gestione === v ? 'on' : ''} onClick={() => setGestione(v)}>
+                  <span className="k-n" aria-hidden>{i + 1}</span><Ic n={v === 'centralino' ? 'offerta' : 'collega'} size={22} /><span><b>{l}</b><span className="sub">{d}</span></span></button>))}
             </div>
             <div className="field ct-importo"><label htmlFor="ct-imp">Importo stimato (facoltativo)</label>
               <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>
           </div>)}
         {tipo === 'offerta_grande' && (
           <div className="ct-allarme ct-grande">
-            <b>Oltre 1.000 €: l'offerta la fa un Tecnico Commerciale.</b>
+            <b>Passata al Tecnico Commerciale: l'offerta la fa lui.</b>
             <div className="field"><label htmlFor="ct-com">Assegna a</label>
               <select id="ct-com" value={f.commerciale} onChange={e => setF({ ...f, commerciale: e.target.value })}>
                 <option value="">— scegli —</option>
@@ -247,7 +233,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             <span className="sub">Di' al cliente: «Entro 2 ore la contatterà il nostro Tecnico Commerciale». Dopo il salvataggio: email al cliente, email di riepilogo al commerciale, richiamo entro 2 ore.</span>
           </div>)}
 
-        <div className="ct-sez"><span className="ct-sez-n">4</span><b>{cliente_ ? 'Cliente' : infoChi.l}</b><span className="sub">dati minimi: nome e telefono bastano</span></div>
+        <div className="ct-sez"><span className="ct-sez-n">3</span><b>{cliente_ ? 'Cliente' : infoChi.l}</b><span className="sub">dati minimi: nome e telefono bastano</span></div>
         <div className="ct-cliente">
           <div className="field ct-ac">
             <label htmlFor="ct-cli">{infoChi.campo}</label>

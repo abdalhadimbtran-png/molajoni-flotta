@@ -120,16 +120,42 @@ Supabase Realtime su `pratiche`, `pratiche_eventi`, `chiamate_trasferite`, `noti
 `clienti_contatti` (più contatti per cliente/sede, preferito) con storia `clienti_contatti_storia` (solo in aggiunta). Scelto un cliente, il contatto preferito/più recente riempie i campi; menu per cambiarlo. Telefono normalizzato +39, email controllata. Se Jennifer cambia telefono/email: «Aggiorna anche nell'anagrafica del cliente?» (sì di default) → storia + conta come «aggiornamento anagrafica». Una pratica nuova aggiunge solo contatti nuovi.
 **Impostazioni › Anagrafica clienti – Importa da Taylor**: Excel/CSV, colonne riconosciute per nome (mappa ricordata), **prova senza scrivere** (nuovi / aggiornati / invariati / protetti / errori + differenze), conferma; upsert per `cod_cliente` in `clienti` + contatto in rubrica; le modifiche manuali non si sovrascrivono senza «Sovrascrivi»; registro `clienti_importazioni` con rapporto errori scaricabile.
 
-## Email: Outlook
-Decisione del titolare (10/11/2026): **tutte le email del Centralino partono dalla casella Outlook di Jennifer** (niente Resend/SMTP per ora). Impostazione `centralino_impostazioni.invio_email` = `'outlook'` (predefinita, migrazione `20261110_0068`) | `'automatico'` (ripristina «Invia»/«Invia entrambe» via coda → Resend; l'amministratore la cambia in Flussi e impostazioni).
-- Pulsante principale **«Apri in Outlook»** ovunque (email dei passi, coordinatore/tecnico, riepilogo commerciale, girate, compositore modelli, riepilogo dopo trasferimento); secondario «Copia testo». Nel passo con tecnico + cliente si apre prima l'email del passo, poi subito il compositore per l'email al cliente.
-- Il clic registra l'evento `email_inviata` con `modo='outlook'` (come «copia»), soddisfa il requisito del passo e avanza come prima. Nessun «annulla» (servirebbe una RPC di revoca).
-- Link: `src/lib/centralino/mailto.ts` (`costruisciMailto`, test `mailto.test.ts`): `encodeURIComponent`, a capo CRLF `%0D%0A`, più destinatari/CC separati da `;`, URL ≤ 1900 caratteri; se il testo è più lungo va negli appunti e il corpo diventa «Testo copiato: incolla con Ctrl+V» (avviso nel toast). Firma = impostazione `firma` («… Molajoni Antincendi · dal 1930 …»).
-- Inviti account (pagina admin): invariati, «Apri in Outlook» già principale.
+## Email: Outlook (bozza .eml formattata)
+Decisione del titolare (10/11/2026): tutte le email partono dalla casella Outlook di Jennifer, **senza copia/incolla**. `centralino_impostazioni.invio_email` = `'outlook'` (predefinito) | `'automatico'` (Resend).
+- **«Apri in Outlook»** (ovunque: passi, coordinatore/tecnico, riepilogo commerciale, compositore, due email del trasferimento) scarica subito una bozza **`.eml`** (`X-Unsent: 1`, To, Cc, Subject RFC 2047 UTF-8, `multipart/alternative` testo + HTML in base64, logo per URL assoluto, nessun allegato). Nome: `{numero} - {oggetto breve}.eml`, tipo `message/rfc822`. Aperta, Outlook desktop la mostra come messaggio nuovo pronto: si preme Invia. Toast: «Bozza pronta: aprila (si apre in Outlook) e premi Invia».
+- Suggerimento una tantum (localStorage): in Chrome/Edge, freccia del download → «Apri sempre i file di questo tipo».
+- Secondario **«Outlook testo semplice»**: `mailto:` (CRLF, `;`, ≤ 1900 caratteri; oltre, testo negli appunti) per Outlook nuovo/web dove l'.eml si apre in sola lettura.
+- Il clic registra `email_inviata` con `modo='outlook'` e avanza il passo come prima.
+- Codice: `src/lib/centralino/emailHtml.ts` (`costruisciEmailHtml`, `costruisciEmailTesto`, `costruisciEml`, `scaricaEml`, `nomeFileEml`), `mailto.ts` (`apriBozza`, `costruisciMailto`), `modelli.ts` (`emailDaModello`, `residui`); test `emailHtml.test.ts`.
 
-## Email ai clienti
-Modelli `email_template` (13 di base). Segnaposto: `{cliente} {contatto} {numero_pratica} {data_appuntamento} {fascia} {commerciale} {tecnico} {firma} {argomento} {referente} {entro}`. Testo modificabile prima dell'invio. Invio: coda `email_in_uscita` (nuove colonne `cc`, `pratica_id`) → Edge Function `notifica-email` (ora con CC) → Resend; ogni invio = evento `email_inviata` con copia del testo. In modalità Outlook (predefinita) vedi «Email: Outlook». «Segna anche … come fatto» avanza lo stadio collegato al modello.
-Da compilare in Impostazioni: email di L. Esposito, A. Chiaradonna, A. Querini (`cc_offerte_grandi`), commerciali, Simona, Roberta, destinatari dei trasferimenti, firma.
+## Email premium (0069)
+Stile Apple Light, solo CSS inline, layout a tabelle (Outlook desktop): logo `https://molajoni-flotta.vercel.app/logo-molajoni.png`, linea rossa, etichetta («MOLAJONI ANTINCENDI · DAL 1930» o «CENTRALINO · USO INTERNO» se l'oggetto inizia con `[Centralino]`), titolo, **dati in evidenza** (tabella a 2 colonne; le righe vuote/«—» non compaiono), testo, firma «Jennifer Marchetti · Front office · Molajoni Antincendi s.r.l. · dal 1930 · tel. 06 6941 4281 · info@molajoni.it» oppure firma del **TMQ** scelto. Anteprima nel compositore, nelle due email del trasferimento e nell'editor dei modelli.
+Colonne nuove di `email_template`: `titolo`, `dati` (jsonb `[[etichetta, "{segnaposto}"], …]`), `firma_tipo` (`front_office|tmq|nessuna`). Segnaposto nuovi: `{saluto}` (Buongiorno/Buonasera, cambio alle 14:00), `{tel_tecnico}` (« (tel. …)» o vuoto), `{rif_pratica}` (« – CT-…» o vuoto), `{scadenza}`, `{tmq}`; `{scadenza_richiamo}` ora è l'ora reale (creazione + 2 ore d'ufficio), `{urgenza}` = Urgente/Ordinario.
+
+## Modelli email (revisione 0069, procedura Rev.01/2027 + decisioni del titolare)
+Oggetti: parola chiave in MAIUSCOLO come nella procedura + cliente + numero pratica; interni `[Centralino] …`. Clienti: «Vi/Vostra», saluto finale della procedura. Revisione completa: `/mnt/user-data/outputs/centralino_revisione_email.md`.
+
+| Flusso · passo | Modello | Oggetto |
+|---|---|---|
+| Manutenzione · coordinatore | `intervento_coordinatore` | [Centralino] Intervento da assegnare – {cliente} – {urgenza} |
+| Manutenzione · cliente informato | `intervento_cliente` | INTERVENTO PROGRAMMATO – {cliente} – {numero} |
+| Manutenzione (facoltativo) | `presa_intervento` | RICHIESTA INTERVENTO – PRESA IN CARICO – … |
+| Sopralluogo · coordinatore | `sopralluogo_coordinatore` | [Centralino] Sopralluogo da assegnare – … |
+| Sopralluogo · cliente (cc commerciale) | `sopralluogo_cliente` | CONFERMA APPUNTAMENTO – … (quando, Tecnico Commerciale, tel.) |
+| Offerta ≤ 1.000 € · conferma / offerta | `presa_offerta_piccola` / `invio_offerta` | PREVENTIVO – … («entro 60 minuti» / in allegato) |
+| Offerta > 1.000 € · cliente / commerciale | `presa_offerta_grande` / `riepilogo_commerciale` | RICHIESTA PREVENTIVO – PRESA IN CARICO – … / [Centralino] Preventivo oltre 1.000 € – … – richiamare entro le hh:mm |
+| Offerta da tablet TMQ · inviato | `preventivo_tmq` (firma TMQ) | PREVENTIVO DA PARTE DEL TMQ VVF – … |
+| Modifica · evasione | `modifica_evasa` (Anagrafica → `conferma_anagrafica`, Disdetta → `conferma_disdetta`, `src/lib/centralino/passi.ts`) | RICHIESTA EVASA / AGGIORNAMENTO DATI / DISDETTA – CONFERMA DI RICEZIONE – … |
+| Girate | `girata_ufficio` | RICHIESTA INOLTRATA – … |
+| Trasferimento · referente / cliente | `trasf_referente` / `riepilogo_trasferita` · `riepilogo_richiamo` | [Centralino] Chiamata trasferita – … / RIEPILOGO TELEFONATA – … · RICHIESTA PRESA IN CARICO – … |
+
+Disattivati (non cancellati): `conferma_intervento`, `conferma_sopralluogo`, `conferma_modifica_calendario` (servivano data/fascia, non più raccolte), `conferma_urgente_allarme` (sostituito da `presa_intervento`), `followup_offerta` (nessun passo; «chi richiama per l'offerta» è ancora una domanda aperta della procedura).
+
+## Offerte da tablet TMQ (B.1, 0069)
+Canale «Tablet TMQ» + «Offerta» → tipo `offerta_tablet`: Ricevuta → **Verificato** (TMQ che firma, scelto tra i tecnici + casella «Preventivo verificato in tutte le sue parti», requisito `verificato` in `privato.ct_mancanti`) → **Inviato al cliente** (`preventivo_tmq`). SLA `{"tipo":"giorni_lav","valore":1,"ora":"12:00"}` = entro le 12:00 del giorno lavorativo successivo (nuovo campo `ora` in `privato.ct_sla` e `sla.ts`). Nel registro conta come «Offerte da tablet» (`tipo like 'offerta%' and canale = 'tablet_tmq'`).
+
+## Risponditore e Emergenze h24
+Nel Nuovo contatto (telefono) il promemoria del risponditore: 1 Manutenzione e Commerciale · 2 Fatture (pomeriggio cellulare di Simona Colagrossi) · 3 Fornitori lun/ven (Roberta Felci) · **4 Emergenze tecniche h24 (tel. da definire)**. «Emergenze h24» è anche un destinatario dei trasferimenti (`destinatari_trasferimento`, email da compilare).
 
 ## Registro del giorno
 `centralino_registro_giorno(p_data)`: telefonate, WhatsApp, email, offerte da tablet / WA / cliente, aggiornamenti anagrafica (= pratiche «modifica»), chiuse — calcolati dalle pratiche (nessun doppio inserimento) + «+1 chiamata informativa» (`centralino_chiamate_info`).

@@ -4,9 +4,11 @@ import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
 import { prossimoStadio, type Commerciale, type Flusso, type PersonaDisp, type Pratica, type TecnicoDisp, type Template } from '../lib/centralino/tipi';
 import { giornoRoma } from '../lib/centralino/sla';
-import { compila, guscioEmail, inTesto, segnaposto } from '../lib/centralino/modelli';
+import { emailDaModello, segnaposto } from '../lib/centralino/modelli';
+import { templatePasso } from '../lib/centralino/passi';
 import { useConfig } from './comune';
-import { avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
+import { apriBozza } from '../lib/centralino/mailto';
+import type { Eml } from '../lib/centralino/emailHtml';
 
 export interface Prossimo { key: string; nome: string; mancanti: string[] }
 export const prossimoDi = (id: number) => rpc<Prossimo | null>('centralino_prossimo', { p_id: id });
@@ -18,10 +20,10 @@ const quandoDefault = (p: Pratica) => (p.urgenza === 'ordinario' ? 'entro 2 gior
 /** Email pronta da modello per la pratica (destinatario scelto dal passo). */
 export function componi(t: Template, p: Pratica, firma: string, a: string, extra: Partial<Pratica> = {}, ccOfferte: string[] = []) {
   const v = { ...segnaposto({ ...p, ...extra }, firma), numero_pratica: p.numero };
-  const corpo = compila(t.corpo_html, v);
+  const e = emailDaModello(t, v);
   const cc = [...t.cc_default, ...(t.cc_offerte_grandi ? ccOfferte : [])];
   if (t.codice === 'sopralluogo_cliente' && p.commerciale_email) cc.push(p.commerciale_email);
-  return { a, cc: [...new Set(cc.filter(Boolean))], oggetto: compila(t.oggetto, v, false), html: guscioEmail(corpo), corpo, testo: inTesto(corpo) };
+  return { a, cc: [...new Set(cc.filter(Boolean))], oggetto: e.oggetto, html: e.html, corpo: e.corpo, testo: e.testo };
 }
 
 /**
@@ -38,7 +40,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const idx = s ? f.stadi.findIndex(x => x.key === s.key) : -1;
   const dopo = idx >= 0 ? f.stadi[idx + 1] : undefined;
   const firma = String(config?.impostazioni.firma ?? '');
-  const modello = (c?: string) => (c ? config?.modelli.find(m => m.codice === c && m.attivo) : undefined);
+  const modello = (c?: string) => { const k = templatePasso(p, c); return k ? config?.modelli.find(m => m.codice === k && m.attivo) : undefined; };
+  const tablet = p.tipo === 'offerta_tablet';
 
   const [coord, setCoord] = useState<PersonaDisp[]>([]);
   const [coordNome, setCoordNome] = useState(p.coordinatore_nome ?? '');
@@ -53,6 +56,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [quandoAt, setQuandoAt] = useState('');
   const [doc, setDoc] = useState(p.documento_intervento ?? '');
   const [avvisato, setAvvisato] = useState(false);
+  const [verificato, setVerificato] = useState(false);
   const [app, setApp] = useState(false);
   const [data, setData] = useState(p.appuntamento_data ?? '');
   const [fascia, setFascia] = useState(p.appuntamento_fascia ?? '');
@@ -74,9 +78,9 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       rpc<PersonaDisp[]>('centralino_altri_referenti', { p_tipo: p.tipo }).then(l => setAltri(l ?? []), () => undefined);
       rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => setTecCoord(l ?? []), () => undefined);
     }
-    if (has('tecnico')) rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => {
+    if (has('tecnico') || has('informato')) rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => {
       setTecnici(l ?? []);
-      if (!tecId) { const lib = [...(l ?? [])].filter(t => !t.assente).sort((a, b) => a.interventi_oggi - b.interventi_oggi)[0]; if (lib) setTecId(lib.id); }
+      if (!tecId && has('tecnico')) { const lib = [...(l ?? [])].filter(t => !t.assente).sort((a, b) => a.interventi_oggi - b.interventi_oggi)[0]; if (lib) setTecId(lib.id); }
     }, () => undefined);
     if (has('commerciale') && p.tipo === 'offerta_grande') rpc<Commerciale[]>('centralino_commerciali', {}).then(setCommerciali, () => undefined);
   }, [s?.key]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -102,27 +106,24 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const tEmail = has('email') || has('informato') ? modello(s?.template) : undefined;
   const aEmail = !tEmail ? '' : tEmail.codice.endsWith('_coordinatore') ? (coordSel?.email ?? '') : tEmail.codice === 'riepilogo_commerciale' ? (p.commerciale_email ?? '') : (p.email ?? '');
   const ccOff = (config?.impostazioni.cc_offerte_grandi ?? []).map(x => x.email).filter(Boolean) as string[];
-  const email = useMemo(() => (tEmail ? componi(tEmail, p, firma, aEmail, {}, ccOff) : null), [tEmail, p, firma, aEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  const telTec = tecnici.find(t => t.id === p.tecnico_dipendente_id)?.telefono ?? null;
+  const email = useMemo(() => (tEmail ? componi(tEmail, p, firma, aEmail, { tecnico_telefono: telTec } as Partial<Pratica>, ccOff) : null), [tEmail, p, firma, aEmail, telTec]); // eslint-disable-line react-hooks/exhaustive-deps
   const [aMod, setAMod] = useState<string | null>(null);
   const destEmail = aMod ?? aEmail;
 
   // passo «cliente» successivo al tecnico: si invia insieme
-  const tCliente = has('tecnico') && (dopo?.requisiti?.includes('email') || (dopo?.requisiti as string[] | undefined)?.includes('informato')) ? modello(dopo!.template) : undefined;
+  const tCliente = !tablet && has('tecnico') && (dopo?.requisiti?.includes('email') || (dopo?.requisiti as string[] | undefined)?.includes('informato')) ? modello(dopo!.template) : undefined;
 
   if (!s) return null;
 
   const automatico = config?.impostazioni.invio_email === 'automatico';
   // modalità Outlook: l'email è registrata come inviata (modo 'outlook') e il messaggio si apre nella casella di Jennifer
-  let daAprire: ReturnType<typeof costruisciMailto> | null = null;
+  let daAprire: Eml | null = null;
   const inviaEmail = async (e: { a: string; cc: string[]; oggetto: string; html: string; testo: string }, codice: string) => {
-    if (!automatico) {
-      const m = costruisciMailto({ a: e.a, cc: e.cc, oggetto: e.oggetto, testo: e.testo });
-      if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
-      daAprire = m;
-    }
+    if (!automatico) daAprire = { a: e.a, cc: e.cc, oggetto: e.oggetto, html: e.html, testo: e.testo };
     return rpc('centralino_invia_email', { p_id: p.id, p_template: codice, p_a: e.a.trim(), p_cc: e.cc, p_oggetto: e.oggetto, p_html: e.html, p_testo: e.testo, p_modo: automatico ? 'resend' : 'outlook', p_avanza: null });
   };
-  const apriSeServe = () => { const m = daAprire as ReturnType<typeof costruisciMailto> | null; if (m) { window.location.href = m.url; toast(avvisoOutlook(m.troncato)); } return !!m; };
+  const apriSeServe = () => { const m = daAprire as Eml | null; if (m) toast(apriBozza({ ...m, numero: p.numero })); return !!m; };
   const avanza = (key: string, dati: Record<string, unknown>) => rpc('centralino_avanza', { p_id: p.id, p_stadio: key, p_dati: dati, p_testo: nota || null });
 
   async function salva(e?: FormEvent) {
@@ -138,6 +139,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     if (has('tecnico')) {
       if (!tecnico) return setErr('Scegli il tecnico.');
       const q = !quando && !quandoAt ? quandoDefault(p) : quandoAt ? `il ${new Date(quandoAt).toLocaleString('it-IT', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : quando;
+      if (tablet && !verificato) return setErr('Spunta «Preventivo verificato» prima di andare avanti.');
+      if (tablet) dati.verificato = true;
       Object.assign(dati, { tecnico_nome: tecnico.nome, tecnico_dipendente_id: tecnico.id, tecnico_quando: q, tecnico_quando_at: quandoAt ? new Date(quandoAt).toISOString() : null });
     }
     if (has('buono') || has('avviso')) {
@@ -166,7 +169,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
           // una sola finestra Outlook per clic: la seconda email (al cliente) si apre subito dopo nel compositore
           apriSeServe(); toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Ora l'email al cliente: «Apri in Outlook».`); onFatto(); onEmail?.(dopo.template); return;
         } else if (emailOk(p.email)) {
-          const ec = componi(tCliente, p, firma, p.email!, { tecnico_nome: String(dati.tecnico_nome), tecnico_quando: String(dati.tecnico_quando) });
+          const ec = componi(tCliente, p, firma, p.email!, { tecnico_nome: String(dati.tecnico_nome), tecnico_quando: String(dati.tecnico_quando), tecnico_telefono: tecnico?.telefono ?? null } as Partial<Pratica>);
           await inviaEmail(ec, tCliente.codice);
           await avanza(dopo.key, {});
           toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato`);
@@ -206,13 +209,14 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
           <button type="button" className={`btn-ghost ct-toggle ${telefonato ? 'on' : ''}`} aria-pressed={telefonato} onClick={() => setTelefonato(!telefonato)}>{telefonato ? '✓ Telefonato' : 'Telefonato'}</button>
         </>)}
         {has('tecnico') && (<>
-          <div className="field"><label htmlFor="av-tec">Tecnico</label>
+          <div className="field"><label htmlFor="av-tec">{tablet ? 'TMQ che firma il preventivo' : 'Tecnico'}</label>
             <select id="av-tec" value={tecId} onChange={e => setTecId(e.target.value ? Number(e.target.value) : '')}><option value="">— scegli —</option>
               {tecnici.map(t => <option key={t.id} value={t.id}>{t.nome} · {t.assente ? 'assente oggi' : `${t.interventi_oggi} interventi oggi`}</option>)}</select></div>
-          <div className="segmented ct-chips" role="radiogroup" aria-label="Quando" onKeyDown={tastiRadio}>
+          {tablet && <label className="check"><input type="checkbox" checked={verificato} onChange={e => setVerificato(e.target.checked)} /> Preventivo verificato in tutte le sue parti</label>}
+          {!tablet && <><div className="segmented ct-chips" role="radiogroup" aria-label="Quando" onKeyDown={tastiRadio}>
             {QUANDO.map((q, i) => { const on = !quandoAt && quando === q; return <button type="button" key={q} role="radio" aria-checked={on} tabIndex={tabRoving(on, i, !quandoAt && QUANDO.includes(quando))} className={on ? 'on' : ''} onClick={() => { setQuando(q); setQuandoAt(''); }}><span className="k-n" aria-hidden>{i + 1}</span>{q}</button>; })}
           </div>
-          <div className="field"><label htmlFor="av-qat">Oppure data e ora</label><input id="av-qat" type="datetime-local" value={quandoAt} onChange={e => setQuandoAt(e.target.value)} /></div>
+          <div className="field"><label htmlFor="av-qat">Oppure data e ora</label><input id="av-qat" type="datetime-local" value={quandoAt} onChange={e => setQuandoAt(e.target.value)} /></div></>}
           {tCliente && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Cliente informato a voce (senza email)</label>}
           {tCliente && <p className="hint">Il cliente riceve: «La contatterà il nostro tecnico {tecnico?.nome ?? '…'} {quandoAt ? 'il giorno scelto' : quando}».{!emailOk(p.email) && ' Manca l\'email del cliente.'}</p>}
         </>)}
@@ -245,7 +249,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             {email.cc.length > 0 && <p className="hint">CC: {email.cc.join(', ')}</p>}
             <div className="ct-anteprima" dangerouslySetInnerHTML={{ __html: email.corpo }} />
             <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Modifica il testo</button>
-            {!automatico && <p className="hint">Con il pulsante principale si apre il messaggio in Outlook già compilato e l'email è registrata come inviata.</p>}
+            {!automatico && <p className="hint">Il pulsante principale scarica la bozza formattata (.eml): aprila, si apre in Outlook pronta, premi Invia. L'email è registrata come inviata.</p>}
           </details>)}
         {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Email non disponibile: cliente informato a voce</label>}
         {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? `Manca l'email di ${coordNome || 'questa persona'}: aggiungila in ${tecDiretto ? 'Dipendenti' : 'Referenti'} oppure basta «Telefonato».` : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}

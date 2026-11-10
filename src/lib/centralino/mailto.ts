@@ -37,3 +37,11 @@ export async function apriOutlook(e: { a: string | string[]; cc?: string | strin
 export const avvisoOutlook = (troncato: boolean) => troncato
   ? 'Outlook aperto. Il testo era lungo: è negli appunti, incollalo nel messaggio con Ctrl+V. Email registrata.'
   : 'Outlook aperto con il messaggio pronto: controlla e premi Invia. Email registrata.';
+
+import { AVVISO_EML, scaricaEml, suggerimentoEml, type Eml } from './emailHtml';
+/** «Apri in Outlook»: scarica la bozza .eml formattata (X-Unsent) e restituisce il testo dell'avviso (con il suggerimento la prima volta). */
+export function apriBozza(e: Eml & { numero?: string | null }): string {
+  scaricaEml(e);
+  const s = suggerimentoEml();
+  return s ? `${AVVISO_EML}. ${s}` : AVVISO_EML;
+}

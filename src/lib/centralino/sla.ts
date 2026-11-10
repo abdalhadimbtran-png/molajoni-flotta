@@ -6,7 +6,8 @@
  *   giorni_lav n  : fine orario dell'n-esimo giorno lavorativo dopo la data di ricezione
  */
 export type TipoSla = 'minuti' | 'ore' | 'stesso_giorno' | 'giorni_lav';
-export interface RegolaSla { tipo: TipoSla; valore?: number; da?: 'creazione' | 'ingresso' }
+/** `ora` (solo giorni_lav): scadenza a quell'ora invece che a fine orario (es. «entro le 12:00 del giorno lavorativo dopo»). */
+export interface RegolaSla { tipo: TipoSla; valore?: number; da?: 'creazione' | 'ingresso'; ora?: string }
 export interface Orario { inizio: string; fine: string }
 export const ORARIO_DEFAULT: Orario = { inizio: '08:30', fine: '17:30' };
 
@@ -55,7 +56,7 @@ export function scadenzaSla(da: Date, r: RegolaSla, festivi: Set<string>, orario
   if (r.tipo === 'giorni_lav') {
     for (let i = 0; i < n; i++) d = prossimoLavorativo(d, festivi);
     if (n <= 0 && !lavorativo(d, festivi)) d = prossimoLavorativo(d, festivi);
-    return istante(d, hf);
+    return istante(d, r.ora ? minuti(r.ora) : hf);
   }
   if (!lavorativo(d, festivi) || t >= hf) { d = prossimoLavorativo(d, festivi); t = hi; }
   else if (t < hi) t = hi;
@@ -131,6 +132,7 @@ export function testoRegola(r: RegolaSla | null | undefined): string {
   if (r.tipo === 'minuti') return `entro ${n} min`;
   if (r.tipo === 'ore') return `entro ${n} ${n === 1 ? 'ora' : 'ore'}`;
   if (r.tipo === 'stesso_giorno') return 'in giornata';
+  if (r.ora) return n === 1 ? `entro le ${r.ora} del giorno lavorativo successivo` : `entro le ${r.ora} del ${n}° giorno lavorativo`;
   return n === 1 ? 'entro il giorno lavorativo dopo' : `entro ${n} giorni lavorativi`;
 }
 

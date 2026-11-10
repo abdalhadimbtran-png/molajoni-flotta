@@ -2,7 +2,7 @@ import type { RegolaSla } from './sla';
 
 export type Canale = 'telefono' | 'whatsapp' | 'email' | 'collega' | 'tablet_tmq' | 'altro';
 export type Esito = 'aperta' | 'chiusa_ok' | 'chiusa_ko' | 'annullata';
-export type TipoPratica = 'manutenzione' | 'sopralluogo' | 'offerta_piccola' | 'offerta_grande' | 'modifica' | 'amministrazione' | 'fornitori' | 'informazione' | 'trasferta' | 'abbigliamento';
+export type TipoPratica = 'manutenzione' | 'sopralluogo' | 'offerta_piccola' | 'offerta_grande' | 'modifica' | 'amministrazione' | 'fornitori' | 'informazione' | 'trasferta' | 'abbigliamento' | 'offerta_tablet';
 export type Requisito = 'appuntamento' | 'email' | 'taylor' | 'commerciale' | 'destinatario' | 'urgenza' | 'coordinatore' | 'tecnico' | 'buono' | 'avviso' | 'informato';
 
 export interface Stadio { key: string; nome: string; sla?: RegolaSla; azione?: 'appuntamento' | 'taylor' | 'esito'; template?: string; requisiti?: Requisito[] }
@@ -57,6 +57,7 @@ export interface Evento {
 export interface Template {
   id: number; codice: string; nome: string; oggetto: string; corpo_html: string; cc_default: string[]; cc_offerte_grandi: boolean;
   tipo_pratica: string | null; attivo: boolean; ordine: number;
+  titolo?: string | null; dati?: [string, string][] | null; firma_tipo?: 'front_office' | 'tmq' | 'nessuna' | null;
 }
 export interface Persona { nome: string; email: string }
 export interface Impostazioni {
@@ -87,7 +88,7 @@ export const RICHIESTE: { v: TipoPratica | 'offerta'; l: string; ic: string; bre
 
 export const NOME_TIPO: Record<TipoPratica, string> = {
   manutenzione: 'Manutenzione', sopralluogo: 'Sopralluogo', offerta_piccola: 'Offerta ≤ 1.000 €', offerta_grande: 'Offerta > 1.000 €',
-  modifica: 'Modifica / anagrafica', amministrazione: 'Amministrazione', fornitori: 'Fornitori', informazione: 'Informazione', trasferta: 'Trasferta (alloggio)', abbigliamento: 'Abbigliamento',
+  modifica: 'Modifica / anagrafica', amministrazione: 'Amministrazione', fornitori: 'Fornitori', informazione: 'Informazione', trasferta: 'Trasferta (alloggio)', abbigliamento: 'Abbigliamento', offerta_tablet: 'Offerta da tablet TMQ',
 };
 export const ESITI: Record<Esito, [string, string]> = {
   aperta: ['info', 'Aperta'], chiusa_ok: ['ok', 'Chiusa'], chiusa_ko: ['ko', 'Chiusa (negativa)'], annullata: ['na', 'Annullata'],

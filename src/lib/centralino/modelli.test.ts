@@ -6,7 +6,7 @@ describe('segnaposto procedura rev2', () => {
   it('compila tecnico, quando, urgenza, indirizzo, importo', () => {
     const v = segnaposto(p, 'Jennifer');
     expect(compila('La contatterà il nostro tecnico {tecnico} {quando}', v, false)).toBe('La contatterà il nostro tecnico Mario entro 1 ora');
-    expect(v.urgenza).toBe('URGENTE');
+    expect(v.urgenza).toBe('Urgente');
     expect(v.obiettivo).toBe('da fare oggi');
     expect(v.indirizzo).toBe('Via Roma 1, 00100 Roma');
     expect(v.importo).toMatch(/^1\.?500,00 €$/);

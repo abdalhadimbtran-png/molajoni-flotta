@@ -3,9 +3,11 @@ import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
 import { fmtOra } from '../lib/format';
 import { prossimoStadio, type Pratica, type Template, type Trasferimento } from '../lib/centralino/tipi';
-import { compila, guscioEmail, inTesto, segnaposto, type Valori } from '../lib/centralino/modelli';
+import { compila, emailDaModello, segnaposto, type Valori } from '../lib/centralino/modelli';
+import type { TecnicoDisp } from '../lib/centralino/tipi';
 import { useConfig } from './comune';
-import { avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
+import { apriBozza, avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
+import { templatePasso } from '../lib/centralino/passi';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const lista = (s: string) => s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
@@ -31,22 +33,24 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   const [invio, setInvio] = useState(false);
   const [senza, setSenza] = useState(false);
   const [motivo, setMotivo] = useState('');
+  const [telTec, setTelTec] = useState<string | null>(null);
+  useEffect(() => { if (pratica?.tecnico_dipendente_id) rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => setTelTec((l ?? []).find(t => t.id === pratica.tecnico_dipendente_id)?.telefono ?? null), () => undefined); }, [pratica?.tecnico_dipendente_id]);
   const prossimo = pratica && config ? prossimoStadio(config.flussi.find(f => f.tipo === pratica.tipo), pratica) : null;
 
   const valori: Valori | null = useMemo(() => {
     if (!config) return null;
     const firma = String(config.impostazioni.firma ?? '');
-    const base = pratica ? segnaposto(pratica, firma) : segnaposto({ numero: '', cliente_nome: trasf?.cliente_nome || 'Cliente', contatto_nome: trasf?.cliente_nome ?? null, appuntamento_data: null, appuntamento_fascia: null, commerciale_nome: null, tecnico_nome: null, telefono: trasf?.telefono, email: trasf?.cliente_email }, firma);
+    const base = pratica ? segnaposto({ ...pratica, tecnico_telefono: telTec }, firma) : segnaposto({ numero: '', cliente_nome: trasf?.cliente_nome || 'Cliente', contatto_nome: trasf?.cliente_nome ?? null, appuntamento_data: null, appuntamento_fascia: null, commerciale_nome: null, tecnico_nome: null, telefono: trasf?.telefono, email: trasf?.cliente_email }, firma);
     return {
       ...base,
-      numero_pratica: pratica ? `Riferimento: ${pratica.numero}` : '',
-      argomento: trasf?.argomento || trasf?.tipo_argomento || 'la sua richiesta',
+      numero_pratica: pratica?.numero ?? '',
+      argomento: trasf?.argomento || trasf?.tipo_argomento || base.argomento,
+      scadenza: trasf?.richiamo_scadenza ? `entro le ${fmtOra(trasf.richiamo_scadenza)}` : '',
       referente: trasf?.destinatario_nome ?? base.commerciale,
       entro: trasf?.entro_testo || (trasf?.richiamo_scadenza ? `entro ${fmtOra(trasf.richiamo_scadenza)}` : 'al più presto'),
     } as Valori;
-  }, [config, pratica, trasf]);
-  // nelle email della pratica {numero_pratica} è il numero nudo (i modelli scrivono già «Riferimento:»)
-  const val = useMemo(() => (valori && pratica && !trasf ? { ...valori, numero_pratica: pratica.numero } : valori), [valori, pratica, trasf]);
+  }, [config, pratica, trasf, telTec]);
+  const val = valori;
 
   function scegli(t: Template) {
     if (!val || !config) return;
@@ -62,20 +66,20 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
     if (m || !ordinati.length || !val) return;
     const pref = (codice && ordinati.find(x => x.codice === codice))
       || (trasf && ordinati.find(x => x.codice === (trasf.modalita === 'richiamo' ? 'riepilogo_richiamo' : 'riepilogo_trasferita')))
-      || (prossimo?.template && ordinati.find(x => x.codice === prossimo.template))
-      || (pratica?.sottotipo === 'Allarme sonoro attivo' && ordinati.find(x => x.codice === 'conferma_urgente_allarme'))
+      || (prossimo?.template && pratica && ordinati.find(x => x.codice === templatePasso(pratica, prossimo.template)))
       || ordinati.find(x => x.tipo_pratica === tipo) || ordinati[0];
     scegli(pref);
   }, [ordinati, val]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const html = () => guscioEmail(corpo);
+  const finale = useMemo(() => (m && val ? emailDaModello(m, val, corpo) : null), [m, val, corpo]);
+  const html = () => finale?.html ?? '';
   async function registra(modo: 'resend' | 'copia' | 'outlook') {
     setErr(null);
     if (!emailOk(a)) { setErr('Scrivi l\'indirizzo email del cliente.'); return false; }
     if (!ogg.trim()) { setErr('Scrivi l\'oggetto.'); return false; }
     setInvio(true);
     try {
-      const testo = inTesto(corpo);
+      const testo = finale?.testo ?? '';
       if (trasf) await rpc('centralino_trasf_email', { p_id: trasf.id, p_template: m?.codice ?? null, p_a: a.trim(), p_cc: lista(cc), p_oggetto: ogg, p_html: html(), p_testo: testo, p_modo: modo });
       else if (pratica) await rpc('centralino_invia_email', { p_id: pratica.id, p_template: m?.codice ?? null, p_a: a.trim(), p_cc: lista(cc), p_oggetto: ogg, p_html: html(), p_testo: testo, p_modo: modo, p_avanza: avanza && prossimo ? prossimo.key : null });
       return true;
@@ -84,12 +88,18 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   const automatico = config?.impostazioni.invio_email === 'automatico';
   async function invia(e: FormEvent) { e.preventDefault(); if (!automatico) { await outlook(); return; } if (await registra('resend')) { toast('Email in invio'); onFatto(); } }
   async function copia() {
-    const testo = `${ogg}\n\n${inTesto(corpo)}`;
+    const testo = `${ogg}\n\n${finale?.testo ?? ''}`;
     try { await navigator.clipboard.writeText(testo); } catch { /* il browser può negarlo: il testo resta visibile */ }
     if (await registra('copia')) { toast('Testo copiato e registrato'); onFatto(); }
   }
   async function outlook() {
-    const m = costruisciMailto({ a, cc: lista(cc), oggetto: ogg, testo: inTesto(corpo) });
+    setErr(null);
+    if (!emailOk(a)) { setErr('Scrivi l\'indirizzo email del cliente.'); return; }
+    const avviso = apriBozza({ a, cc: lista(cc), oggetto: ogg, html: html(), testo: finale?.testo ?? '', numero: pratica?.numero });
+    if (await registra('outlook')) { toast(avviso); onFatto(); }
+  }
+  async function testoSemplice() {
+    const m = costruisciMailto({ a, cc: lista(cc), oggetto: ogg, testo: finale?.testo ?? '' });
     if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
     if (await registra('outlook')) { window.location.href = m.url; toast(avvisoOutlook(m.troncato)); onFatto(); }
   }
@@ -116,15 +126,18 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
         <div className="field"><label>Testo (modificabile)</label>
           <div className="ct-anteprima" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
             onBlur={e => setCorpo((e.target as HTMLDivElement).innerHTML)} dangerouslySetInnerHTML={{ __html: corpo }} /></div>
+        {finale && <details className="ct-anteprima-box" open><summary>Anteprima dell'email formattata</summary>
+          <iframe title="Anteprima email" className="ct-iframe ct-iframe-email" srcDoc={finale.html} /></details>}
         {pratica && prossimo && <label className="check"><input type="checkbox" checked={avanza} onChange={e => setAvanza(e.target.checked)} /> Segna anche «{prossimo.nome}» come fatto</label>}
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex">
           <button className="btn" disabled={invio}>{invio ? 'Apertura…' : automatico ? 'Invia' : 'Apri in Outlook'}</button>
           {automatico && <button type="button" className="btn-ghost" onClick={outlook} disabled={invio}>Apri in Outlook</button>}
+          <button type="button" className="btn-ghost" onClick={testoSemplice} disabled={invio}>Outlook testo semplice</button>
           <button type="button" className="btn-ghost" onClick={copia} disabled={invio}>Copia testo</button>
           <button type="button" className="btn-ghost" onClick={onClose}>Più tardi</button>
         </div>
-        <p className="hint">Si apre un nuovo messaggio in Outlook già compilato (A, CC, oggetto, testo e firma): controlla e premi Invia. L'email è registrata nella storia della pratica.</p>
+        <p className="hint">«Apri in Outlook» scarica una bozza formattata (.eml): aprila, si apre in Outlook pronta, premi Invia. «Outlook testo semplice» apre un messaggio senza formattazione (per Outlook nuovo/web). L'email è registrata nella storia della pratica.</p>
         {trasf && (
           <details open={senza} onToggle={e => setSenza((e.target as HTMLDetailsElement).open)}>
             <summary>Email non disponibile</summary>

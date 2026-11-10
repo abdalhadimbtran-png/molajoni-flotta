@@ -1,0 +1,485 @@
+[
+ {
+  "codice": "presa_intervento",
+  "nome": "Al cliente – richiesta intervento presa in carico (facoltativa)",
+  "tipo_pratica": "manutenzione",
+  "oggetto": "RICHIESTA INTERVENTO – PRESA IN CARICO – {cliente} – {numero_pratica}",
+  "titolo": "Richiesta di intervento presa in carico",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Problema",
+    "{dettaglio}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo preso in carico la Vostra richiesta di intervento. <b>Entro 1 ora</b> Vi ricontatteremo per comunicarVi il nome del tecnico e l'orario.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "intervento_coordinatore",
+  "nome": "Al coordinatore – intervento da assegnare",
+  "tipo_pratica": "manutenzione",
+  "oggetto": "[Centralino] Intervento da assegnare – {cliente} – {urgenza}",
+  "titolo": "Intervento da assegnare",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Urgenza",
+    "{urgenza} · {obiettivo}"
+   ],
+   [
+    "Cliente",
+    "{cliente} · {stato_cliente}"
+   ],
+   [
+    "Problema",
+    "{dettaglio}"
+   ],
+   [
+    "Richiesta",
+    "{descrizione}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ],
+   [
+    "Contatto",
+    "{contatto}"
+   ],
+   [
+    "Telefono",
+    "{telefono}"
+   ],
+   [
+    "Email",
+    "{email_cliente}"
+   ]
+  ],
+  "corpo_html": "<p>Ciao,</p><p>nuova richiesta di intervento da assegnare. Al cliente ho detto che <b>entro 1 ora</b> lo ricontattiamo con il nome del tecnico e l'orario.</p><p>Mi indichi chi va e quando?</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "intervento_cliente",
+  "nome": "Al cliente – intervento programmato (tecnico e orario)",
+  "tipo_pratica": "manutenzione",
+  "oggetto": "INTERVENTO PROGRAMMATO – {cliente} – {numero_pratica}",
+  "titolo": "Intervento programmato",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Tecnico",
+    "{tecnico}"
+   ],
+   [
+    "Quando",
+    "{quando}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>come anticipato telefonicamente, Vi confermiamo che il nostro tecnico <b>{tecnico}</b> Vi contatterà <b>{quando}</b> per l'intervento richiesto.</p><p>Per qualsiasi variazione potete rispondere a questa email o chiamarci allo 06 6941 4281.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "sopralluogo_coordinatore",
+  "nome": "Al coordinatore – sopralluogo da assegnare",
+  "tipo_pratica": "sopralluogo",
+  "oggetto": "[Centralino] Sopralluogo da assegnare – {cliente} – {urgenza}",
+  "titolo": "Sopralluogo da assegnare",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Urgenza",
+    "{urgenza} · {obiettivo}"
+   ],
+   [
+    "Cliente",
+    "{cliente} · {stato_cliente}"
+   ],
+   [
+    "Richiesta",
+    "{descrizione}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ],
+   [
+    "Contatto",
+    "{contatto}"
+   ],
+   [
+    "Telefono",
+    "{telefono}"
+   ],
+   [
+    "Email",
+    "{email_cliente}"
+   ]
+  ],
+  "corpo_html": "<p>Ciao,</p><p>nuova richiesta di sopralluogo da assegnare. Al cliente ho detto che <b>entro 1 ora</b> lo ricontattiamo per confermare l'appuntamento.</p><p>Mi indichi il Tecnico Commerciale e quando?</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "sopralluogo_cliente",
+  "nome": "Al cliente – conferma appuntamento sopralluogo",
+  "tipo_pratica": "sopralluogo",
+  "oggetto": "CONFERMA APPUNTAMENTO – {cliente} – {numero_pratica}",
+  "titolo": "Conferma appuntamento",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Quando",
+    "{quando}"
+   ],
+   [
+    "Tecnico Commerciale",
+    "{tecnico}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo l'appuntamento per il sopralluogo <b>{quando}</b> con il nostro Tecnico Commerciale <b>{tecnico}</b>{tel_tecnico}.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "presa_offerta_piccola",
+  "nome": "Al cliente – preventivo entro 60 minuti",
+  "tipo_pratica": "offerta_piccola",
+  "oggetto": "PREVENTIVO – {cliente} – {numero_pratica}",
+  "titolo": "Preventivo in lavorazione",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Richiesta",
+    "{descrizione}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che la Vostra richiesta è in lavorazione e che <b>riceverete il preventivo entro 60 minuti</b>.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "invio_offerta",
+  "nome": "Al cliente – invio preventivo",
+  "tipo_pratica": "offerta_piccola",
+  "oggetto": "PREVENTIVO – {cliente} – {numero_pratica}",
+  "titolo": "Il Vostro preventivo",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Importo indicativo",
+    "{importo}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>in allegato il preventivo richiesto.</p><p>Restiamo a disposizione per qualsiasi chiarimento; per confermare è sufficiente rispondere a questa email.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "presa_offerta_grande",
+  "nome": "Al cliente – richiesta preventivo oltre 1.000 €",
+  "tipo_pratica": "offerta_grande",
+  "oggetto": "RICHIESTA PREVENTIVO – PRESA IN CARICO – {cliente} – {numero_pratica}",
+  "titolo": "Richiesta di preventivo presa in carico",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Tecnico Commerciale",
+    "{commerciale}"
+   ],
+   [
+    "Vi contatterà",
+    "entro 2 ore"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo ricevuto la Vostra richiesta: <b>entro 2 ore Vi contatterà il nostro Tecnico Commerciale {commerciale}</b> per concordare il sopralluogo e preparare l'offerta.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "riepilogo_commerciale",
+  "nome": "Al Tecnico Commerciale – riepilogo preventivo oltre 1.000 €",
+  "tipo_pratica": "offerta_grande",
+  "oggetto": "[Centralino] Preventivo oltre 1.000 € – {cliente} – richiamare entro le {scadenza_richiamo}",
+  "titolo": "Preventivo oltre 1.000 € da gestire",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Richiamare entro",
+    "{scadenza_richiamo}"
+   ],
+   [
+    "Cliente",
+    "{cliente} · {stato_cliente}"
+   ],
+   [
+    "Contatto",
+    "{contatto}"
+   ],
+   [
+    "Telefono",
+    "{telefono}"
+   ],
+   [
+    "Email",
+    "{email_cliente}"
+   ],
+   [
+    "Richiesta",
+    "{descrizione}"
+   ],
+   [
+    "Importo stimato",
+    "{importo}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ]
+  ],
+  "corpo_html": "<p>Ciao {commerciale},</p><p>ti ho assegnato questa richiesta: <b>chiama il cliente entro le {scadenza_richiamo}</b>, poi conferma per email giorno e fascia del sopralluogo.</p><p>Al cliente ho già scritto che entro 2 ore lo contatterai tu. Da qui la pratica è tua.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "preventivo_tmq",
+  "nome": "Al cliente – preventivo da tablet TMQ",
+  "tipo_pratica": "offerta_tablet",
+  "oggetto": "PREVENTIVO DA PARTE DEL TMQ VVF – {cliente} – {numero_pratica}",
+  "titolo": "Preventivo",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Cliente",
+    "{cliente}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>in allegato il preventivo.</p><p>Distinti saluti.</p>",
+  "firma_tipo": "tmq"
+ },
+ {
+  "codice": "modifica_evasa",
+  "nome": "Al cliente – richiesta evasa (calendario, anagrafica, disdetta)",
+  "tipo_pratica": "modifica",
+  "oggetto": "RICHIESTA EVASA – {cliente} – {numero_pratica}",
+  "titolo": "Richiesta evasa",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Richiesta",
+    "{dettaglio}"
+   ],
+   [
+    "Dettagli",
+    "{descrizione}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che la Vostra richiesta è stata registrata ed evasa.</p><p>Per qualsiasi necessità potete rispondere a questa email.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "conferma_anagrafica",
+  "nome": "Al cliente – dati anagrafici aggiornati",
+  "tipo_pratica": "modifica",
+  "oggetto": "AGGIORNAMENTO DATI – {cliente} – {numero_pratica}",
+  "titolo": "Dati aggiornati",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Cliente",
+    "{cliente}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo aggiornato i dati di <b>{cliente}</b> come da Vostra richiesta.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "conferma_disdetta",
+  "nome": "Al cliente – disdetta ricevuta",
+  "tipo_pratica": "modifica",
+  "oggetto": "DISDETTA – CONFERMA DI RICEZIONE – {cliente} – {numero_pratica}",
+  "titolo": "Disdetta ricevuta",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Cliente",
+    "{cliente}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo di aver ricevuto la richiesta di disdetta per <b>{cliente}</b>. L'ufficio competente la gestirà secondo i termini del contratto.</p><p>Distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "girata_ufficio",
+  "nome": "Al cliente – richiesta inoltrata all'ufficio competente",
+  "tipo_pratica": null,
+  "oggetto": "RICHIESTA INOLTRATA – {cliente} – {numero_pratica}",
+  "titolo": "Richiesta inoltrata",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Inoltrata a",
+    "{referente}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo inoltrato la Vostra richiesta a <b>{referente}</b>, che Vi ricontatterà il prima possibile.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "riepilogo_trasferita",
+  "nome": "Al cliente – riepilogo telefonata trasferita",
+  "tipo_pratica": "trasferimento",
+  "oggetto": "RIEPILOGO TELEFONATA – {cliente}{rif_pratica}",
+  "titolo": "Riepilogo della telefonata",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Argomento",
+    "{argomento}"
+   ],
+   [
+    "Referente",
+    "{referente}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>grazie per la telefonata di oggi. Come d'accordo Vi abbiamo messo in contatto con <b>{referente}</b>, che Vi invierà la conferma scritta di quanto concordato.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "riepilogo_richiamo",
+  "nome": "Al cliente – richiesta presa in carico, vi ricontatteremo",
+  "tipo_pratica": "trasferimento",
+  "oggetto": "RICHIESTA PRESA IN CARICO – {cliente}{rif_pratica}",
+  "titolo": "Richiesta presa in carico",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Argomento",
+    "{argomento}"
+   ],
+   [
+    "Referente",
+    "{referente}"
+   ],
+   [
+    "Vi ricontatterà",
+    "{scadenza}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>grazie per averci chiamato. Abbiamo preso in carico la Vostra richiesta: <b>{referente}</b> Vi ricontatterà <b>{scadenza}</b>.</p><p>Se preferite un altro orario, potete rispondere a questa email.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "trasf_referente",
+  "nome": "Al referente – chiamata trasferita",
+  "tipo_pratica": "trasferimento_referente",
+  "oggetto": "[Centralino] Chiamata trasferita – {cliente} – {argomento}",
+  "titolo": "Chiamata trasferita",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Scadenza",
+    "{scadenza}"
+   ],
+   [
+    "Cliente",
+    "{cliente} · {stato_cliente}"
+   ],
+   [
+    "Contatto",
+    "{contatto}"
+   ],
+   [
+    "Telefono",
+    "{telefono}"
+   ],
+   [
+    "Email",
+    "{email_cliente}"
+   ],
+   [
+    "Sede",
+    "{sede}"
+   ],
+   [
+    "Canale",
+    "{canale}"
+   ],
+   [
+    "Argomento",
+    "{argomento}"
+   ],
+   [
+    "Richiesta",
+    "{richiesta}"
+   ],
+   [
+    "Importo stimato",
+    "{importo}"
+   ]
+  ],
+  "corpo_html": "<p>Ciao {referente},</p><p>{richiesta_al_referente}</p><p><a href=\"{link}\" style=\"display:inline-block;background:#E30613;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600\">Apri la pratica</a></p><p style=\"color:#8e8e93;font-size:12px\">Trasferita da {autore} alle {ora_trasferimento}.</p>",
+  "firma_tipo": "front_office"
+ }
+]

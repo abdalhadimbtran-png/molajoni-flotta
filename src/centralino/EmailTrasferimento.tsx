@@ -3,10 +3,11 @@ import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { fmtEuro } from '../lib/format';
 import { Banner, Modal, toast } from '../ui';
 import { NOME_TIPO, STATI_CLIENTE, nomeCanale, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
-import { compila, guscioEmail, inTesto, segnaposto, type Valori } from '../lib/centralino/modelli';
+import { compila, emailDaModello, segnaposto, type Valori } from '../lib/centralino/modelli';
+import type { Template } from '../lib/centralino/tipi';
 import { partiRoma } from '../lib/centralino/sla';
 import { useConfig } from './comune';
-import { avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
+import { apriBozza, avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
@@ -14,7 +15,7 @@ const hhmm = (iso: string) => { const p = partiRoma(new Date(iso)); return `${St
 const giorno = (iso: string) => { const p = partiRoma(new Date(iso)); const oggi = partiRoma(new Date()); const dow = new Date(Date.UTC(p.y, p.m - 1, p.g)).getUTCDay();
   return p.y === oggi.y && p.m === oggi.m && p.g === oggi.g ? 'oggi' : `${GIORNI[dow]} ${String(p.g).padStart(2, '0')}/${String(p.m).padStart(2, '0')}`; };
 
-interface Bozza { a: string; oggetto: string; corpo: string }
+interface Bozza { a: string; oggetto: string; corpo: string; t?: Template }
 type Valori2 = Valori & Record<string, string>;
 
 /**
@@ -55,7 +56,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
     return {
       ...b, referente: trasf.destinatario_nome, argomento: trasf.tipo_argomento || (p ? NOME_TIPO[p.tipo] : 'la sua richiesta'),
       entro: sc ? (trasf.entro_testo || `entro le ${hhmm(sc)}`) : 'al più presto', ora_scadenza: sc ? hhmm(sc) : '', giorno: sc ? giorno(sc) : '',
-      numero_pratica: p ? `Riferimento: ${p.numero}` : '',
+      numero_pratica: p?.numero ?? '', rif_pratica: p ? ` – ${p.numero}` : '',
       stato_cliente: stato ? STATI_CLIENTE[stato][1] : '—', telefono: trasf.telefono || p?.telefono || '—', email_cliente: trasf.cliente_email || p?.email || '—',
       sede: [p?.sede, p?.indirizzo, p?.cap, p?.comune].filter(Boolean).join(', ') || '—', canale: p ? nomeCanale(p.canale) : 'Telefono',
       richiesta: [trasf.argomento, p?.descrizione].filter(Boolean).join(' — ') || '—', importo: p?.importo_stimato != null ? fmtEuro(p.importo_stimato) : '—',
@@ -72,18 +73,19 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
     const tr = m('trasf_referente'), tc = m(trasf.richiamo_scadenza ? 'riepilogo_richiamo' : 'riepilogo_trasferita');
     // nei segnaposto HTML del referente il testo è già HTML sicuro (frasi nostre); i dati del cliente vengono «escapati»
     const corpoRef = tr ? compila(tr.corpo_html.replace('{richiesta_al_referente}', '§RQ§'), valori).replace('§RQ§', valori.richiesta_al_referente) : '';
-    setRef({ a: refEmail, oggetto: tr ? compila(tr.oggetto, valori, false).replace(' ()', '') : '', corpo: corpoRef });
-    setCli({ a: trasf.cliente_email || p?.email || '', oggetto: tc ? compila(tc.oggetto, valori, false) : '', corpo: tc ? compila(tc.corpo_html, valori) : '' });
+    setRef({ a: refEmail, oggetto: tr ? compila(tr.oggetto, valori, false) : '', corpo: corpoRef, t: tr });
+    setCli({ a: trasf.cliente_email || p?.email || '', oggetto: tc ? compila(tc.oggetto, valori, false) : '', corpo: tc ? compila(tc.corpo_html, valori) : '', t: tc });
   }, [valori, config, refEmail, p]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const fin = (b: Bozza) => (b.t && valori ? emailDaModello(b.t, valori, b.corpo) : { html: b.corpo, testo: b.corpo.replace(/<[^>]+>/g, ''), oggetto: b.oggetto });
   async function inviaRef(modo: 'resend' | 'copia' | 'outlook') {
     if (!ref) return false;
-    await rpc('centralino_trasf_email_referente', { p_id: trasf.id, p_a: ref.a.trim(), p_oggetto: ref.oggetto, p_html: guscioEmail(ref.corpo), p_testo: inTesto(ref.corpo), p_modo: modo });
+    await rpc('centralino_trasf_email_referente', { p_id: trasf.id, p_a: ref.a.trim(), p_oggetto: ref.oggetto, p_html: fin(ref).html, p_testo: fin(ref).testo, p_modo: modo });
     setInviataRef(true); return true;
   }
   async function inviaCli(modo: 'resend' | 'copia' | 'outlook') {
     if (!cli) return false;
-    await rpc('centralino_trasf_email', { p_id: trasf.id, p_template: trasf.richiamo_scadenza ? 'riepilogo_richiamo' : 'riepilogo_trasferita', p_a: cli.a.trim(), p_cc: [], p_oggetto: cli.oggetto, p_html: guscioEmail(cli.corpo), p_testo: inTesto(cli.corpo), p_modo: modo });
+    await rpc('centralino_trasf_email', { p_id: trasf.id, p_template: trasf.richiamo_scadenza ? 'riepilogo_richiamo' : 'riepilogo_trasferita', p_a: cli.a.trim(), p_cc: [], p_oggetto: cli.oggetto, p_html: fin(cli).html, p_testo: fin(cli).testo, p_modo: modo });
     setInviataCli(true); return true;
   }
   async function entrambe() {
@@ -102,19 +104,20 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
   async function outlook(chi: 'ref' | 'cli') {
     const b = chi === 'ref' ? ref : cli; if (!b || !emailOk(b.a)) { setErr(chi === 'ref' ? `Aggiungi l'email di ${trasf.destinatario_nome} in Impostazioni.` : 'Scrivi l\'email del cliente.'); return; }
     setErr(null);
-    const m = costruisciMailto({ a: b.a, oggetto: b.oggetto, testo: inTesto(b.corpo) });
-    if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
     try {
+      const f = fin(b);
+      const avviso = apriBozza({ a: b.a, oggetto: b.oggetto, html: f.html, testo: f.testo, numero: p?.numero });
       await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook'));
-      window.location.href = m.url; toast(avvisoOutlook(m.troncato));
+      toast(avviso);
       const altra = chi === 'ref' ? inviataCli : inviataRef;
       if (altra) onFatto();
     } catch (e) { setErr(testoErrore(e)); }
   }
   async function copia(chi: 'ref' | 'cli') {
     const b = chi === 'ref' ? ref : cli; if (!b || !emailOk(b.a)) { setErr('Indirizzo email mancante.'); return; }
-    try { await navigator.clipboard.writeText(`${b.oggetto}\n\n${inTesto(b.corpo)}`); } catch { /* il testo resta visibile */ }
-    try { await (chi === 'ref' ? inviaRef('copia') : inviaCli('copia')); toast('Testo copiato e registrato'); } catch (e) { setErr(testoErrore(e)); }
+    const m = costruisciMailto({ a: b.a, oggetto: b.oggetto, testo: fin(b).testo });
+    if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
+    try { await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook')); window.location.href = m.url; toast(avvisoOutlook(m.troncato)); } catch (e) { setErr(testoErrore(e)); }
   }
 
   const Scheda = ({ chi, b, set, fatta, titolo }: { chi: 'ref' | 'cli'; b: Bozza | null; set: (x: Bozza) => void; fatta: boolean; titolo: string }) => (
@@ -126,7 +129,8 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
         {chi === 'ref' && !refEmail && !fatta && <p className="ct-err-email">Aggiungi l'email di {trasf.destinatario_nome} in Impostazioni › Destinatari dei trasferimenti. Il trasferimento è comunque registrato.</p>}
         <div className="field"><label>Oggetto</label><input value={b.oggetto} disabled={fatta} onChange={e => set({ ...b, oggetto: e.target.value })} /></div>
         <div className="ct-anteprima" contentEditable={!fatta} suppressContentEditableWarning onBlur={e => set({ ...b, corpo: (e.target as HTMLDivElement).innerHTML })} dangerouslySetInnerHTML={{ __html: b.corpo }} />
-        {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => copia(chi)}>Copia testo</button></div>}
+        {b.t && valori && <details className="ct-anteprima-box"><summary>Anteprima formattata</summary><iframe title="Anteprima email" className="ct-iframe ct-iframe-email" srcDoc={fin(b).html} /></details>}
+        {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => copia(chi)}>Outlook testo semplice</button></div>}
       </>}
     </section>
   );
@@ -148,7 +152,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
           {!automatico && !inviataCli && !emailOk(cli?.a ?? '') && motivo && <button className="btn" disabled={invio} onClick={entrambe}>Registra «email non disponibile»</button>}
           <button type="button" className="btn-ghost" onClick={inviataRef && inviataCli ? onFatto : onClose}>{inviataRef && inviataCli ? 'Chiudi' : 'Più tardi'}</button>
         </div>
-        <p className="hint">Ogni pulsante Outlook apre un nuovo messaggio già compilato dalla tua casella e registra l'email come inviata. Finché manca un'email resta il segnale rosso.</p>
+        <p className="hint">«Outlook → …» scarica la bozza formattata (.eml): aprila, si apre in Outlook pronta, premi Invia. L'email è registrata come inviata. Finché manca un'email resta il segnale rosso.</p>
       </div>
     </Modal>
   );

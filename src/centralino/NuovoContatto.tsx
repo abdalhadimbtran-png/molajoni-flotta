@@ -68,7 +68,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     setRichiesta(v); setSottotipo('');
     if (v === 'fornitori' && chi !== 'fornitore') setChi('fornitore');
   }
-  const tipo: TipoPratica | null = richiesta === 'offerta' ? (grande || Number(importo) > 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
+  const tipo: TipoPratica | null = richiesta === 'offerta' ? (canale === 'tablet_tmq' ? 'offerta_tablet' : grande || Number(importo) > 1000 ? 'offerta_grande' : 'offerta_piccola') : richiesta;
   const flusso = config?.flussi.find(x => x.tipo === tipo);
   const allarme = tipo === 'manutenzione' && sottotipo === 'Allarme sonoro attivo';
   const fest = config?.festivi ?? new Set<string>();
@@ -177,6 +177,8 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     <Modal titolo="Nuovo contatto" onClose={onClose}>
       <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(); } }}>
         {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
+        {canale === 'telefono' && <p className="ct-proc"><b>Risponditore:</b> 1 Manutenzione e Commerciale · 2 Fatture (pomeriggio: cellulare di Simona Colagrossi) · 3 Fornitori lun/ven (Roberta Felci) · <b>4 Emergenze tecniche h24</b> (tel. da definire)</p>}
+        {canale === 'tablet_tmq' && tipo === 'offerta_tablet' && <p className="ct-proc"><b>Offerta da tablet TMQ:</b> verifica il preventivo in tutte le sue parti e invialo al cliente entro le 12:00 del giorno lavorativo successivo («PREVENTIVO DA PARTE DEL TMQ VVF», firma del TMQ).</p>}
 
         <div className="ct-sez"><span className="ct-sez-n">1</span><b>Chi chiama?</b><span className="k-hint"><kbd>←</kbd><kbd>→</kbd> per scegliere · <kbd>Invio</kbd> per confermare · <kbd>1</kbd>–<kbd>9</kbd> scelta rapida</span></div>
         <div className="segmented ct-chips ct-chi-sel" role="radiogroup" aria-label="Chi chiama" ref={chiRef} onKeyDown={tastiRadio}>

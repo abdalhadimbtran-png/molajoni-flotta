@@ -9,7 +9,7 @@ import { useConfig } from './comune';
 import { useSalva } from '../lib/salva';
 import { apriBozza, apriEmail } from '../lib/centralino/mailto';
 import { useTastoTelefono } from './tastiera';
-import { AVVISO_ALLEGATO, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
+import { AVVISO_ALLEGATO, avanzaConModello, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const lista = (s: string) => s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
@@ -64,7 +64,8 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
     const c = [...t.cc_default];
     if (t.cc_offerte_grandi) { c.push(...config.impostazioni.cc_offerte_grandi.map(x => x.email).filter(Boolean)); if (pratica?.commerciale_email) c.push(pratica.commerciale_email); }
     setCc([...new Set(c)].join(', '));
-    setAvanza(!!pratica && !!prossimo && prossimo.template === t.codice);
+    // il passo coordinatore richiede anche il nome del coordinatore: si avanza dalla finestra del passo
+    setAvanza(!!pratica && !!prossimo && avanzaConModello(pratica, prossimo.template, t.codice));
   }
   useEffect(() => {
     if (m || !ordinati.length || !val) return;

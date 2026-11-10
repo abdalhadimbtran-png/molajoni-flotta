@@ -160,3 +160,10 @@ export function conto(inizio: string | Date, scadenza: string | Date | null, ora
   const pausa = r ? (() => { const p = partiRoma(r); const dow = new Date(Date.UTC(p.y, p.m - 1, p.g)).getUTCDay(); return `in pausa fino a ${giornoRoma(r) === giornoRoma(ora) ? 'oggi' : g[dow].slice(0, 3)} ${due(p.h)}:${due(p.mi)}`; })() : null;
   return { testo: `mancano ${orologio(resto)}`, colore: resto / tot < soglia ? 'arancio' : 'verde', pausa, scaduto: false };
 }
+
+/** Inizio (00:00 di Roma) di un giorno AAAA-MM-GG, come istante ISO (per i filtri su timestamptz). */
+export const inizioGiornoRoma = (d: string) => { const [y, m, g] = d.split('-').map(Number); return daRoma(y, m, g, 0, 0).toISOString(); };
+/** Fine (23:59:59.999 di Roma) di un giorno AAAA-MM-GG, come istante ISO. */
+export const fineGiornoRoma = (d: string) => new Date(new Date(inizioGiornoRoma(piuGiorno(d))).getTime() - 1).toISOString();
+/** Primo giorno del mese di Roma (AAAA-MM-01) dell'istante dato. */
+export const primoDelMeseRoma = (d: Date = new Date()) => { const p = partiRoma(d); return iso(p.y, p.m, 1); };

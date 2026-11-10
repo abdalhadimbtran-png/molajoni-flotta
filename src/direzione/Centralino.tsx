@@ -12,7 +12,7 @@ import KpiTrasferimenti from '../centralino/KpiTrasferimenti';
 import { calcolaKpi, durata } from '../lib/centralino/kpi';
 import { kpi, linkAnalisi, valuta, type RecPratica } from '../lib/centralino/registro';
 import { CANALI, NOME_TIPO, STATI_CLIENTE, nomeCanale, type StatoCliente } from '../lib/centralino/tipi';
-import { testoResiduo } from '../lib/centralino/sla';
+import { inizioGiornoRoma, testoResiduo } from '../lib/centralino/sla';
 import { giorniTra, heatmap, intervallo, perCommerciale, piuGiorni, precedente, primaRisposta, slaPerPasso, trend, valore, type Periodo } from '../lib/direzione/analisi';
 import { BASE, Barre, Cella, Delta, Info, Kpi, Sezione, oggiRoma } from './comuni';
 import { Feed } from './Feed';
@@ -24,7 +24,7 @@ const PASSI = [['coordinatore', 'Inviato al coordinatore'], ['tecnico', 'Tecnico
 const SEZ = [['volumi', 'Volumi'], ['servizio', 'Servizio'], ['offerte', 'Offerte'], ['trasferimenti', 'Trasferimenti'], ['qualita', 'Qualità'], ['registro', 'Registro di Jennifer'], ['movimenti', 'Movimenti']] as const;
 
 async function carica90(da: string) {
-  const { data, error } = await supabase.from('pratiche').select('created_at').gte('created_at', `${da}T00:00:00`).limit(10000);
+  const { data, error } = await supabase.from('pratiche').select('created_at').gte('created_at', inizioGiornoRoma(da)).limit(10000);
   if (error) throw error; return (data ?? []) as { created_at: string }[];
 }
 

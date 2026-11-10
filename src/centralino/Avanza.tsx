@@ -32,7 +32,7 @@ export function componi(t: Template, p: Pratica, firma: string, a: string, extra
  * «Invia email al coordinatore e avanti», «Conferma e informa il cliente», «Chiudi».
  * Scorciatoia: Invio = azione principale, Esc = chiudi.
  */
-export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica; f: Flusso; stadio?: unknown; onClose: () => void; onFatto: () => void; onEmail?: (template?: string) => void }) {
+export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica; f: Flusso; stadio?: unknown; onClose: () => void; onFatto: () => void; onEmail?: (template?: string, dopoPasso?: boolean) => void }) {
   const { config } = useConfig();
   const s = prossimoStadio(f, p);
   const req = s?.requisiti ?? [];
@@ -194,16 +194,16 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
         if (voce) { await avanza(dopo.key, { informato_voce: true }); toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato a voce`); }
         else if (emailOk(p.email) && !automatico) {
           // una sola finestra Outlook per clic: la seconda email (al cliente) si apre subito dopo nel compositore
-          apriSeServe(); toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Ora l'email al cliente: «Apri in Outlook».`); onFatto(); onEmail?.(dopo.template); return;
+          apriSeServe(); toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Ora l'email al cliente: «Apri in Outlook».`); onFatto(); onEmail?.(dopo.template, true); return;
         } else if (emailOk(p.email)) {
           const ec = componi(tCliente, p, firma, p.email!, { tecnico_nome: String(dati.tecnico_nome), tecnico_quando: String(dati.tecnico_quando), tecnico_telefono: tecnico?.telefono ?? null } as Partial<Pratica>);
           await inviaEmail(ec, tCliente.codice);
           await avanza(dopo.key, {});
           toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato`);
-        } else { toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Manca l'email del cliente: informalo per telefono o scrivi l'email.`); onFatto(); onEmail?.(dopo.template); return; }
+        } else { toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Manca l'email del cliente: informalo per telefono o scrivi l'email.`); onFatto(); onEmail?.(dopo.template, true); return; }
       } else if (!apriSeServe()) toast(ultimo ? `${p.numero}: pratica chiusa` : `${p.numero}: ${s.nome}`);
       onFatto();
-      if (extraDopo) onEmail?.(tExtra!.codice);
+      if (extraDopo) onEmail?.(tExtra!.codice, true);
     });
     if (!esito.ok && !esito.duplicato) { setErr(esito.messaggio); setInvio(false); }
   }

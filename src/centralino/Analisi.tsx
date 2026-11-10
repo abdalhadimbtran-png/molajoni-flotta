@@ -6,7 +6,7 @@ import { Errore, toast, useLoad } from '../ui';
 import { testoCella, type Col, type Report, type Riga } from '../admin/report/catalogo';
 import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, eCliente, nomeCanale, nomeTipoContatto, type Esito } from '../lib/centralino/tipi';
 import { KPI, kpi, valuta, type Filtri, type RecInfo, type RecPratica, type RecTrasf } from '../lib/centralino/registro';
-import { orologio } from '../lib/centralino/sla';
+import { giornoRoma, orologio } from '../lib/centralino/sla';
 import { datiPeriodo } from './Direzione';
 import { useAdesso, useConfig } from './comune';
 import { Conto, nomeStadio } from './componenti';
@@ -19,7 +19,7 @@ const COL_PRATICHE: Col[] = [c('numero', 'Numero', 'testo', 15), c('quando', 'Da
 const COL_TRASF: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('cliente', 'Nome', 'testo', 22), c('stato_cliente', 'Cliente è', 'testo', 11), c('referente', 'Referente', 'testo', 16), c('argomento', 'Argomento', 'testo', 18),
   c('esito', 'Modalità', 'testo', 16), c('scadenza', 'Richiamo entro', 'dataora', 15), c('richiamato', 'Richiamato', 'dataora', 15), c('ritardo', 'Ritardo', 'testo', 10), c('email_ref', 'Email referente', 'testo', 10), c('email_cli', 'Email cliente', 'testo', 10)];
 const COL_INFO: Col[] = [c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 12), c('cliente', 'Cliente / nota', 'testo', 40), c('tipo', 'Tipo', 'testo', 20)];
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => giornoRoma(d);
 /** Persona reale se nota (tecnico, commerciale), altrimenti il ruolo assegnato. */
 const chiDi = (p: RecPratica) => { const x = p as RecPratica & { tecnico_nome?: string | null; commerciale_nome?: string | null }; return x.tecnico_nome || x.commerciale_nome || p.assegnato_nome || ''; };
 

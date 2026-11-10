@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Errore, useLoad } from '../ui';
 import { CANALI, ESITI, NOME_TIPO, STATI_CLIENTE, type Pratica } from '../lib/centralino/tipi';
+import { fineGiornoRoma, giornoRoma, inizioGiornoRoma, primoDelMeseRoma } from '../lib/centralino/sla';
 import { CAMPI_PRATICA, useAdesso, useConfig } from './comune';
 import { ChiBadge, Ic, SlaChip, iconaTipo, nomeStadio, regolaDi } from './componenti';
 import { Scheletro } from './Scheletro';
@@ -26,14 +27,14 @@ export default function Pratiche() {
   const { config } = useConfig();
   const oggi = new Date();
   const [vista, setVista] = useState<Vista>('aperte');
-  const [da, setDa] = useState(new Date(oggi.getFullYear(), oggi.getMonth(), 1).toISOString().slice(0, 10));
-  const [a, setA] = useState(oggi.toISOString().slice(0, 10));
+  const [da, setDa] = useState(primoDelMeseRoma(oggi));
+  const [a, setA] = useState(giornoRoma(oggi));
   const [tipo, setTipo] = useState(''); const [esito, setEsito] = useState(''); const [canale, setCanale] = useState(''); const [q, setQ] = useState(''); const [stato, setStato] = useState(''); const [chi] = useState('');
   const { data, errore, reload } = useLoad(async () => {
     let x = supabase.from('pratiche').select(CAMPI_PRATICA);
     if (vista === 'aperte') x = x.eq('esito', 'aperta').order('sla_scadenza', { ascending: true, nullsFirst: false });
-    else if (vista === 'oggi') x = x.gte('created_at', `${oggi.toISOString().slice(0, 10)}T00:00:00`).order('created_at', { ascending: false });
-    else x = x.gte('created_at', `${da}T00:00:00`).lte('created_at', `${a}T23:59:59`).order('created_at', { ascending: false });
+    else if (vista === 'oggi') x = x.gte('created_at', inizioGiornoRoma(giornoRoma(new Date()))).order('created_at', { ascending: false });
+    else x = x.gte('created_at', inizioGiornoRoma(da)).lte('created_at', fineGiornoRoma(a)).order('created_at', { ascending: false });
     const { data, error } = await x.limit(2000);
     if (error) throw error; return (data ?? []) as Pratica[];
   }, [vista, da, a, ctx.versione]);

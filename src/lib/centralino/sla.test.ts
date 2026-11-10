@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conto, daRoma, giornoRoma, orologio, riapertura, scadenzaSla, secondiUfficio, semaforo, testoRegola, testoResiduo } from './sla';
+import { conto, daRoma, fineGiornoRoma, inizioGiornoRoma, primoDelMeseRoma, giornoRoma, orologio, riapertura, scadenzaSla, secondiUfficio, semaforo, testoRegola, testoResiduo } from './sla';
 import { compila, segnaposto } from './modelli';
 import { calcolaKpi, calcolaTrasf } from './kpi';
 
@@ -120,5 +120,17 @@ describe('conto alla rovescia', () => {
   it('dopo la scadenza conta il ritardo in rosso', () => {
     const c = conto(R(2026, 11, 5, 9), R(2026, 11, 5, 10), R(2026, 11, 5, 10, 18), FEST)!;
     expect(c).toMatchObject({ testo: 'in ritardo da 00:18', colore: 'rosso', scaduto: true });
+  });
+});
+
+describe('limiti del giorno di Roma', () => {
+  it('inverno (UTC+1) e estate (UTC+2)', () => {
+    expect(inizioGiornoRoma('2026-11-10')).toBe('2026-11-09T23:00:00.000Z');
+    expect(fineGiornoRoma('2026-11-10')).toBe('2026-11-10T22:59:59.999Z');
+    expect(inizioGiornoRoma('2026-07-01')).toBe('2026-06-30T22:00:00.000Z');
+  });
+  it('primo del mese secondo Roma', () => {
+    expect(primoDelMeseRoma(new Date('2026-10-31T23:30:00Z'))).toBe('2026-11-01');
+    expect(primoDelMeseRoma(new Date('2026-11-10T12:00:00Z'))).toBe('2026-11-01');
   });
 });

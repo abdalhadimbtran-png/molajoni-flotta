@@ -11,7 +11,7 @@ import { Scheletro } from './Scheletro';
 import type { Dataset } from '../lib/centralino/registro';
 import { Tessera } from './Tessera';
 import KpiTrasferimenti from './KpiTrasferimenti';
-import { semaforo, testoResiduo } from '../lib/centralino/sla';
+import { fineGiornoRoma, giornoRoma, inizioGiornoRoma, primoDelMeseRoma, semaforo, testoResiduo } from '../lib/centralino/sla';
 import { CAMPI_PRATICA, useAdesso, useAggiornamento, useConfig } from './comune';
 import { nomeStadio } from './componenti';
 import { trasferimenti } from './Trasferimento';
@@ -21,7 +21,7 @@ export interface DatiPeriodo extends Dataset { pratiche: Pratica[]; eventi: (Eve
 
 /** Pratiche create nel periodo + chiuse nel periodo + eventi + tutte le aperte + trasferimenti + contatti informativi: base di KPI, dettagli e report. */
 export async function datiPeriodo(da: string, a: string): Promise<DatiPeriodo> {
-  const fine = `${a}T23:59:59`, ini = `${da}T00:00:00`;
+  const fine = fineGiornoRoma(a), ini = inizioGiornoRoma(da);
   const [p, e, ap, t, inf, ch, ag] = await Promise.all([
     supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').gte('created_at', ini).lte('created_at', fine).limit(5000),
     supabase.from('pratiche_eventi').select('*, pratiche(numero,cliente_nome)').gte('at', ini).lte('at', fine).order('at', { ascending: false }).limit(5000),
@@ -36,7 +36,7 @@ export async function datiPeriodo(da: string, a: string): Promise<DatiPeriodo> {
     info: (inf.data ?? []) as Dataset['info'], chiuse: (ch.data ?? []) as Pratica[], agg: (ag.data ?? []) as Dataset['agg'] };
 }
 const pc = (n: number | null) => (n == null ? '—' : `${n}%`);
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => giornoRoma(d);
 
 /** /direzione/centralino: monitoraggio in sola lettura. */
 export default function Direzione() {
@@ -47,7 +47,7 @@ export default function Direzione() {
   const [da, a] = useMemo(() => {
     const o = new Date();
     if (per === 'oggi') return [iso(o), iso(o)];
-    if (per === 'mese') return [iso(new Date(o.getFullYear(), o.getMonth(), 1)), iso(o)];
+    if (per === 'mese') return [primoDelMeseRoma(o), iso(o)];
     return [iso(new Date(Date.now() - (Number(per) - 1) * 864e5)), iso(o)];
   }, [per]);
   const { data, errore, reload } = useLoad(async () => ({ ...(await datiPeriodo(da, a)), trend: await trasferimenti(new Date(Date.now() - 30 * 864e5).toISOString()) }), [da, a, ctx.versione]);

@@ -33,6 +33,13 @@ export default function Pratica() {
   const nuova = qs.get('nuova') === '1';
   // dopo un passo si apre subito il successivo (una schermata per passo, nessun clic in più)
   const [continua, setContinua] = useState<string | null>(null);
+  // email da aprire dopo un passo (presa in carico, email al cliente): si apre a dati ricaricati, così
+  // il compositore ha tecnico/quando aggiornati e il passo successivo non lo sostituisce
+  const [emailDopo, setEmailDopo] = useState<{ codice?: string; da: string } | null>(null);
+  useEffect(() => {
+    if (!emailDopo || !data || data.pratica.stato_corrente === emailDopo.da) return;
+    setEmailDopo(null); setCodiceEmail(emailDopo.codice); setModale('email');
+  }, [emailDopo, data]);
   useEffect(() => {
     if (!continua || !data) return;
     if (data.pratica.stato_corrente === continua) return;
@@ -67,7 +74,7 @@ export default function Pratica() {
   async function avanzaUno() {
     if (!prossimo) return;
     if (!avanzaDiretto(prossimo) || (data?.pr?.mancanti.length ?? 0) > 0) { setModale('avanza'); return; }
-    try { await rpc('centralino_avanza', { p_id: p.id, p_stadio: prossimo.key, p_dati: {}, p_testo: null }); toast(prossimo.nome); fatto(); } catch (e) { toast(testoErrore(e)); }
+    try { await rpc('centralino_avanza', { p_id: p.id, p_stadio: prossimo.key, p_dati: {}, p_testo: null }); toast(prossimo.nome); setContinua(p.stato_corrente); fatto(); } catch (e) { toast(testoErrore(e)); }
   }
   async function carica(l: FileList | null) {
     if (!l) return;
@@ -173,7 +180,7 @@ export default function Pratica() {
         </aside>
       </div>
 
-      {modale === 'avanza' && f && <Avanza p={p} f={f} onClose={() => setModale('')} onFatto={() => { setContinua(p.stato_corrente); fatto(); }} onEmail={t => { setCodiceEmail(t); setModale('email'); }} />}
+      {modale === 'avanza' && f && <Avanza p={p} f={f} onClose={() => setModale('')} onFatto={() => { setContinua(p.stato_corrente); fatto(); }} onEmail={(t, dopoPasso) => { if (dopoPasso) { setContinua(null); setEmailDopo({ codice: t, da: p.stato_corrente }); } else { setCodiceEmail(t); setModale('email'); } }} />}
       {modale === 'sposta' && <ModaleSposta p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {(modale === 'nota' || modale === 'chiamata') && <ModaleNota p={p} tipo={modale} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'email' && <ModaleEmail pratica={p} codice={codiceEmail} onClose={() => setModale('')} onFatto={fatto} />}

@@ -3,6 +3,7 @@ import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { Caricamento, Errore, toast, useLoad } from '../ui';
 import { testoCella, type Col, type Report, type Riga } from '../admin/report/catalogo';
 import { ESITI, NOME_TIPO, STATI_CLIENTE, eCliente, nomeCanale, nomeTipoContatto } from '../lib/centralino/tipi';
+import { giornoRoma, primoDelMeseRoma } from '../lib/centralino/sla';
 import { calcolaKpi, calcolaTrasf, durata } from '../lib/centralino/kpi';
 import { datiPeriodo, type DatiPeriodo } from './Direzione';
 import { useConfig } from './comune';
@@ -40,8 +41,8 @@ const giorni = (da: string, a: string) => { const l: string[] = []; for (let d =
 export default function ReportCentralino() {
   const { config } = useConfig();
   const o = new Date();
-  const [da, setDa] = useState(new Date(o.getFullYear(), o.getMonth(), 1).toISOString().slice(0, 10));
-  const [a, setA] = useState(o.toISOString().slice(0, 10));
+  const [da, setDa] = useState(primoDelMeseRoma(o));
+  const [a, setA] = useState(giornoRoma(o));
   const [sel, setSel] = useState(DEF[0]);
   const [esporto, setEsporto] = useState('');
   const { data, errore, reload } = useLoad(async () => {

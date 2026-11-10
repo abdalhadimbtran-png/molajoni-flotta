@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Caricamento } from '../ui';
 import { Icona, Layout, type Gruppo } from '../admin/Barra';
 import { useSessione } from '../admin/Shell';
+import { Protezione } from '../Protezione';
 import { Campanella } from '../formazione/ShellFormazione';
 import { NOME_TIPO, type Pratica } from '../lib/centralino/tipi';
 import { cerca } from './comune';
@@ -137,7 +138,7 @@ export default function ShellCentralino() {
           {s.admin && <NavLink to="/admin"><Icona n="sicurezza" />Amministrazione</NavLink>}
           <button onClick={() => supabase.auth.signOut()}><Icona n="ritorno" />Esci</button>
         </>}>
-        <Outlet context={ctx} />
+        <Protezione chiave={loc.pathname}><Outlet context={ctx} /></Protezione>
       </Layout>
       {aiuto && <AiutoTastiera onClose={() => setAiuto(false)} />}
       {aperto && <NuovoContatto cliente={preset} onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}

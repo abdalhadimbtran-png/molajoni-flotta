@@ -5,7 +5,8 @@ export type Esito = 'aperta' | 'chiusa_ok' | 'chiusa_ko' | 'annullata';
 export type TipoPratica = 'manutenzione' | 'sopralluogo' | 'offerta_piccola' | 'offerta_grande' | 'modifica' | 'amministrazione' | 'fornitori' | 'informazione' | 'trasferta' | 'abbigliamento' | 'offerta_tablet';
 export type Requisito = 'appuntamento' | 'email' | 'taylor' | 'commerciale' | 'destinatario' | 'urgenza' | 'coordinatore' | 'tecnico' | 'buono' | 'avviso' | 'informato';
 
-export interface Stadio { key: string; nome: string; sla?: RegolaSla; azione?: 'appuntamento' | 'taylor' | 'esito'; template?: string; requisiti?: Requisito[] }
+export interface Stadio { key: string; nome: string; sla?: RegolaSla; azione?: 'appuntamento' | 'taylor' | 'esito'; template?: string; requisiti?: Requisito[];
+  /** email facoltativa aggiuntiva (es. conferma al chiamante) */ template_extra?: string; extra_etichetta?: string; /** «informazione»: si può non girare (risposta data dal centralino) */ girata_facoltativa?: boolean }
 export interface Flusso {
   tipo: TipoPratica; nome: string; icona: string; ordine: number; sottotipi: string[]; sottotipi_urgenti: string[];
   stadi: Stadio[]; sla_sottotipi: Record<string, Record<string, RegolaSla>>; assegnazione: { ruolo: string; nome: string } | null;

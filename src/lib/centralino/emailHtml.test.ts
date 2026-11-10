@@ -13,7 +13,7 @@ describe('email premium', () => {
     expect(h).toContain('#E30613');
     expect(h).toContain('CT-2026-000001');
     expect(h).not.toContain('>Telefono<');
-    expect(h).toContain('Jennifer Marchetti');
+    expect(h).toContain('J. Marchetti');
     expect(h).toContain('06 6941 4281');
     expect(h).not.toMatch(/<style|class=/);
   });

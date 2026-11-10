@@ -8,10 +8,11 @@ export const ROSSO = '#E30613';
 export type FirmaTipo = 'front_office' | 'tmq' | 'nessuna';
 export interface FirmaDati { nome?: string }
 
-export const FIRMA_FRONT_OFFICE = ['Jennifer Marchetti', 'Front office', 'Molajoni Antincendi s.r.l. · dal 1930', 'tel. 06 6941 4281 · info@molajoni.it'];
+/** Firma della procedura del front office: dopo «Grazie per la preferenza e distinti saluti» (nel corpo). */
+export const FIRMA_FRONT_OFFICE = ['Molajoni Antincendi s.r.l.', 'J. Marchetti', 'tel. 06 6941 4281 · info@molajoni.it'];
 export const firmaRighe = (tipo: FirmaTipo, f: FirmaDati = {}): string[] =>
   tipo === 'nessuna' ? []
-    : tipo === 'tmq' ? [f.nome || 'Il TMQ', 'TMQ – Tecnico Manutentore Qualificato dal Corpo Nazionale dei Vigili del Fuoco', 'Molajoni Antincendi s.r.l. · dal 1930', 'tel. 06 6941 4281 · info@molajoni.it']
+    : tipo === 'tmq' ? ['Il TMQ – Tecnico Manutentore Qualificato dal Corpo Nazionale dei Vigili del Fuoco', ...(f.nome ? [f.nome] : []), 'Molajoni Antincendi s.r.l.', 'tel. 06 6941 4281 · info@molajoni.it']
     : FIRMA_FRONT_OFFICE;
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));

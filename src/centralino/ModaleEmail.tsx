@@ -7,7 +7,7 @@ import { compila, emailDaModello, segnaposto, type Valori } from '../lib/central
 import type { TecnicoDisp } from '../lib/centralino/tipi';
 import { useConfig } from './comune';
 import { apriBozza, avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
-import { templatePasso } from '../lib/centralino/passi';
+import { AVVISO_ALLEGATO, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const lista = (s: string) => s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
@@ -55,6 +55,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   function scegli(t: Template) {
     if (!val || !config) return;
     setM(t);
+    if (t.codice === 'girata_referente' && pratica) { const r = config.impostazioni.destinatari_trasferimento.find(d => d.nome === pratica.assegnato_nome); if (r?.email) setA(r.email); }
     setOgg(compila(t.oggetto, val, false));
     setCorpo(compila(t.corpo_html, val));
     const c = [...t.cc_default];
@@ -96,7 +97,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
     setErr(null);
     if (!emailOk(a)) { setErr('Scrivi l\'indirizzo email del cliente.'); return; }
     const avviso = apriBozza({ a, cc: lista(cc), oggetto: ogg, html: html(), testo: finale?.testo ?? '', numero: pratica?.numero });
-    if (await registra('outlook')) { toast(avviso); onFatto(); }
+    if (await registra('outlook')) { toast(richiedeAllegato(m) ? `${avviso} ${AVVISO_ALLEGATO}.` : avviso); onFatto(); }
   }
   async function testoSemplice() {
     const m = costruisciMailto({ a, cc: lista(cc), oggetto: ogg, testo: finale?.testo ?? '' });
@@ -129,6 +130,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
         {finale && <details className="ct-anteprima-box" open><summary>Anteprima dell'email formattata</summary>
           <iframe title="Anteprima email" className="ct-iframe ct-iframe-email" srcDoc={finale.html} /></details>}
         {pratica && prossimo && <label className="check"><input type="checkbox" checked={avanza} onChange={e => setAvanza(e.target.checked)} /> Segna anche «{prossimo.nome}» come fatto</label>}
+        {richiedeAllegato(m) && <Banner s="warn">{AVVISO_ALLEGATO}: la bozza .eml non contiene allegati.</Banner>}
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex">
           <button className="btn" disabled={invio}>{invio ? 'Apertura…' : automatico ? 'Invia' : 'Apri in Outlook'}</button>

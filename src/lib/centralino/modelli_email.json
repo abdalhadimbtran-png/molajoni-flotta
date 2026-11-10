@@ -360,7 +360,7 @@
  },
  {
   "codice": "girata_ufficio",
-  "nome": "Al cliente – richiesta inoltrata all'ufficio competente",
+  "nome": "Al cliente – richiesta inoltrata (facoltativa)",
   "tipo_pratica": null,
   "oggetto": "RICHIESTA INOLTRATA – {cliente} – {numero_pratica}",
   "titolo": "Richiesta inoltrata",
@@ -480,6 +480,91 @@
    ]
   ],
   "corpo_html": "<p>Ciao {referente},</p><p>{richiesta_al_referente}</p><p><a href=\"{link}\" style=\"display:inline-block;background:#E30613;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600\">Apri la pratica</a></p><p style=\"color:#8e8e93;font-size:12px\">Trasferita da {autore} alle {ora_trasferimento}.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "girata_referente",
+  "nome": "Al referente – richiesta girata dal centralino",
+  "tipo_pratica": null,
+  "oggetto": "[Centralino] Richiesta da gestire – {cliente} – {argomento}",
+  "titolo": "Richiesta da gestire",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Chi chiama",
+    "{chi_chiama}"
+   ],
+   [
+    "Nome",
+    "{cliente}"
+   ],
+   [
+    "Contatto",
+    "{contatto}"
+   ],
+   [
+    "Telefono",
+    "{telefono}"
+   ],
+   [
+    "Email",
+    "{email_cliente}"
+   ],
+   [
+    "Argomento",
+    "{argomento}"
+   ],
+   [
+    "Sintesi / note",
+    "{descrizione}"
+   ]
+  ],
+  "corpo_html": "<p>Ciao {referente},</p><p>ti giro questa richiesta ricevuta dal centralino: <b>{argomento}</b> da <b>{cliente}</b> ({chi_chiama}).</p><p>Sintesi: {descrizione}</p><p>Puoi ricontattare {contatto} al {telefono}? Da qui la richiesta è tua.</p><p><a href=\"{link}\" style=\"display:inline-block;background:#E30613;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600\">Apri la pratica {numero_pratica}</a></p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "girata_fornitore",
+  "nome": "Al fornitore – comunicazione inoltrata (facoltativa)",
+  "tipo_pratica": null,
+  "oggetto": "COMUNICAZIONE INOLTRATA – {cliente} – {numero_pratica}",
+  "titolo": "Comunicazione inoltrata",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Inoltrata a",
+    "{referente}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo inoltrato la Vostra comunicazione a <b>{referente}</b>, che Vi ricontatterà il prima possibile.</p><p>Cordiali saluti.</p>",
+  "firma_tipo": "front_office"
+ },
+ {
+  "codice": "presa_sopralluogo",
+  "nome": "Al cliente – richiesta sopralluogo presa in carico (facoltativa)",
+  "tipo_pratica": "sopralluogo",
+  "oggetto": "RICHIESTA SOPRALLUOGO – PRESA IN CARICO – {cliente} – {numero_pratica}",
+  "titolo": "Richiesta di sopralluogo presa in carico",
+  "dati": [
+   [
+    "Numero pratica",
+    "{numero_pratica}"
+   ],
+   [
+    "Richiesta",
+    "{descrizione}"
+   ],
+   [
+    "Indirizzo",
+    "{indirizzo}"
+   ]
+  ],
+  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo preso in carico la Vostra richiesta di sopralluogo. <b>Entro 1 ora</b> Vi ricontatteremo per comunicarVi il nome del Tecnico Commerciale e l'appuntamento.</p><p>Grazie per la preferenza e distinti saluti.</p>",
   "firma_tipo": "front_office"
  }
 ]

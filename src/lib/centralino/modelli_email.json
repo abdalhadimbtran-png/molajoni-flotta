@@ -19,7 +19,7 @@
     "{indirizzo}"
    ]
   ],
-  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo preso in carico la Vostra richiesta di intervento. <b>Entro 1 ora</b> Vi ricontatteremo per comunicarVi il nome del tecnico e l'orario.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "corpo_html": "<p>{saluto},</p><p>come anticipato telefonicamente, Vi confermiamo che sarete contattati a breve da un nostro tecnico per l'intervento richiesto.</p><p>Per qualsiasi variazione potete rispondere a questa email o chiamarci allo 06 6941 4281.</p><p>Grazie per la preferenza e distinti saluti.</p>'\n where codice = 'intervento_cliente';\nupdate public.email_template set\n  dati = '[[\"Numero pratica\", \"{numero_pratica}\"], [\"Indirizzo\", \"{indirizzo}\"]]'::jsonb,\n  corpo_html = '<p>{saluto},</p><p>Vi confermiamo che sarete contattati a breve da un nostro tecnico per fissare l'appuntamento del sopralluogo.</p><p>Grazie per la preferenza e distinti saluti.</p>'\n where codice = 'sopralluogo_cliente';\nupdate public.email_template set\n  corpo_html = '<p>{saluto},</p><p>Vi confermiamo che abbiamo preso in carico la Vostra richiesta di intervento. <b>Entro 1 ora</b> sarete contattati da un nostro tecnico.</p><p>Grazie per la preferenza e distinti saluti.</p>",
   "firma_tipo": "front_office"
  },
  {
@@ -71,7 +71,7 @@
  },
  {
   "codice": "intervento_cliente",
-  "nome": "Al cliente – intervento programmato (tecnico e orario)",
+  "nome": "Al cliente – intervento programmato",
   "tipo_pratica": "manutenzione",
   "oggetto": "INTERVENTO PROGRAMMATO – {cliente} – {numero_pratica}",
   "titolo": "Intervento programmato",
@@ -81,19 +81,11 @@
     "{numero_pratica}"
    ],
    [
-    "Tecnico",
-    "{tecnico}"
-   ],
-   [
-    "Quando",
-    "{quando}"
-   ],
-   [
     "Indirizzo",
     "{indirizzo}"
    ]
   ],
-  "corpo_html": "<p>{saluto},</p><p>come anticipato telefonicamente, Vi confermiamo che il nostro tecnico <b>{tecnico}</b> Vi contatterà <b>{quando}</b> per l'intervento richiesto.</p><p>Per qualsiasi variazione potete rispondere a questa email o chiamarci allo 06 6941 4281.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "corpo_html": "<p>{saluto},</p><p>come anticipato telefonicamente, Vi confermiamo che sarete contattati a breve da un nostro tecnico per l'intervento richiesto.</p><p>Per qualsiasi variazione potete rispondere a questa email o chiamarci allo 06 6941 4281.</p><p>Grazie per la preferenza e distinti saluti.</p>",
   "firma_tipo": "front_office"
  },
  {
@@ -151,19 +143,11 @@
     "{numero_pratica}"
    ],
    [
-    "Quando",
-    "{quando}"
-   ],
-   [
-    "Tecnico Commerciale",
-    "{tecnico}"
-   ],
-   [
     "Indirizzo",
     "{indirizzo}"
    ]
   ],
-  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo l'appuntamento per il sopralluogo <b>{quando}</b> con il nostro Tecnico Commerciale <b>{tecnico}</b>{tel_tecnico}.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "corpo_html": "<p>{saluto},</p><p>come anticipato telefonicamente, Vi confermiamo che sarete contattati a breve da un nostro tecnico per l'intervento richiesto.</p><p>Per qualsiasi variazione potete rispondere a questa email o chiamarci allo 06 6941 4281.</p><p>Grazie per la preferenza e distinti saluti.</p>'\n where codice = 'intervento_cliente';\nupdate public.email_template set\n  dati = '[[\"Numero pratica\", \"{numero_pratica}\"], [\"Indirizzo\", \"{indirizzo}\"]]'::jsonb,\n  corpo_html = '<p>{saluto},</p><p>Vi confermiamo che sarete contattati a breve da un nostro tecnico per fissare l'appuntamento del sopralluogo.</p><p>Grazie per la preferenza e distinti saluti.</p>",
   "firma_tipo": "front_office"
  },
  {
@@ -564,7 +548,7 @@
     "{indirizzo}"
    ]
   ],
-  "corpo_html": "<p>{saluto},</p><p>Vi confermiamo che abbiamo preso in carico la Vostra richiesta di sopralluogo. <b>Entro 1 ora</b> Vi ricontatteremo per comunicarVi il nome del Tecnico Commerciale e l'appuntamento.</p><p>Grazie per la preferenza e distinti saluti.</p>",
+  "corpo_html": "<p>{saluto},</p><p>come anticipato telefonicamente, Vi confermiamo che sarete contattati a breve da un nostro tecnico per l'intervento richiesto.</p><p>Per qualsiasi variazione potete rispondere a questa email o chiamarci allo 06 6941 4281.</p><p>Grazie per la preferenza e distinti saluti.</p>'\n where codice = 'intervento_cliente';\nupdate public.email_template set\n  dati = '[[\"Numero pratica\", \"{numero_pratica}\"], [\"Indirizzo\", \"{indirizzo}\"]]'::jsonb,\n  corpo_html = '<p>{saluto},</p><p>Vi confermiamo che sarete contattati a breve da un nostro tecnico per fissare l'appuntamento del sopralluogo.</p><p>Grazie per la preferenza e distinti saluti.</p>'\n where codice = 'sopralluogo_cliente';\nupdate public.email_template set\n  corpo_html = '<p>{saluto},</p><p>Vi confermiamo che abbiamo preso in carico la Vostra richiesta di intervento. <b>Entro 1 ora</b> sarete contattati da un nostro tecnico.</p><p>Grazie per la preferenza e distinti saluti.</p>'\n where codice = 'presa_intervento';\nupdate public.email_template set\n  corpo_html = '<p>{saluto},</p><p>Vi confermiamo che abbiamo preso in carico la Vostra richiesta di sopralluogo. <b>Entro 1 ora</b> sarete contattati da un nostro tecnico per l'appuntamento.</p><p>Grazie per la preferenza e distinti saluti.</p>",
   "firma_tipo": "front_office"
  }
 ]

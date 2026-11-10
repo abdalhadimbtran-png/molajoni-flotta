@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { rpc, testoErrore } from '../lib/supabase';
+import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
 import { CANALI, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, TIPI_CONTATTO, type TipoContatto, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
 import { scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla';
@@ -15,6 +15,11 @@ interface Sede { impianto: string; indirizzo: string; cap: string | null; comune
 
 /** Canali selezionabili: «Collega / Tecnico» resta solo per lo storico (nomeCanale). */
 const CANALI_SCELTA = CANALI.filter(c => c.v !== 'collega');
+
+/** Bozza del modulo in localStorage (per utente): sopravvive a chiusure accidentali. */
+const CHIAVE_BOZZA = (uid: string) => `ct-bozza-nuovo:${uid}`;
+function leggiBozza(uid: string): Record<string, unknown> | null { try { const t = localStorage.getItem(CHIAVE_BOZZA(uid)); return t ? JSON.parse(t) : null; } catch { return null; } }
+function scriviBozza(uid: string, v: Record<string, unknown> | null) { try { if (v) localStorage.setItem(CHIAVE_BOZZA(uid), JSON.stringify(v)); else localStorage.removeItem(CHIAVE_BOZZA(uid)); } catch { /* storage non disponibile */ } }
 
 /** Primo obiettivo SLA del flusso (per l'anteprima nel modulo). */
 function primoSla(f: Flusso | undefined, sottotipo: string): RegolaSla | null {
@@ -57,6 +62,47 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [suggSel, setSuggSel] = useState(-1);
   const cliente_ = chi === 'cliente';
   const infoChi = TIPI_CONTATTO.find(x => x.v === chi)!;
+  // bozza: utente → ripristino → salvataggio a ogni modifica
+  const [uid, setUid] = useState<string | null>(null);
+  const [pronta, setPronta] = useState(false);
+  const [ripristinata, setRipristinata] = useState(false);
+  const [confAnnulla, setConfAnnulla] = useState(false);
+  useEffect(() => { supabase.auth.getSession().then(({ data }) => setUid(data.session?.user.id ?? 'anon'), () => setUid('anon')); }, []);
+  useEffect(() => {
+    if (!uid) return;
+    const b = cliente ? null : leggiBozza(uid);
+    if (b) {
+      if (b.canale) setCanale(b.canale as Canale);
+      if (b.richiesta) setRichiesta(b.richiesta as TipoPratica | 'offerta');
+      if (typeof b.sottotipo === 'string') setSottotipo(b.sottotipo);
+      if (b.gestione) setGestione(b.gestione as 'centralino' | 'commerciale');
+      if (typeof b.importo === 'string') setImporto(b.importo);
+      if (typeof b.q === 'string') setQ(b.q);
+      if (b.cli) setCli(b.cli as Cliente);
+      if (typeof b.sede === 'string') setSede(b.sede);
+      if (b.f) setF(x => ({ ...x, ...(b.f as typeof x) }));
+      if (typeof b.tacit === 'boolean') setTacit(b.tacit);
+      if (typeof b.trasf === 'boolean') setTrasf(b.trasf);
+      setRipristinata(true);
+      window.setTimeout(() => { if (typeof b.urgenza === 'string') setUrgenza(b.urgenza as '' | 'urgente' | 'ordinario'); }, 0);
+    }
+    setPronta(true);
+  }, [uid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const piena = !!(richiesta || q.trim() || importo || Object.values(f).some(v => v.trim()));
+  useEffect(() => {
+    if (!uid || !pronta) return;
+    scriviBozza(uid, piena ? { canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza } : null);
+  }, [uid, pronta, piena, canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza]);
+  function svuota() {
+    if (uid) scriviBozza(uid, null);
+    setCanale('telefono'); setRichiesta(null); setSottotipo(''); setGestione(null); setImporto(''); setQ(''); setCli(null); setSede(''); setSedi([]); setContatti([]); setContattoId(null);
+    setF({ contatto_nome: '', telefono: '', email: '', indirizzo: '', cap: '', comune: '', descrizione: '', commerciale: '' }); setTacit(false); setTrasf(false); setRipristinata(false);
+  }
+  function annulla() {
+    if (piena && !confAnnulla) { setConfAnnulla(true); return; }
+    if (uid) scriviBozza(uid, null);
+    onClose();
+  }
   // all'apertura: focus sul Canale
   useEffect(() => { const k = window.setTimeout(() => focusGruppo(chiRef.current), 30); return () => window.clearTimeout(k); }, []);
 
@@ -162,6 +208,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
       } });
       if (!cliente_) await rpc('centralino_tipo_contatto', { p_pratica_id: r.id, p_trasf_id: null, p_tipo: chi });
       if (cliente_ && cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
+      if (uid) scriviBozza(uid, null);
       if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
       // passata al Tecnico Commerciale: subito il passo «email al cliente» (richiamo 2 ore per il commerciale già creato)
       onCreata(r.id, tipo === 'offerta_grande' ? 'avanza=1' : conUrgenza ? 'avanza=1' : trasf ? 'trasferisci=1' : '');
@@ -169,8 +216,9 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   }
 
   return (
-    <Modal titolo="Nuovo contatto" onClose={onClose}>
+    <Modal titolo="Nuovo contatto" onClose={onClose} bloccaFuori>
       <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(); } }}>
+        {ripristinata && <p className="ct-bozza">Bozza ripristinata · <button type="button" className="ct-link" onClick={svuota}>Svuota</button></p>}
         {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
 
 
@@ -298,7 +346,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             {scad && <>Scadenza <b>{testoResiduo(scad)}</b> </>}
             {urgente && <span className="ct-sla rosso">urgente</span>}
           </div>
-          <div className="row-flex"><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button><button className="btn" disabled={invio}>{invio ? 'Salvo…' : 'Salva'}</button></div>
+          <div className="row-flex">{confAnnulla && <span className="ct-conf">Scartare i dati? <button type="button" className="ct-link" onClick={annulla}>Scarta</button> · <button type="button" className="ct-link" onClick={() => setConfAnnulla(false)}>No</button></span>}<button type="button" className="btn-ghost" onClick={annulla}>Annulla</button><button className="btn" disabled={invio}>{invio ? 'Salvo…' : 'Salva'}</button></div>
         </div>
       </form>
     </Modal>

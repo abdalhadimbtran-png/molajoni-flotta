@@ -12,15 +12,17 @@ export function Msgs({ items }: { items: Messaggio[] }) {
 
 export const Banner = ({ s, children }: { s: 'ok' | 'ko' | 'warn'; children: ReactNode }) => <div className={`banner ${s}`}>{children}</div>;
 
-export function Modal({ titolo, onClose, children }: { titolo: string; onClose: () => void; children: ReactNode }) {
+/** `bloccaFuori`: clic sullo sfondo ed Esc non chiudono (moduli con dati da non perdere). */
+export function Modal({ titolo, onClose, children, bloccaFuori }: { titolo: string; onClose: () => void; children: ReactNode; bloccaFuori?: boolean }) {
   const { t } = useT();
   useEffect(() => {
+    if (bloccaFuori) return;
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
-  }, [onClose]);
+  }, [onClose, bloccaFuori]);
   return (
-    <div className="modal" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal" onClick={e => { if (!bloccaFuori && e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card" role="dialog" aria-modal="true" aria-label={titolo}>
         <div className="modal-head"><h2>{titolo}</h2><button className="btn-ghost btn-sm" onClick={onClose}>{t('Chiudi')}</button></div>
         {children}

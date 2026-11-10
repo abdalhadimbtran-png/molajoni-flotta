@@ -214,7 +214,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     : email ? (automatico ? 'Invia e avanti' : 'Apri in Outlook e avanti') : `Fatto: ${s.nome}`;
 
   return (
-    <Modal titolo={`Passo ${idx + 1} di ${f.stadi.length}: ${s.nome}`} onClose={onClose}>
+    <Modal titolo={`Passo ${idx + 1} di ${f.stadi.length}: ${s.nome}`} onClose={onClose} bloccaFuori>
       <form className="form" onSubmit={salva} ref={formRef} onKeyDown={e => {
         // Invio = Avanti (anche da tendine e caselle); non su pulsanti, link, riepiloghi o gruppi a scelta
         if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.defaultPrevented) return;

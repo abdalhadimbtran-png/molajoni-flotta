@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Protezione, installaGestoriGlobali } from './Protezione';
 import '@fontsource-variable/inter/opsz.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-400.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-500.css';
@@ -68,10 +69,16 @@ import ShellDirezione from './direzione/ShellDirezione';
 import PanoramicaDirezione from './direzione/Panoramica';
 import CentralinoDirezione from './direzione/Centralino';
 
+function ProtezionePagina({ children }: { children: React.ReactNode }) {
+  const loc = useLocation();
+  return <Protezione chiave={loc.pathname}>{children}</Protezione>;
+}
+
 function App() {
   if (!configurato) return <div className="wrap"><div className="banner ko">Configurazione mancante: VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.</div></div>;
   return (
     <BrowserRouter>
+      <ProtezionePagina>
       <Routes>
         {/* App di tutti i dipendenti: /t, /t/v/:qr, /t/scansiona, /t/elenco, /t/ferie, /t/ferie/nuova, /t/ferie/:id, /t/profilo */}
         <Route path="/t/*" element={<Tecnico />} />
@@ -156,8 +163,11 @@ function App() {
         <Route path="/" element={<Smistamento />} />
         <Route path="*" element={<Smistamento />} />
       </Routes>
+      </ProtezionePagina>
     </BrowserRouter>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><LinguaProvider><App /></LinguaProvider></React.StrictMode>);
+installaGestoriGlobali();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><Protezione><LinguaProvider><App /></LinguaProvider></Protezione></React.StrictMode>);

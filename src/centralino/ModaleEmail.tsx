@@ -124,7 +124,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   }
 
   return (
-    <Modal titolo={trasf ? 'Email di riepilogo al cliente' : `Email · ${pratica?.numero ?? ''}`} onClose={onClose}>
+    <Modal titolo={trasf ? 'Email di riepilogo al cliente' : `Email · ${pratica?.numero ?? ''}`} onClose={onClose} bloccaFuori>
       <form className="form ct-email" onSubmit={invia}>
         {trasf && <Banner s="warn">Dopo ogni chiamata trasferita l'email di riepilogo al cliente è obbligatoria.</Banner>}
         <div className="field"><label htmlFor="em-mod">Modello</label>

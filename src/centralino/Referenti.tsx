@@ -1,9 +1,10 @@
 import { FormEvent, useState } from 'react';
-import { rpc, supabase, testoErrore } from '../lib/supabase';
+import { rpc, supabase } from '../lib/supabase';
 import { Banner, Errore, Modal, toast, useLoad } from '../ui';
 import { config as ricaricaConfig } from './comune';
 import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
+import { useSalva } from '../lib/salva';
 
 export const RESPONSABILITA: { k: string; l: string; d: string }[] = [
   { k: 'offerte_grandi', l: 'Offerte del Tecnico Commerciale', d: 'Ricevono le offerte passate dal centralino (chi è disponibile) e sono in copia nelle prese in carico' },
@@ -64,14 +65,20 @@ export default function Referenti() {
 function Modale({ r, onClose, onFatto }: { r: Referente | null; onClose: () => void; onFatto: () => void }) {
   const [f, setF] = useState({ nome: r?.nome ?? '', ruolo: r?.ruolo ?? '', email: r?.email ?? '', telefono: r?.telefono ?? '', cellulare: r?.cellulare ?? '', note: r?.note ?? '', attivo: r?.attivo ?? true, responsabilita: r?.responsabilita ?? [], ordine: r?.ordine ?? 100, coordina_interventi: !!r?.coordina_interventi, coordina_sopralluoghi: !!r?.coordina_sopralluoghi });
   const [err, setErr] = useState<string | null>(null);
+  const { salva: esegui, inCorso } = useSalva();
   const tog = (k: string) => setF({ ...f, responsabilita: f.responsabilita.includes(k) ? f.responsabilita.filter(x => x !== k) : [...f.responsabilita, k] });
   async function salva(e: FormEvent) {
     e.preventDefault(); setErr(null);
     const email = f.email.trim().toLowerCase();
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setErr('Email non valida.'); return; }
     const riga = { ...f, nome: f.nome.trim(), email: email || null, ruolo: f.ruolo.trim() || null, telefono: f.telefono.trim() || null, cellulare: f.cellulare.trim() || null, note: f.note.trim() || null };
-    const x = r ? await supabase.from('referenti').update(riga).eq('id', r.id) : await supabase.from('referenti').insert(riga);
-    if (x.error) { setErr(testoErrore(x.error)); return; }
+    // modifica idempotente: un nuovo tentativo se cade la rete; il nuovo inserimento no (evita doppioni)
+    const esito = await esegui(async () => {
+      const x = r ? await supabase.from('referenti').update(riga).eq('id', r.id) : await supabase.from('referenti').insert(riga);
+      if (x.error) throw x.error;
+    }, { riprova: !!r });
+    if (esito.duplicato) return;
+    if (!esito.ok) { setErr(esito.messaggio); return; }
     toast('Referente salvato'); onFatto();
   }
   return (
@@ -93,7 +100,7 @@ function Modale({ r, onClose, onFatto }: { r: Referente | null; onClose: () => v
         <div className="field"><label htmlFor="rf-no">Nota (es. «al pomeriggio sul cellulare»)</label><input id="rf-no" value={f.note} onChange={e => setF({ ...f, note: e.target.value })} /></div>
         <label className="check"><input type="checkbox" checked={f.attivo} onChange={e => setF({ ...f, attivo: e.target.checked })} /> Attivo</label>
         {err && <Banner s="ko">{err}</Banner>}
-        <div className="row-flex"><button className="btn">Salva</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
+        <div className="row-flex"><button className="btn" disabled={inCorso}>{inCorso ? 'Salvataggio…' : 'Salva'}</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
       </form>
     </Modal>
   );

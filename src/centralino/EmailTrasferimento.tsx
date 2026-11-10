@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { rpc, supabase, testoErrore } from '../lib/supabase';
+import { rpc, supabase } from '../lib/supabase';
 import { fmtEuro } from '../lib/format';
 import { Banner, Modal, toast } from '../ui';
 import { NOME_TIPO, STATI_CLIENTE, nomeCanale, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
@@ -7,6 +7,7 @@ import { compila, emailDaModello, segnaposto, type Valori } from '../lib/central
 import type { Template } from '../lib/centralino/tipi';
 import { partiRoma } from '../lib/centralino/sla';
 import { useConfig } from './comune';
+import { useSalva } from '../lib/salva';
 import { apriBozza, apriEmail } from '../lib/centralino/mailto';
 import { useTastoTelefono } from './tastiera';
 
@@ -36,6 +37,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
   const [motivo, setMotivo] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
+  const { salva: esegui } = useSalva({ riprova: false });
   const automatico = config?.impostazioni.invio_email === 'automatico';
   useEffect(() => { if (!p && trasf.pratica_id) supabase.from('pratiche').select('*').eq('id', trasf.pratica_id).maybeSingle().then(r => setP((r.data as Pratica) ?? null)); }, [trasf.pratica_id, p]);
 
@@ -95,42 +97,50 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
     if (automatico && !inviataRef && !emailOk(ref?.a ?? '')) problemi.push(`Aggiungi l'email di ${trasf.destinatario_nome} in Impostazioni (Destinatari dei trasferimenti).`);
     if (!inviataCli && !emailOk(cli?.a ?? '') && !motivo) problemi.push('Scrivi l\'email del cliente oppure scegli «Email non disponibile» con il motivo.');
     setInvio(true);
-    try {
+    const esito = await esegui(async () => {
       if (automatico && !inviataRef && emailOk(ref?.a ?? '')) await inviaRef('resend');
       if (automatico && !inviataCli && emailOk(cli?.a ?? '')) await inviaCli('resend');
       else if (!inviataCli && motivo) await rpc('centralino_trasf_senza_email', { p_id: trasf.id, p_motivo: motivo });
       if (problemi.length) { setErr(problemi.join(' ')); } else { toast(automatico ? 'Email in invio: referente e cliente' : 'Registrato'); if (automatico || inviataRef) onFatto(); }
-    } catch (e) { setErr(testoErrore(e)); } finally { setInvio(false); }
+    });
+    if (esito.duplicato) return;
+    setInvio(false);
+    if (!esito.ok) setErr(esito.messaggio);
   }
   async function outlook(chi: 'ref' | 'cli') {
     const b = chi === 'ref' ? ref : cli; if (!b || !emailOk(b.a)) { setErr(chi === 'ref' ? `Aggiungi l'email di ${trasf.destinatario_nome} in Impostazioni.` : 'Scrivi l\'email del cliente.'); return; }
     setErr(null);
-    try {
+    const esito = await esegui(async () => {
       await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook'));
       toast(apriEmail({ a: b.a, oggetto: b.oggetto, testo: fin(b).testo }));
       const altra = chi === 'ref' ? inviataCli : inviataRef;
       if (altra) onFatto();
-    } catch (e) { setErr(testoErrore(e)); }
+    });
+    if (!esito.ok && !esito.duplicato) setErr(esito.messaggio);
   }
   /** Secondario: bozza formattata .eml. */
   async function eml(chi: 'ref' | 'cli') {
     const b = chi === 'ref' ? ref : cli; if (!b || !emailOk(b.a)) { setErr('Indirizzo email mancante.'); return; }
-    try {
+    const esito = await esegui(async () => {
       await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook'));
       const f = fin(b); toast(apriBozza({ a: b.a, oggetto: b.oggetto, html: f.html, testo: f.testo, numero: p?.numero }));
       if (chi === 'ref' ? inviataCli : inviataRef) onFatto();
-    } catch (e) { setErr(testoErrore(e)); }
+    });
+    if (!esito.ok && !esito.duplicato) setErr(esito.messaggio);
   }
   /** Alternativa all'email: avvisato per telefono (conta come l'email inviata). */
   async function telefono(chi: 'ref' | 'cli') {
     if (invio) return;
     setErr(null); setInvio(true);
-    try {
+    const esito = await esegui(async () => {
       await rpc('centralino_avvisato_telefono', { p_pratica_id: null, p_trasf_id: trasf.id, p_chi: chi === 'ref' ? 'referente' : 'cliente', p_destinatario: chi === 'ref' ? trasf.destinatario_nome : (trasf.cliente_nome ?? null), p_template: chi === 'ref' ? 'trasf_referente' : null, p_avanza: null });
       if (chi === 'ref') setInviataRef(true); else setInviataCli(true);
       toast(chi === 'ref' ? `${trasf.destinatario_nome} avvisato per telefono` : 'Cliente avvisato per telefono');
       if (chi === 'ref' ? inviataCli : inviataRef) onFatto();
-    } catch (e) { setErr(testoErrore(e)); } finally { setInvio(false); }
+    });
+    if (esito.duplicato) return;
+    setInvio(false);
+    if (!esito.ok) setErr(esito.messaggio);
   }
   // T: avvisa per telefono il primo ancora da fare
   useTastoTelefono(() => telefono(!inviataRef ? 'ref' : 'cli'), !(inviataRef && inviataCli));

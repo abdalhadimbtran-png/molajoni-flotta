@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { rpc, testoErrore } from '../lib/supabase';
+import { rpc } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
 import { fmtOra } from '../lib/format';
 import { prossimoStadio, type Pratica, type Template, type Trasferimento } from '../lib/centralino/tipi';
 import { compila, emailDaModello, segnaposto, type Valori } from '../lib/centralino/modelli';
 import type { TecnicoDisp } from '../lib/centralino/tipi';
 import { useConfig } from './comune';
+import { useSalva } from '../lib/salva';
 import { apriBozza, apriEmail } from '../lib/centralino/mailto';
 import { useTastoTelefono } from './tastiera';
 import { AVVISO_ALLEGATO, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
@@ -32,6 +33,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   const [avanza, setAvanza] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
+  const { salva: esegui } = useSalva({ riprova: false });
   const [senza, setSenza] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [telTec, setTelTec] = useState<string | null>(null);
@@ -80,12 +82,15 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
     if (!emailOk(a)) { setErr('Scrivi l\'indirizzo email del cliente.'); return false; }
     if (!ogg.trim()) { setErr('Scrivi l\'oggetto.'); return false; }
     setInvio(true);
-    try {
+    const esito = await esegui(async () => {
       const testo = finale?.testo ?? '';
       if (trasf) await rpc('centralino_trasf_email', { p_id: trasf.id, p_template: m?.codice ?? null, p_a: a.trim(), p_cc: lista(cc), p_oggetto: ogg, p_html: html(), p_testo: testo, p_modo: modo });
       else if (pratica) await rpc('centralino_invia_email', { p_id: pratica.id, p_template: m?.codice ?? null, p_a: a.trim(), p_cc: lista(cc), p_oggetto: ogg, p_html: html(), p_testo: testo, p_modo: modo, p_avanza: avanza && prossimo ? prossimo.key : null });
-      return true;
-    } catch (x) { setErr(testoErrore(x)); return false; } finally { setInvio(false); }
+    });
+    if (esito.duplicato) return false;
+    setInvio(false);
+    if (!esito.ok) setErr(esito.messaggio);
+    return esito.ok;
   }
   const automatico = config?.impostazioni.invio_email === 'automatico';
   async function invia(e: FormEvent) { e.preventDefault(); if (!automatico) { await outlook(); return; } if (await registra('resend')) { toast('Email in invio'); onFatto(); } }
@@ -112,15 +117,19 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   async function telefono() {
     if (invio) return;
     setErr(null); setInvio(true);
-    try {
+    const esito = await esegui(async () => {
       await rpc('centralino_avvisato_telefono', { p_pratica_id: trasf ? null : pratica?.id ?? null, p_trasf_id: trasf?.id ?? null, p_chi: chi, p_destinatario: nomeDest || null, p_template: m?.codice ?? null, p_avanza: !trasf && avanza && prossimo ? prossimo.key : null });
       toast(`Registrato: ${chi === 'cliente' ? 'cliente' : nomeDest || chi} avvisato per telefono`); onFatto();
-    } catch (x) { setErr(testoErrore(x)); } finally { setInvio(false); }
+    });
+    if (esito.duplicato) return;
+    setInvio(false);
+    if (!esito.ok) setErr(esito.messaggio);
   }
   useTastoTelefono(telefono, !!m);
   async function senzaEmail() {
     if (!trasf || !motivo.trim()) { setErr('Scrivi il motivo.'); return; }
-    try { await rpc('centralino_trasf_senza_email', { p_id: trasf.id, p_motivo: motivo }); toast('Registrato: email non disponibile'); onFatto(); } catch (x) { setErr(testoErrore(x)); }
+    const esito = await esegui(() => rpc('centralino_trasf_senza_email', { p_id: trasf.id, p_motivo: motivo }));
+    if (esito.ok) { toast('Registrato: email non disponibile'); onFatto(); } else if (!esito.duplicato) setErr(esito.messaggio);
   }
 
   return (

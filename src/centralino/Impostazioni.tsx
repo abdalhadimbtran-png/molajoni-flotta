@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase, testoErrore } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Banner, Caricamento, Errore, toast, useLoad } from '../ui';
 import type { Flusso } from '../lib/centralino/tipi';
 import { config as ricaricaConfig } from './comune';
 import { useCtx } from './ShellCentralino';
 import ImportaClienti from './ImportaClienti';
 import AzzeraDati from './AzzeraDati';
+import { useSalva } from '../lib/salva';
 
 interface Riga { chiave: string; valore: unknown; descrizione: string | null }
 const NOMI: Record<string, string> = {
@@ -55,17 +56,21 @@ function Voce({ titolo, desc, valore, scrive, salva }: { titolo: string; desc: s
   const [t, setT] = useState(() => JSON.stringify(valore, null, 2));
   const [err, setErr] = useState<string | null>(null);
   const [aperto, setAperto] = useState(false);
+  const { salva: esegui, inCorso } = useSalva();
   async function ok() {
     setErr(null);
     let v: unknown; try { v = JSON.parse(t); } catch { setErr('Formato non valido: controlla virgole e virgolette.'); return; }
-    try { await salva(v); toast('Salvato'); setAperto(false); } catch (e) { setErr(testoErrore(e)); }
+    const esito = await esegui(() => salva(v));
+    if (esito.duplicato) return;
+    if (!esito.ok) { setErr(esito.messaggio); return; }
+    toast('Salvato'); setAperto(false);
   }
   return (
     <details className="ct-voce" open={aperto} onToggle={e => setAperto((e.target as HTMLDetailsElement).open)}>
       <summary><b>{titolo}</b>{desc && <span className="sub"> · {desc}</span>}</summary>
       <textarea className="ct-mono" rows={Math.min(24, t.split('\n').length + 1)} value={t} onChange={e => setT(e.target.value)} readOnly={!scrive} aria-label={titolo} />
       {err && <Banner s="ko">{err}</Banner>}
-      {scrive && <div className="row-flex"><button className="btn btn-sm" onClick={ok}>Salva</button><button className="btn-ghost btn-sm" onClick={() => setT(JSON.stringify(valore, null, 2))}>Ripristina</button></div>}
+      {scrive && <div className="row-flex"><button className="btn btn-sm" onClick={ok} disabled={inCorso}>{inCorso ? 'Salvataggio…' : 'Salva'}</button><button className="btn-ghost btn-sm" onClick={() => setT(JSON.stringify(valore, null, 2))}>Ripristina</button></div>}
     </details>
   );
 }

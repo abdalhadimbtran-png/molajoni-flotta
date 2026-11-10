@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { supabase, rpc, testoErrore } from '../lib/supabase';
+import { useSalva } from '../lib/salva';
 import { STATI_VEICOLO, fmtData, fmtKm, giorniA, normTarga } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { SEL_TECNICI, SEL_VEICOLI, type Tecnico, type Veicolo } from '../lib/tipi';
@@ -93,6 +94,7 @@ function FormVeicolo({ v, onClose, onSalvato }: { v: Veicolo | null; onClose: ()
   const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string; checked?: boolean; type?: string } }) =>
     setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const { salva: esegui, inCorso } = useSalva();
   async function salva(e: FormEvent) {
     e.preventDefault(); setErr(null);
     const base = {
@@ -101,10 +103,15 @@ function FormVeicolo({ v, onClose, onSalvato }: { v: Veicolo | null; onClose: ()
       scad_assicurazione: f.scad_assicurazione || null, scad_revisione: f.scad_revisione || null, scad_bollo: f.scad_bollo || null,
       in_officina: f.in_officina, note: f.note.trim() || null,
     };
-    const { error } = v
-      ? await supabase.from('veicoli').update({ ...base, dismesso: f.dismesso }).eq('id', v.id)
-      : await supabase.from('veicoli').insert({ ...base, km_attuali: Number(f.km_attuali || 0) });
-    if (error) { setErr(tm(testoErrore(error))); return; }
+    // modifica: un nuovo tentativo se cade la rete; nuovo veicolo: no (la targa è unica, ma evitiamo doppioni)
+    const esito = await esegui(async () => {
+      const { error } = v
+        ? await supabase.from('veicoli').update({ ...base, dismesso: f.dismesso }).eq('id', v.id)
+        : await supabase.from('veicoli').insert({ ...base, km_attuali: Number(f.km_attuali || 0) });
+      if (error) throw error;
+    }, { riprova: !!v });
+    if (esito.duplicato) return;
+    if (!esito.ok) { setErr(tm(testoErrore(esito.errore))); return; }
     toast(v ? t('Veicolo aggiornato') : t('Veicolo aggiunto')); onSalvato();
   }
   return (
@@ -125,7 +132,7 @@ function FormVeicolo({ v, onClose, onSalvato }: { v: Veicolo | null; onClose: ()
         {v && <label className="chk span2"><input type="checkbox" checked={f.dismesso} onChange={set('dismesso')} /> {t('Dismesso (non più in flotta, lo storico resta)')}</label>}
         {v && <p className="hint span2">{t('Per correggere i km usa "Movimento → Rettifica", così la correzione resta nel registro.')}</p>}
         {err && <div className="span2"><Banner s="ko">{err}</Banner></div>}
-        <div className="row-flex span2"><button className="btn">{t('Salva')}</button><button type="button" className="btn-ghost" onClick={onClose}>{t('Annulla')}</button></div>
+        <div className="row-flex span2"><button className="btn" disabled={inCorso}>{t('Salva')}</button><button type="button" className="btn-ghost" onClick={onClose}>{t('Annulla')}</button></div>
       </form>
     </Modal>
   );

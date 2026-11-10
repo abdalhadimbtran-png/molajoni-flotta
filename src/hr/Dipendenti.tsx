@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, rpc } from '../lib/supabase';
+import { useSalva } from '../lib/salva';
 import { fmtData, oggiISO } from '../lib/format';
 import { Banner, Caricamento, Errore, MenuAzioni, Modal, Pill, toast, useLoad } from '../ui';
 import {
@@ -130,6 +131,7 @@ function FormDipendente({ x, onClose, onSalvato }: { x: Dipendente | null; onClo
   const tec = f.categoria === 'TEC';
   const nuovaCessazione = !!f.data_cessazione && f.data_cessazione !== (x?.data_cessazione ?? '');
 
+  const { salva: esegui } = useSalva();
   async function salva() {
     setErr(null); setInvio(true);
     const rec = {
@@ -140,10 +142,16 @@ function FormDipendente({ x, onClose, onSalvato }: { x: Dipendente | null; onClo
       patente_scadenza: tec ? f.patente_scadenza || null : x?.patente_scadenza ?? null,
       data_cessazione: f.data_cessazione || null, attivo: x ? f.attivo : true,
     };
-    const r = x ? await supabase.from('dipendenti').update(rec).eq('id', x.id).select(SEL_DIP).single()
-      : await supabase.from('dipendenti').insert(rec).select(SEL_DIP).single();
+    const esito = await esegui(async () => {
+      const r = x ? await supabase.from('dipendenti').update(rec).eq('id', x.id).select(SEL_DIP).single()
+        : await supabase.from('dipendenti').insert(rec).select(SEL_DIP).single();
+      if (r.error) throw r.error;
+      return r;
+    }, { riprova: !!x });
+    if (esito.duplicato) return;
     setInvio(false);
-    if (r.error) { setConferma(false); setErr(erroreHR(r.error)); return; }
+    if (!esito.ok) { setConferma(false); setErr(erroreHR(esito.errore as Parameters<typeof erroreHR>[0])); return; }
+    const r = esito.dato;
     toast(x ? 'Dati salvati' : 'Dipendente aggiunto: ora crea la scheda di accesso con il PIN.');
     onSalvato(x ? null : (r.data as unknown as Dipendente));
   }

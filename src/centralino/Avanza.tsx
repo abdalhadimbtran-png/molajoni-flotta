@@ -7,6 +7,7 @@ import { giornoRoma } from '../lib/centralino/sla';
 import { emailDaModello, segnaposto } from '../lib/centralino/modelli';
 import { AVVISO_ALLEGATO, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
 import { useConfig } from './comune';
+import { useSalva } from '../lib/salva';
 import { apriEmail } from '../lib/centralino/mailto';
 import type { Eml } from '../lib/centralino/emailHtml';
 
@@ -72,6 +73,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [nota, setNota] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [invio, setInvio] = useState(false);
+  // invii email e avanzamenti non sono idempotenti: niente nuovo tentativo automatico, solo anti-doppio-clic + toast
+  const { salva: esegui } = useSalva({ riprova: false });
   const formRef = useRef<HTMLFormElement>(null);
   // all'apertura: focus sul primo campo
   useEffect(() => { const k = window.setTimeout(() => { const f = formRef.current; if (f && !f.contains(document.activeElement)) tabbabili(f)[0]?.focus(); }, 30); return () => window.clearTimeout(k); }, [s?.key]);
@@ -176,7 +179,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     const mandaEmail = !tel && !!email && !!tEmail && !(has('informato') && voce) && !(has('coordinatore') && !emailOk(destEmail));
     if (mandaEmail && !emailOk(destEmail)) return setErr(has('informato') ? 'Manca l\'email del cliente: spunta «Informato a voce».' : 'Manca l\'indirizzo email del destinatario.');
     setInvio(true);
-    try {
+    const esito = await esegui(async () => {
       if (mandaEmail && email && tEmail) await inviaEmail({ ...email, a: destEmail }, tEmail.codice);
       if (tel) await rpc('centralino_avvisato_telefono', { p_pratica_id: p.id, p_trasf_id: null, p_chi: chiTel, p_destinatario: nomeTel || null, p_template: tEmail?.codice ?? tCliente?.codice ?? null, p_avanza: null });
       // facoltativa: in automatico parte subito; con Outlook si apre dopo nel compositore (una bozza per clic)
@@ -201,7 +204,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       } else if (!apriSeServe()) toast(ultimo ? `${p.numero}: pratica chiusa` : `${p.numero}: ${s.nome}`);
       onFatto();
       if (extraDopo) onEmail?.(tExtra!.codice);
-    } catch (x) { setErr(testoErrore(x)); setInvio(false); }
+    });
+    if (!esito.ok && !esito.duplicato) { setErr(esito.messaggio); setInvio(false); }
   }
 
   telRef.current = () => { if (!invio) void salva(undefined, true); };

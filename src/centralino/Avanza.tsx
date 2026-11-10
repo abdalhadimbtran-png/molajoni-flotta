@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { tabRoving, tabbabili, tastiRadio } from './tastiera';
+import { tabRoving, tabbabili, tastiRadio, useTastoTelefono } from './tastiera';
 import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
 import { prossimoStadio, type Commerciale, type Flusso, type PersonaDisp, type Pratica, type TecnicoDisp, type Template } from '../lib/centralino/tipi';
@@ -7,7 +7,7 @@ import { giornoRoma } from '../lib/centralino/sla';
 import { emailDaModello, segnaposto } from '../lib/centralino/modelli';
 import { AVVISO_ALLEGATO, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
 import { useConfig } from './comune';
-import { apriBozza } from '../lib/centralino/mailto';
+import { apriEmail } from '../lib/centralino/mailto';
 import type { Eml } from '../lib/centralino/emailHtml';
 
 export interface Prossimo { key: string; nome: string; mancanti: string[] }
@@ -45,7 +45,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
 
   const [coord, setCoord] = useState<PersonaDisp[]>([]);
   const [coordNome, setCoordNome] = useState(p.coordinatore_nome ?? '');
-  const [telefonato, setTelefonato] = useState(!!p.coordinatore_telefonato);
+  const [telefonatoS, setTelefonato] = useState(!!p.coordinatore_telefonato);
+  const telefonato = telefonatoS;
   const [altri, setAltri] = useState<PersonaDisp[]>([]);
   const [tecCoord, setTecCoord] = useState<TecnicoDisp[]>([]);
   const [coordSelKey, setCoordSelKey] = useState('');
@@ -64,7 +65,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [comm, setComm] = useState(p.commerciale_nome ?? '');
   const [commerciali, setCommerciali] = useState<Commerciale[]>([]);
   const [dest, setDest] = useState(p.assegnato_nome ?? f.assegnazione?.nome ?? '');
-  const [voce, setVoce] = useState(false);
+  const [voceS, setVoce] = useState(false);
+  const voce = voceS;
   const [extra, setExtra] = useState(false);
   const [nota, setNota] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -118,10 +120,15 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const emailExtra = useMemo(() => (tExtra && emailOk(p.email) ? componi(tExtra, p, firma, p.email!, extraDati) : null), [tExtra, p, firma, destEff]); // eslint-disable-line react-hooks/exhaustive-deps
   const [aMod, setAMod] = useState<string | null>(null);
   const destEmail = aMod ?? aEmail;
+  const chiTel = girata ? 'referente' : has('coordinatore') ? (tecDiretto ? 'tecnico' : 'coordinatore') : tEmail?.codice === 'riepilogo_commerciale' ? 'commerciale' : 'cliente';
+  const nomeTel = girata ? destEff : has('coordinatore') ? coordNome : chiTel === 'commerciale' ? (comm || p.commerciale_nome) : (p.contatto_nome || p.cliente_nome);
 
   // passo «cliente» successivo al tecnico: si invia insieme
   const tCliente = !tablet && has('tecnico') && (dopo?.requisiti?.includes('email') || (dopo?.requisiti as string[] | undefined)?.includes('informato')) ? modello(dopo!.template) : undefined;
 
+  const telPossibile = !!(tEmail || tCliente);
+  const telRef = useRef<(() => void) | null>(null);
+  useTastoTelefono(() => telRef.current?.(), telPossibile);
   if (!s) return null;
 
   const automatico = config?.impostazioni.invio_email === 'automatico';
@@ -132,12 +139,14 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     return rpc('centralino_invia_email', { p_id: p.id, p_template: codice, p_a: e.a.trim(), p_cc: e.cc, p_oggetto: e.oggetto, p_html: e.html, p_testo: e.testo, p_modo: automatico ? 'resend' : 'outlook', p_avanza: null });
   };
   const allegato = richiedeAllegato(tEmail);
-  const apriSeServe = () => { const m = daAprire as Eml | null; if (m) toast(`${apriBozza({ ...m, numero: p.numero })}${allegato ? ` ${AVVISO_ALLEGATO}.` : ''}`); return !!m; };
+  const apriSeServe = () => { const m = daAprire as Eml | null; if (m) toast(`${apriEmail({ a: m.a, cc: m.cc, oggetto: m.oggetto, testo: m.testo })}${allegato ? ` ${AVVISO_ALLEGATO}.` : ''}`); return !!m; };
   const avanza = (key: string, dati: Record<string, unknown>) => rpc('centralino_avanza', { p_id: p.id, p_stadio: key, p_dati: dati, p_testo: nota || null });
 
-  async function salva(e?: FormEvent) {
+  async function salva(e?: FormEvent, tel = false) {
     e?.preventDefault(); if (!s) return; setErr(null);
     const dati: Record<string, unknown> = {};
+    const telefonato = telefonatoS || (tel && has('coordinatore'));
+    const voce = voceS || tel;
     if (has('coordinatore')) {
       if (!coordNome) return setErr('Scegli il coordinatore.');
       if (!telefonato && !emailOk(destEmail)) return setErr('Invia l\'email (manca l\'indirizzo) oppure segna «Telefonato».');
@@ -163,11 +172,12 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     if (has('destinatario') && destEff) dati.assegnato_nome = destEff;
     if (girata && destEff && !emailOk(destEmail)) return setErr(`Manca l'email di ${destEff}: aggiungila in Referenti oppure scrivila nell'anteprima.`);
     if (has('informato') && voce) dati.informato_voce = true;
-    const mandaEmail = !!email && !!tEmail && !(has('informato') && voce) && !(has('coordinatore') && !emailOk(destEmail));
+    const mandaEmail = !tel && !!email && !!tEmail && !(has('informato') && voce) && !(has('coordinatore') && !emailOk(destEmail));
     if (mandaEmail && !emailOk(destEmail)) return setErr(has('informato') ? 'Manca l\'email del cliente: spunta «Informato a voce».' : 'Manca l\'indirizzo email del destinatario.');
     setInvio(true);
     try {
       if (mandaEmail && email && tEmail) await inviaEmail({ ...email, a: destEmail }, tEmail.codice);
+      if (tel) await rpc('centralino_avvisato_telefono', { p_pratica_id: p.id, p_trasf_id: null, p_chi: chiTel, p_destinatario: nomeTel || null, p_template: tEmail?.codice ?? tCliente?.codice ?? null, p_avanza: null });
       // facoltativa: in automatico parte subito; con Outlook si apre dopo nel compositore (una bozza per clic)
       const extraDopo = extra && !!emailExtra && !!tExtra && !automatico;
       if (extra && emailExtra && tExtra && automatico) await inviaEmail(emailExtra, tExtra.codice);
@@ -192,6 +202,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       if (extraDopo) onEmail?.(tExtra!.codice);
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
+
+  telRef.current = () => { if (!invio) void salva(undefined, true); };
 
   const etichetta = invio ? 'Invio…'
     : has('coordinatore') ? (emailOk(destEmail) ? (automatico ? (tecDiretto ? 'Invia email al tecnico e avanti' : 'Invia email al coordinatore e avanti') : (tecDiretto ? 'Apri in Outlook (tecnico) e avanti' : 'Apri in Outlook (coordinatore) e avanti')) : 'Avanti')
@@ -263,15 +275,15 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             {email.cc.length > 0 && <p className="hint">CC: {email.cc.join(', ')}</p>}
             <div className="ct-anteprima" dangerouslySetInnerHTML={{ __html: email.corpo }} />
             <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Modifica il testo</button>
-            {!automatico && <p className="hint">Il pulsante principale scarica la bozza formattata (.eml): aprila, si apre in Outlook pronta, premi Invia. L'email è registrata come inviata.</p>}
+            {!automatico && <p className="hint">Il pulsante principale apre Outlook con il messaggio pronto: premi Invia. L'email è registrata come inviata. La versione formattata (.eml) è in «Modifica il testo».</p>}
           </details>)}
-        {allegato && <Banner s="warn">{AVVISO_ALLEGATO}: la bozza .eml non contiene allegati.</Banner>}
+        {allegato && <Banner s="warn">{AVVISO_ALLEGATO}: il messaggio non contiene allegati.</Banner>}
         {tExtra && <label className="check"><input type="checkbox" checked={extra} disabled={!emailOk(p.email)} onChange={e => setExtra(e.target.checked)} /> {s.extra_etichetta || tExtra.nome}{!emailOk(p.email) ? ' — manca l\'email di chi ha chiamato' : ''}</label>}
         {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Email non disponibile: cliente informato a voce</label>}
         {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? `Manca l'email di ${coordNome || 'questa persona'}: aggiungila in ${tecDiretto ? 'Dipendenti' : 'Referenti'} oppure basta «Telefonato».` : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}
         <details><summary>Nota (facoltativa)</summary><input aria-label="Nota" value={nota} onChange={e => setNota(e.target.value)} /></details>
         {err && <Banner s="ko">{err}</Banner>}
-        <div className="row-flex"><button className="btn" disabled={invio}>{etichetta}</button><span className="k-hint"><kbd>Invio</kbd> avanti · <kbd>Spazio</kbd> spunta · <kbd>↑</kbd><kbd>↓</kbd> nelle tendine · <kbd>Esc</kbd> chiudi</span></div>
+        <div className="row-flex"><button className="btn" disabled={invio}>{etichetta}</button>{telPossibile && <button type="button" className="btn-ghost" disabled={invio} onClick={() => salva(undefined, true)} title="Tasto T">Avvisato per telefono <kbd>T</kbd></button>}<span className="k-hint"><kbd>Invio</kbd> avanti · <kbd>Spazio</kbd> spunta · <kbd>↑</kbd><kbd>↓</kbd> nelle tendine · <kbd>Esc</kbd> chiudi</span></div>
       </form>
     </Modal>
   );

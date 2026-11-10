@@ -6,7 +6,8 @@ import { prossimoStadio, type Pratica, type Template, type Trasferimento } from 
 import { compila, emailDaModello, segnaposto, type Valori } from '../lib/centralino/modelli';
 import type { TecnicoDisp } from '../lib/centralino/tipi';
 import { useConfig } from './comune';
-import { apriBozza, avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
+import { apriBozza, apriEmail } from '../lib/centralino/mailto';
+import { useTastoTelefono } from './tastiera';
 import { AVVISO_ALLEGATO, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
@@ -93,17 +94,30 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
     try { await navigator.clipboard.writeText(testo); } catch { /* il browser può negarlo: il testo resta visibile */ }
     if (await registra('copia')) { toast('Testo copiato e registrato'); onFatto(); }
   }
+  /** Un clic: Outlook si apre (mailto) con A/CC/oggetto/testo semplice; l'email è registrata. */
   async function outlook() {
-    setErr(null);
-    if (!emailOk(a)) { setErr('Scrivi l\'indirizzo email del cliente.'); return; }
+    if (!(await registra('outlook'))) return;
+    const avviso = apriEmail({ a, cc: lista(cc), oggetto: ogg, testo: finale?.testo ?? '' });
+    toast(richiedeAllegato(m) ? `${avviso} ${AVVISO_ALLEGATO}.` : avviso); onFatto();
+  }
+  /** Secondario: bozza formattata .eml da aprire. */
+  async function eml() {
+    if (!(await registra('outlook'))) return;
     const avviso = apriBozza({ a, cc: lista(cc), oggetto: ogg, html: html(), testo: finale?.testo ?? '', numero: pratica?.numero });
-    if (await registra('outlook')) { toast(richiedeAllegato(m) ? `${avviso} ${AVVISO_ALLEGATO}.` : avviso); onFatto(); }
+    toast(richiedeAllegato(m) ? `${avviso} ${AVVISO_ALLEGATO}.` : avviso); onFatto();
   }
-  async function testoSemplice() {
-    const m = costruisciMailto({ a, cc: lista(cc), oggetto: ogg, testo: finale?.testo ?? '' });
-    if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
-    if (await registra('outlook')) { window.location.href = m.url; toast(avvisoOutlook(m.troncato)); onFatto(); }
+  /** Alternativa all'email: avvisato per telefono. Conta come l'email inviata (e avanza il passo se spuntato). */
+  const chi = m?.codice === 'girata_referente' ? 'referente' : m?.codice.endsWith('_coordinatore') ? 'coordinatore' : m?.codice === 'riepilogo_commerciale' ? 'commerciale' : 'cliente';
+  const nomeDest = chi === 'referente' ? pratica?.assegnato_nome : chi === 'coordinatore' ? pratica?.coordinatore_nome : chi === 'commerciale' ? pratica?.commerciale_nome : (trasf?.cliente_nome ?? pratica?.contatto_nome ?? pratica?.cliente_nome);
+  async function telefono() {
+    if (invio) return;
+    setErr(null); setInvio(true);
+    try {
+      await rpc('centralino_avvisato_telefono', { p_pratica_id: trasf ? null : pratica?.id ?? null, p_trasf_id: trasf?.id ?? null, p_chi: chi, p_destinatario: nomeDest || null, p_template: m?.codice ?? null, p_avanza: !trasf && avanza && prossimo ? prossimo.key : null });
+      toast(`Registrato: ${chi === 'cliente' ? 'cliente' : nomeDest || chi} avvisato per telefono`); onFatto();
+    } catch (x) { setErr(testoErrore(x)); } finally { setInvio(false); }
   }
+  useTastoTelefono(telefono, !!m);
   async function senzaEmail() {
     if (!trasf || !motivo.trim()) { setErr('Scrivi il motivo.'); return; }
     try { await rpc('centralino_trasf_senza_email', { p_id: trasf.id, p_motivo: motivo }); toast('Registrato: email non disponibile'); onFatto(); } catch (x) { setErr(testoErrore(x)); }
@@ -130,16 +144,16 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
         {finale && <details className="ct-anteprima-box" open><summary>Anteprima dell'email formattata</summary>
           <iframe title="Anteprima email" className="ct-iframe ct-iframe-email" srcDoc={finale.html} /></details>}
         {pratica && prossimo && <label className="check"><input type="checkbox" checked={avanza} onChange={e => setAvanza(e.target.checked)} /> Segna anche «{prossimo.nome}» come fatto</label>}
-        {richiedeAllegato(m) && <Banner s="warn">{AVVISO_ALLEGATO}: la bozza .eml non contiene allegati.</Banner>}
+        {richiedeAllegato(m) && <Banner s="warn">{AVVISO_ALLEGATO}: il messaggio non contiene allegati.</Banner>}
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex">
           <button className="btn" disabled={invio}>{invio ? 'Apertura…' : automatico ? 'Invia' : 'Apri in Outlook'}</button>
           {automatico && <button type="button" className="btn-ghost" onClick={outlook} disabled={invio}>Apri in Outlook</button>}
-          <button type="button" className="btn-ghost" onClick={testoSemplice} disabled={invio}>Outlook testo semplice</button>
+          <button type="button" className="btn-ghost" onClick={telefono} disabled={invio} title="Tasto T">Avvisato per telefono <kbd>T</kbd></button>
           <button type="button" className="btn-ghost" onClick={copia} disabled={invio}>Copia testo</button>
           <button type="button" className="btn-ghost" onClick={onClose}>Più tardi</button>
         </div>
-        <p className="hint">«Apri in Outlook» scarica una bozza formattata (.eml): aprila, si apre in Outlook pronta, premi Invia. «Outlook testo semplice» apre un messaggio senza formattazione (per Outlook nuovo/web). L'email è registrata nella storia della pratica.</p>
+        <p className="hint">«Apri in Outlook» apre subito il messaggio pronto: premi Invia. «Avvisato per telefono» segna il passo come fatto senza email. Tutto resta nella storia della pratica. <button type="button" className="ct-link" onClick={eml} disabled={invio}>Versione formattata (.eml)</button></p>
         {trasf && (
           <details open={senza} onToggle={e => setSenza((e.target as HTMLDetailsElement).open)}>
             <summary>Email non disponibile</summary>

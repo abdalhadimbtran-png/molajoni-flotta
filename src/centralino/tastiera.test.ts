@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SCORCIATOIE, indiceCifra, indiceSuccessivo, sequenzaVai, staScrivendo, tabRoving } from './tastiera';
+import { SCORCIATOIE, indiceCifra, indiceSuccessivo, sequenzaVai, staScrivendo, tabRoving, tastoTelefono } from './tastiera';
 
 describe('indiceSuccessivo (roving focus)', () => {
   it('frecce avanti/indietro a giro', () => {
@@ -58,5 +58,14 @@ describe('scorciatoie globali', () => {
   it('il riquadro «?» elenca tutte le scorciatoie richieste', () => {
     const t = SCORCIATOIE.map(s => s.tasti.join('+'));
     for (const k of ['N', '/', '?', 'Esc', 'G+O', 'G+P', 'G+T', 'G+C', 'J+K', 'A', 'Ctrl+Invio', '1–9']) expect(t).toContain(k);
+  });
+});
+
+describe('tastoTelefono', () => {
+  it('T senza modificatori e fuori dai campi', () => {
+    expect(tastoTelefono({ key: 't', target: { tagName: 'BUTTON' } })).toBe(true);
+    expect(tastoTelefono({ key: 'T', ctrlKey: true })).toBe(false);
+    expect(tastoTelefono({ key: 't', target: { tagName: 'INPUT', type: 'text' } })).toBe(false);
+    expect(tastoTelefono({ key: 'x' })).toBe(false);
   });
 });

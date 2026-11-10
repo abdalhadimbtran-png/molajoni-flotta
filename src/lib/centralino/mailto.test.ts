@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORPO_BREVE, costruisciMailto, MAX_MAILTO } from './mailto';
+import { costruisciMailto, MAX_MAILTO, SALUTO_CLIENTE, testoMailto } from './mailto';
 
 describe('costruisciMailto', () => {
   it('codifica oggetto e testo con CRLF', () => {
@@ -15,11 +15,22 @@ describe('costruisciMailto', () => {
   it('senza CC non mette il parametro', () => {
     expect(costruisciMailto({ a: 'a@x.it', cc: '', oggetto: 'O', testo: 'T' }).url).not.toContain('cc=');
   });
-  it('testo lungo: corpo breve e URL sotto il limite', () => {
-    const m = costruisciMailto({ a: 'a@x.it', oggetto: 'O', testo: 'à'.repeat(1000) });
+  it('testo lungo: corpo accorciato, firma tenuta, URL sotto il limite', () => {
+    const t = testoMailto(`${'parola à '.repeat(300)}\n\n${SALUTO_CLIENTE}`);
+    const m = costruisciMailto({ a: 'a@x.it', oggetto: 'O', testo: t });
     expect(m.troncato).toBe(true);
     expect(m.url.length).toBeLessThanOrEqual(MAX_MAILTO);
-    expect(m.url).toContain(encodeURIComponent(CORPO_BREVE));
-    expect(m.testo).toBe('à'.repeat(1000));
+    expect(decodeURIComponent(m.url)).toContain('J. Marchetti');
+    expect(decodeURIComponent(m.url)).toContain('parola');
+  });
+});
+
+describe('testoMailto', () => {
+  it('toglie titolo e firma «--», mette chiusura e firma di Jennifer', () => {
+    const t = testoMailto(`CONFERMA APPUNTAMENTO\n\nPratica: 12\n\nGentile cliente,\nconfermiamo.\n\n${SALUTO_CLIENTE}\n\n--\nMolajoni Antincendi s.r.l.\nJ. Marchetti\ntel. 06`);
+    expect(t).toBe(`Pratica: 12\n\nGentile cliente,\nconfermiamo.\n\n${SALUTO_CLIENTE}\nMolajoni Antincendi s.r.l.\nJ. Marchetti`);
+  });
+  it('senza «Grazie per la preferenza» chiude con Distinti saluti', () => {
+    expect(testoMailto('Ciao,\nti giro la richiesta.').endsWith('Distinti saluti\nMolajoni Antincendi s.r.l.\nJ. Marchetti')).toBe(true);
   });
 });

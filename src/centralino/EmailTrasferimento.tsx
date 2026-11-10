@@ -7,7 +7,8 @@ import { compila, emailDaModello, segnaposto, type Valori } from '../lib/central
 import type { Template } from '../lib/centralino/tipi';
 import { partiRoma } from '../lib/centralino/sla';
 import { useConfig } from './comune';
-import { apriBozza, avvisoOutlook, costruisciMailto } from '../lib/centralino/mailto';
+import { apriBozza, apriEmail } from '../lib/centralino/mailto';
+import { useTastoTelefono } from './tastiera';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
@@ -105,24 +106,38 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
     const b = chi === 'ref' ? ref : cli; if (!b || !emailOk(b.a)) { setErr(chi === 'ref' ? `Aggiungi l'email di ${trasf.destinatario_nome} in Impostazioni.` : 'Scrivi l\'email del cliente.'); return; }
     setErr(null);
     try {
-      const f = fin(b);
-      const avviso = apriBozza({ a: b.a, oggetto: b.oggetto, html: f.html, testo: f.testo, numero: p?.numero });
       await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook'));
-      toast(avviso);
+      toast(apriEmail({ a: b.a, oggetto: b.oggetto, testo: fin(b).testo }));
       const altra = chi === 'ref' ? inviataCli : inviataRef;
       if (altra) onFatto();
     } catch (e) { setErr(testoErrore(e)); }
   }
-  async function copia(chi: 'ref' | 'cli') {
+  /** Secondario: bozza formattata .eml. */
+  async function eml(chi: 'ref' | 'cli') {
     const b = chi === 'ref' ? ref : cli; if (!b || !emailOk(b.a)) { setErr('Indirizzo email mancante.'); return; }
-    const m = costruisciMailto({ a: b.a, oggetto: b.oggetto, testo: fin(b).testo });
-    if (m.troncato) { try { await navigator.clipboard.writeText(m.testo); } catch { /* il browser può negarlo */ } }
-    try { await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook')); window.location.href = m.url; toast(avvisoOutlook(m.troncato)); } catch (e) { setErr(testoErrore(e)); }
+    try {
+      await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook'));
+      const f = fin(b); toast(apriBozza({ a: b.a, oggetto: b.oggetto, html: f.html, testo: f.testo, numero: p?.numero }));
+      if (chi === 'ref' ? inviataCli : inviataRef) onFatto();
+    } catch (e) { setErr(testoErrore(e)); }
   }
+  /** Alternativa all'email: avvisato per telefono (conta come l'email inviata). */
+  async function telefono(chi: 'ref' | 'cli') {
+    if (invio) return;
+    setErr(null); setInvio(true);
+    try {
+      await rpc('centralino_avvisato_telefono', { p_pratica_id: null, p_trasf_id: trasf.id, p_chi: chi === 'ref' ? 'referente' : 'cliente', p_destinatario: chi === 'ref' ? trasf.destinatario_nome : (trasf.cliente_nome ?? null), p_template: chi === 'ref' ? 'trasf_referente' : null, p_avanza: null });
+      if (chi === 'ref') setInviataRef(true); else setInviataCli(true);
+      toast(chi === 'ref' ? `${trasf.destinatario_nome} avvisato per telefono` : 'Cliente avvisato per telefono');
+      if (chi === 'ref' ? inviataCli : inviataRef) onFatto();
+    } catch (e) { setErr(testoErrore(e)); } finally { setInvio(false); }
+  }
+  // T: avvisa per telefono il primo ancora da fare
+  useTastoTelefono(() => telefono(!inviataRef ? 'ref' : 'cli'), !(inviataRef && inviataCli));
 
   const Scheda = ({ chi, b, set, fatta, titolo }: { chi: 'ref' | 'cli'; b: Bozza | null; set: (x: Bozza) => void; fatta: boolean; titolo: string }) => (
     <section className={`ct-email2 ${fatta ? 'fatta' : ''}`}>
-      <div className="ct-email2-h"><b>{titolo}</b>{fatta ? <span className="ct-sla verde">inviata</span> : <span className="ct-sla rosso">da inviare</span>}</div>
+      <div className="ct-email2-h"><b>{titolo}</b>{fatta ? <span className="ct-sla verde">fatto</span> : <span className="ct-sla rosso">da inviare</span>}</div>
       {b && <>
         <div className="field"><label>A</label><input type="email" value={b.a} disabled={fatta || (chi === 'ref' && !!refEmail)} onChange={e => set({ ...b, a: e.target.value })}
           placeholder={chi === 'ref' ? 'email del referente (da Impostazioni)' : 'email del cliente'} /></div>
@@ -130,7 +145,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
         <div className="field"><label>Oggetto</label><input value={b.oggetto} disabled={fatta} onChange={e => set({ ...b, oggetto: e.target.value })} /></div>
         <div className="ct-anteprima" contentEditable={!fatta} suppressContentEditableWarning onBlur={e => set({ ...b, corpo: (e.target as HTMLDivElement).innerHTML })} dangerouslySetInnerHTML={{ __html: b.corpo }} />
         {b.t && valori && <details className="ct-anteprima-box"><summary>Anteprima formattata</summary><iframe title="Anteprima email" className="ct-iframe ct-iframe-email" srcDoc={fin(b).html} /></details>}
-        {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => copia(chi)}>Outlook testo semplice</button></div>}
+        {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => telefono(chi)} disabled={invio}>Avvisato per telefono</button><button type="button" className="ct-link" onClick={() => eml(chi)}>Versione formattata (.eml)</button></div>}
       </>}
     </section>
   );
@@ -152,7 +167,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
           {!automatico && !inviataCli && !emailOk(cli?.a ?? '') && motivo && <button className="btn" disabled={invio} onClick={entrambe}>Registra «email non disponibile»</button>}
           <button type="button" className="btn-ghost" onClick={inviataRef && inviataCli ? onFatto : onClose}>{inviataRef && inviataCli ? 'Chiudi' : 'Più tardi'}</button>
         </div>
-        <p className="hint">«Outlook → …» scarica la bozza formattata (.eml): aprila, si apre in Outlook pronta, premi Invia. L'email è registrata come inviata. Finché manca un'email resta il segnale rosso.</p>
+        <p className="hint">«Outlook → …» apre subito il messaggio pronto: premi Invia. «Avvisato per telefono» (tasto <kbd>T</kbd>) lo segna come fatto senza email. Tutto è registrato. Finché manca un'email resta il segnale rosso.</p>
       </div>
     </Modal>
   );

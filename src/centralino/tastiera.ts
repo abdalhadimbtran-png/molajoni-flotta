@@ -23,7 +23,12 @@ export const SCORCIATOIE: { tasti: string[]; testo: string; gruppo: 'Ovunque' | 
   { tasti: ['1–9'], testo: 'Scegli la n-esima voce', gruppo: 'Moduli' },
   { tasti: ['Tab'], testo: 'Gruppo / campo successivo (Maiusc+Tab indietro)', gruppo: 'Moduli' },
   { tasti: ['Ctrl', 'Invio'], testo: 'Salva il nuovo contatto', gruppo: 'Moduli' },
+  { tasti: ['T'], testo: 'Nelle email: «Avvisato per telefono» (passo fatto senza email)', gruppo: 'Moduli' },
 ];
+
+/** Tasto T (senza modificatori, non mentre si scrive): «Avvisato per telefono». */
+export const tastoTelefono = (e: { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; target?: ElLike | null }) =>
+  (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey && !staScrivendo(e.target);
 
 /** Destinazioni della sequenza «G poi …». */
 export const VAI: Record<string, string> = { o: '', p: '/pratiche', t: '/trasferimenti', c: '/clienti' };
@@ -85,6 +90,15 @@ export function focusGruppo(g: Element | null | undefined) {
   if (!g) return;
   const v = [...g.querySelectorAll<HTMLElement>('[role=radio]:not([disabled])')];
   (v.find(x => x.getAttribute('aria-checked') === 'true') ?? v[0])?.focus();
+}
+
+/** Finché il componente è montato, T chiama `fn` (se attivo). */
+export function useTastoTelefono(fn: () => void, attivo: boolean) {
+  useEffect(() => {
+    if (!attivo) return;
+    const h = (e: KeyboardEvent) => { if (!e.defaultPrevented && tastoTelefono({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, target: e.target as HTMLElement })) { e.preventDefault(); fn(); } };
+    document.addEventListener('keydown', h); return () => document.removeEventListener('keydown', h);
+  }, [fn, attivo]);
 }
 
 /** onKeyDown per un contenitore role="radiogroup" con voci role="radio" (button). */

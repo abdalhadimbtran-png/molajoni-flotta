@@ -155,7 +155,7 @@ Disattivati (non cancellati): `conferma_intervento`, `conferma_sopralluogo`, `co
 Canale «Tablet TMQ» + «Offerta» → tipo `offerta_tablet`: Ricevuta → **Verificato** (TMQ che firma, scelto tra i tecnici + casella «Preventivo verificato in tutte le sue parti», requisito `verificato` in `privato.ct_mancanti`) → **Inviato al cliente** (`preventivo_tmq`). SLA `{"tipo":"giorni_lav","valore":1,"ora":"12:00"}` = entro le 12:00 del giorno lavorativo successivo (nuovo campo `ora` in `privato.ct_sla` e `sla.ts`). Nel registro conta come «Offerte da tablet» (`tipo like 'offerta%' and canale = 'tablet_tmq'`).
 
 ## Risponditore e Emergenze h24
-Nel Nuovo contatto (telefono) il promemoria del risponditore: 1 Manutenzione e Commerciale · 2 Fatture (pomeriggio cellulare di Simona Colagrossi) · 3 Fornitori lun/ven (Roberta Felci) · **4 Emergenze tecniche h24 (tel. da definire)**. «Emergenze h24» è anche un destinatario dei trasferimenti (`destinatari_trasferimento`, email da compilare).
+Il promemoria del risponditore non è più mostrato nel Nuovo contatto (rimosso su richiesta). «Emergenze h24» è anche un destinatario dei trasferimenti (`destinatari_trasferimento`, email da compilare).
 
 ## Registro del giorno
 `centralino_registro_giorno(p_data)`: telefonate, WhatsApp, email, offerte da tablet / WA / cliente, aggiornamenti anagrafica (= pratiche «modifica»), chiuse — calcolati dalle pratiche (nessun doppio inserimento) + «+1 chiamata informativa» (`centralino_chiamate_info`).
@@ -196,6 +196,6 @@ KPI nuovi nel registro: `cliente1h`, `sla_passo` (filtro `passo`), `urgenti_gior
 
 ## Solo richieste dei clienti (0071–0073, 10/11/2026)
 
-- Il centralino gestisce **solo richieste dei clienti**: niente selettore «Chi chiama» (nuovo contatto, liste, badge, filtri, KPI, Direzione). Colonna `tipo_contatto` e dati restano (predefinito `cliente`). «Collega / Tecnico» e «Tablet TMQ» restano come **canali** (fonte), il soggetto è sempre un cliente.
+- Il centralino gestisce **solo richieste dei clienti**: niente selettore «Chi chiama» (nuovo contatto, liste, badge, filtri, KPI, Direzione). Colonna `tipo_contatto` e dati restano (predefinito `cliente`). «Tablet TMQ» resta come **canale** (fonte); «Collega / Tecnico» non è più selezionabile nel Nuovo contatto (scorciatoie 1 Telefono · 2 WhatsApp · 3 Email · 4 Tablet TMQ · 5 Altro), il valore `collega` resta leggibile nello storico, il soggetto è sempre un cliente.
 - Cosa chiede: Intervento manutenzione, Sopralluogo, Offerta (Gestita da Jennifer / Passata al Tecnico Commerciale), Offerta da tablet TMQ, Modifica calendario/anagrafica/disdetta, Informazione al cliente. «Chiamata per un responsabile» resta, solo clienti.
 - **Fatture e Fornitori non sono pratiche**: flussi `amministrazione` e `fornitori` disattivati (dati conservati), esclusi da registro, KPI, Direzione e report. Restano solo le indicazioni del risponditore (tasto 2 → Simona Colagrossi, tasto 3 → Roberta Felci). `centralino_chiamata_girata` (0072) non è più eseguibile (0073); la colonna `centralino_chiamate_info.categoria` resta inutilizzata.

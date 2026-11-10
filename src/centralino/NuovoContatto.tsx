@@ -13,6 +13,9 @@ interface Contatto { id: number; contatto_nome: string | null; ruolo: string | n
 interface Fornitore { id: number; nome: string; piva: string | null; telefono: string | null; email: string | null; referente: string | null }
 interface Sede { impianto: string; indirizzo: string; cap: string | null; comune: string | null }
 
+/** Canali selezionabili: «Collega / Tecnico» resta solo per lo storico (nomeCanale). */
+const CANALI_SCELTA = CANALI.filter(c => c.v !== 'collega');
+
 /** Primo obiettivo SLA del flusso (per l'anteprima nel modulo). */
 function primoSla(f: Flusso | undefined, sottotipo: string): RegolaSla | null {
   if (!f) return null;
@@ -169,16 +172,15 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     <Modal titolo="Nuovo contatto" onClose={onClose}>
       <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(); } }}>
         {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
-        {canale === 'telefono' && <p className="ct-proc"><b>Risponditore:</b> 1 Manutenzione e Commerciale · 2 Fatture (pomeriggio: cellulare di Simona Colagrossi) · 3 Fornitori lun/ven (Roberta Felci) · <b>4 Emergenze tecniche h24</b> (tel. da definire)</p>}
         {canale === 'tablet_tmq' && tipo === 'offerta_tablet' && <p className="ct-proc"><b>Offerta da tablet TMQ:</b> verifica il preventivo in tutte le sue parti e invialo al cliente entro le 12:00 del giorno lavorativo successivo («PREVENTIVO DA PARTE DEL TMQ VVF», firma del TMQ).</p>}
 
 
         <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b><span className="k-hint"><kbd>←</kbd><kbd>→</kbd> per scegliere · <kbd>Invio</kbd> per confermare · <kbd>1</kbd>–<kbd>9</kbd> scelta rapida</span></div>
-        <div className="ct-big ct-big-canali" role="radiogroup" aria-label="Canale" ref={chiRef} onKeyDown={tastiRadio}>
-          {CANALI.map((c, i) => (
-            <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} tabIndex={tabRoving(canale === c.v, i, true)} className={canale === c.v ? 'on' : ''} onClick={() => setCanale(c.v)}>
-              <span className="k-n" aria-hidden>{i + 1}</span>
-              <Ic n={iconaCanale(c.v)} size={22} /><span>{c.l}</span></button>))}
+        <div className="ct-canali" role="radiogroup" aria-label="Canale" ref={chiRef} onKeyDown={tastiRadio}>
+          {CANALI_SCELTA.map((c, i) => (
+            <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} tabIndex={tabRoving(canale === c.v, i, true)} className={canale === c.v ? 'on' : ''} onClick={() => setCanale(c.v)} title={c.l}>
+              <Ic n={iconaCanale(c.v)} size={18} /><span className="ct-canale-l">{c.l.split(' / ')[0]}</span>
+              <span className="k-n" aria-hidden>{i + 1}</span></button>))}
         </div>
 
         <div className="ct-sez"><span className="ct-sez-n">2</span><b>Cosa chiede il cliente?</b></div>
@@ -186,8 +188,8 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
           {RICHIESTE.map((r, i) => (
             <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} tabIndex={tabRoving(richiesta === r.v, i, !!richiesta)} className={richiesta === r.v ? 'on' : ''}
               onClick={() => { if (richiesta !== r.v) setRichiestaChi(r.v); }}>
-              <span className="k-n" aria-hidden>{i + 1}</span>
-              <Ic n={r.ic} size={22} /><span><b>{r.l}</b><span className="sub">{r.breve}</span></span></button>))}
+              <span className="ct-ico"><Ic n={r.ic} size={20} /></span><span className="ct-big-t"><b>{r.l}</b><span className="sub">{r.breve}</span></span>
+              <span className="k-n" aria-hidden>{i + 1}</span><span className="ct-check" aria-hidden /></button>))}
         </div>
         {flusso && flusso.sottotipi.length > 0 && (
           <div className="field"><label id="ct-sotto-l">Dettaglio</label>
@@ -212,11 +214,12 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
           <p className="ct-script">Nessun appuntamento ora. Di' al cliente: «Entro 1 ora la ricontattiamo per confermarle l'appuntamento».</p>
         </>)}
         {richiesta === 'offerta' && canale !== 'tablet_tmq' && (
-          <div className="ct-riga">
+          <div className="ct-sub-panel">
             <div className="ct-big ct-big-gestione" role="radiogroup" aria-label="Chi gestisce l'offerta" onKeyDown={tastiRadio}>
               {([['centralino', 'Gestita da Jennifer', 'Conferma «entro 60 minuti» e invio dell\'offerta'], ['commerciale', 'Passa al Tecnico Commerciale', 'Lo contatterà il commerciale entro 2 ore']] as const).map(([v, l, d], i) => (
                 <button type="button" key={v} role="radio" aria-checked={gestione === v} tabIndex={tabRoving(gestione === v, i, !!gestione)} className={gestione === v ? 'on' : ''} onClick={() => setGestione(v)}>
-                  <span className="k-n" aria-hidden>{i + 1}</span><Ic n={v === 'centralino' ? 'offerta' : 'collega'} size={22} /><span><b>{l}</b><span className="sub">{d}</span></span></button>))}
+                  <span className="ct-ico"><Ic n={v === 'centralino' ? 'offerta' : 'collega'} size={20} /></span><span className="ct-big-t"><b>{l}</b><span className="sub">{d}</span></span>
+                  <span className="k-n" aria-hidden>{i + 1}</span><span className="ct-check" aria-hidden /></button>))}
             </div>
             <div className="field ct-importo"><label htmlFor="ct-imp">Importo stimato (facoltativo)</label>
               <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
+import { chiaveCliente, statoPerCliente } from './statoCliente';
 import { CANALI, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, TIPI_CONTATTO, type TipoContatto, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
 import { scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla';
 import { salvaAppunti, useConfig } from './comune';
@@ -55,6 +56,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [invio, setInvio] = useState(false);
   const [stato, setStato] = useState<StatoCliente | null>(null);
   const [statoMan, setStatoMan] = useState(false);
+  const statoChiave = useRef<string | null>(null);
   const [trasf, setTrasf] = useState(false);
   const qRef = useRef<HTMLInputElement>(null);
   const chiRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,17 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
       if (b.gestione) setGestione(b.gestione as 'centralino' | 'commerciale');
       if (typeof b.importo === 'string') setImporto(b.importo);
       if (typeof b.q === 'string') setQ(b.q);
-      if (b.cli) setCli(b.cli as Cliente);
+      if (b.cli) {
+        const c = b.cli as Cliente;
+        setCli(c); statoChiave.current = chiaveCliente(c);
+        // ricarica impianti e rubrica del cliente senza toccare i campi della bozza
+        if (c.fonte !== 'fornitore') {
+          if (c.codice && c.fonte === 'taylor') rpc<Sede[]>('centralino_sedi', { p_codice: c.codice }).then(setSedi, () => setSedi([]));
+          rpc<Contatto[]>('centralino_contatti', { p_codice: c.codice, p_nome: c.nome }).then(l => { setContatti(l); setContattoId(typeof b.contattoId === 'number' && l.some(k => k.id === b.contattoId) ? b.contattoId : null); }, () => setContatti([]));
+        }
+      }
+      if (b.stato === null || typeof b.stato === 'string') setStato(b.stato as StatoCliente | null);
+      if (typeof b.statoMan === 'boolean') setStatoMan(b.statoMan);
       if (typeof b.sede === 'string') setSede(b.sede);
       if (b.f) setF(x => ({ ...x, ...(b.f as typeof x) }));
       if (typeof b.tacit === 'boolean') setTacit(b.tacit);
@@ -91,8 +103,8 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const piena = !!(richiesta || q.trim() || importo || Object.values(f).some(v => v.trim()));
   useEffect(() => {
     if (!uid || !pronta) return;
-    scriviBozza(uid, piena ? { canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza } : null);
-  }, [uid, pronta, piena, canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza]);
+    scriviBozza(uid, piena ? { canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza, stato, statoMan, contattoId } : null);
+  }, [uid, pronta, piena, canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza, stato, statoMan, contattoId]);
   function svuota() {
     if (uid) scriviBozza(uid, null);
     setCanale('telefono'); setRichiesta(null); setSottotipo(''); setGestione(null); setImporto(''); setQ(''); setCli(null); setSede(''); setSedi([]); setContatti([]); setContattoId(null);
@@ -138,12 +150,21 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   }, [q, cli, chi]);
 
   // stato cliente proposto: da Taylor (interventi recenti → attivo) o «nuovo»
+  // cliente collegato → «attivo»; scollegato → «nuovo» (se non scelto a mano)
+  useEffect(() => {
+    if (!pronta) return;
+    if (!cliente_) { statoChiave.current = null; return; }
+    const n = statoPerCliente({ stato, man: statoMan, chiave: statoChiave.current }, cli);
+    statoChiave.current = n.chiave;
+    if (n.stato !== stato) setStato(n.stato);
+    if (n.man !== statoMan) setStatoMan(n.man);
+  }, [cli, pronta, cliente_]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (statoMan) return;
     if (!cliente_) { setStato(null); return; }
-    if (cli?.stato_cliente) { setStato(cli.stato_cliente); return; }
+    if (cli) return;
     if (q.trim().length < 3) { setStato(null); return; }
-    const k = window.setTimeout(() => { rpc<StatoCliente>('centralino_stato_cliente', { p_codice: cli?.codice ?? null, p_nome: q }).then(setStato, () => undefined); }, 400);
+    const k = window.setTimeout(() => { rpc<StatoCliente>('centralino_stato_cliente', { p_codice: null, p_nome: q }).then(setStato, () => undefined); }, 400);
     return () => window.clearTimeout(k);
   }, [cli, q, statoMan, cliente_]);
 
@@ -204,7 +225,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         importo_stimato: richiesta === 'offerta' && importo ? Number(importo) : null,
         appuntamento_data: null, appuntamento_fascia: null, tacitazione_tentata: tacit,
         commerciale_nome: tipo === 'offerta_grande' ? f.commerciale || null : null, nessuno_disponibile: tipo === 'offerta_grande' && nessunoEff,
-        stato_cliente: cliente_ && statoMan ? stato : null,
+        stato_cliente: cliente_ && (statoMan || cli) ? stato : null,
       } });
       if (!cliente_) await rpc('centralino_tipo_contatto', { p_pratica_id: r.id, p_trasf_id: null, p_tipo: chi });
       if (cliente_ && cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
@@ -330,7 +351,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
 
 
         {cliente_ && q.trim().length >= 3 && <div className="field"><label htmlFor="ct-stato">Il cliente è</label>
-          <select id="ct-stato" value={stato ?? ''} onChange={e => { setStato((e.target.value || null) as StatoCliente | null); setStatoMan(!!e.target.value); }}>
+          <select id="ct-stato" value={stato ?? ''} onChange={e => { setStato((e.target.value || (cli ? 'attivo' : null)) as StatoCliente | null); setStatoMan(!!e.target.value); }}>
             <option value="">{stato ? `Proposto: ${STATI_CLIENTE[stato][1]}` : '— proposta automatica —'}</option>
             {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
           </select></div>}

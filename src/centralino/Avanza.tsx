@@ -48,7 +48,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const [telefonatoS, setTelefonato] = useState(!!p.coordinatore_telefonato);
   const telefonato = telefonatoS;
   const [altri, setAltri] = useState<PersonaDisp[]>([]);
-  const tecCoord: TecnicoDisp[] = []; // i tecnici non si scelgono più dal centralino
+  // sopralluogo: Jennifer può girare direttamente a un tecnico/commerciale; intervento/manutenzione: lo assegna il coordinatore
+  const [tecCoord, setTecCoord] = useState<TecnicoDisp[]>([]);
   const [coordSelKey, setCoordSelKey] = useState('');
   const [avvisoCoordApp, setAvvisoCoordApp] = useState(false);
   const [tecnici, setTecnici] = useState<TecnicoDisp[]>([]);
@@ -79,7 +80,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     if (has('coordinatore')) {
       rpc<PersonaDisp[]>('centralino_coordinatori', { p_tipo: p.tipo }).then(l => { setCoord(l ?? []); if (!coordNome) setCoordNome((l ?? []).find(x => x.disponibile)?.nome ?? l?.[0]?.nome ?? ''); }, () => undefined);
       rpc<PersonaDisp[]>('centralino_altri_referenti', { p_tipo: p.tipo }).then(l => setAltri(l ?? []), () => undefined);
-      // niente tecnici qui: Jennifer non sceglie il tecnico, lo assegna il coordinatore al telefono
+      if (p.tipo === 'sopralluogo') rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => setTecCoord(l ?? []), () => undefined);
     }
     if (has('tecnico') || has('informato')) rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => {
       setTecnici(l ?? []);
@@ -162,7 +163,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
       Object.assign(dati, { tecnico_nome: tecnico.nome, tecnico_dipendente_id: tecnico.id, tecnico_quando: q, tecnico_quando_at: quandoAt ? new Date(quandoAt).toISOString() : null });
     }
     if (has('buono') || has('avviso')) {
-      if (!avvisato && !app) return setErr('Spunta «Tecnico avvisato» (Taylor/WhatsApp).');
+      if (!avvisato && !app) return setErr(p.tipo === 'sopralluogo' ? 'Spunta almeno un avviso al tecnico (Taylor/WhatsApp o app).' : 'Spunta «Tecnico avvisato» (Taylor/WhatsApp).');
       if (doc.trim()) dati.documento_intervento = doc.trim();
       if (avvisato) { dati.alert_taylor = true; dati.whatsapp_tecnico = true; }
     }
@@ -249,7 +250,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
         {(has('buono') || has('avviso')) && (<>
           {has('buono') && <div className="field"><label htmlFor="av-doc">N. buono di intervento (facoltativo)</label><input id="av-doc" value={doc} onChange={e => setDoc(e.target.value)} /></div>}
           <label className="check"><input type="checkbox" checked={avvisato} onChange={e => setAvvisato(e.target.checked)} /> Tecnico avvisato: alert su Taylor + WhatsApp</label>
-          {p.tecnico_dipendente_id ? <label className="check"><input type="checkbox" checked={app} onChange={e => setApp(e.target.checked)} /> Invia anche l'avviso urgente nell'app</label> : null}
+          {p.tipo === 'sopralluogo' ? <label className="check"><input type="checkbox" checked={app} onChange={e => setApp(e.target.checked)} /> Invia anche l'avviso urgente nell'app{p.tecnico_dipendente_id ? '' : ' (tecnico senza app)'}</label> : p.tecnico_dipendente_id ? <label className="check"><input type="checkbox" checked={app} onChange={e => setApp(e.target.checked)} /> Invia anche l'avviso urgente nell'app</label> : null}
           <p className="hint">Obiettivo: {p.urgenza === 'ordinario' ? 'intervento entro 2 giorni lavorativi' : 'intervento oggi'}.</p>
         </>)}
         {has('appuntamento') && (

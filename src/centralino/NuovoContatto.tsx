@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { rpc, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
-import { CANALI, REGOLA_ANAGRAFICA, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, TIPI_CONTATTO, type TipoContatto, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
+import { CANALI, REGOLA_SQUILLI, RICHIESTE, STATI_CLIENTE, TIPI_CONTATTO, type TipoContatto, type Commerciale, type StatoCliente, SCRIPT_TELEFONO, type Canale, type Flusso, type TipoPratica } from '../lib/centralino/tipi';
 import { scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla';
 import { salvaAppunti, useConfig } from './comune';
 import Appunti from './Appunti';
@@ -172,10 +172,9 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     <Modal titolo="Nuovo contatto" onClose={onClose}>
       <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(); } }}>
         {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
-        {canale === 'tablet_tmq' && tipo === 'offerta_tablet' && <p className="ct-proc"><b>Offerta da tablet TMQ:</b> verifica il preventivo in tutte le sue parti e invialo al cliente entro le 12:00 del giorno lavorativo successivo («PREVENTIVO DA PARTE DEL TMQ VVF», firma del TMQ).</p>}
 
 
-        <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b><span className="k-hint"><kbd>←</kbd><kbd>→</kbd> per scegliere · <kbd>Invio</kbd> per confermare · <kbd>1</kbd>–<kbd>9</kbd> scelta rapida</span></div>
+        <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b></div>
         <div className="ct-canali" role="radiogroup" aria-label="Canale" ref={chiRef} onKeyDown={tastiRadio}>
           {CANALI_SCELTA.map((c, i) => (
             <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} tabIndex={tabRoving(canale === c.v, i, true)} className={canale === c.v ? 'on' : ''} onClick={() => setCanale(c.v)} title={c.l}>
@@ -183,12 +182,12 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
               <span className="k-n" aria-hidden>{i + 1}</span></button>))}
         </div>
 
-        <div className="ct-sez"><span className="ct-sez-n">2</span><b>Cosa chiede il cliente?</b></div>
+        <div className="ct-sez"><span className="ct-sez-n">2</span><b>Richiesta</b></div>
         <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta" onKeyDown={tastiRadio}>
           {RICHIESTE.map((r, i) => (
             <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} tabIndex={tabRoving(richiesta === r.v, i, !!richiesta)} className={richiesta === r.v ? 'on' : ''}
               onClick={() => { if (richiesta !== r.v) setRichiestaChi(r.v); }}>
-              <span className="ct-ico"><Ic n={r.ic} size={20} /></span><span className="ct-big-t"><b>{r.l}</b><span className="sub">{r.breve}</span></span>
+              <span className="ct-ico"><Ic n={r.ic} size={20} /></span><span className="ct-big-t"><b>{r.l}</b></span>
               <span className="k-n" aria-hidden>{i + 1}</span><span className="ct-check" aria-hidden /></button>))}
         </div>
         {flusso && flusso.sottotipi.length > 0 && (
@@ -200,47 +199,44 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             </div></div>)}
         {allarme && (
           <div className="ct-allarme">
-            <b>Allarme sonoro attivo: urgente, intervento in giornata.</b>
-            <span className="sub">Prova la tacitazione con il cliente (tasto «tacitazione» sulla centrale, poi reset).</span>
-            <label className="check"><input type="checkbox" checked={tacit} onChange={e => setTacit(e.target.checked)} /> Tacitazione tentata al telefono</label>
+            <b>Allarme: urgente</b>
+            <label className="check"><input type="checkbox" checked={tacit} onChange={e => setTacit(e.target.checked)} /> Tacitazione tentata</label>
           </div>)}
         {conUrgenza && (<>
           <div className="field"><label id="ct-urg-l">Urgenza</label>
             <div className="segmented" role="radiogroup" aria-labelledby="ct-urg-l" onKeyDown={tastiRadio}>
-              {([['urgente', 'Urgente (oggi)'], ['ordinario', 'Ordinario (entro 2 gg lav.)']] as const).map(([v, l], i) => (
+              {([['urgente', 'Urgente'], ['ordinario', 'Ordinario']] as const).map(([v, l], i) => (
                 <button type="button" key={v} role="radio" aria-checked={urgenza === v} tabIndex={tabRoving(urgenza === v, i, !!urgenza)} className={urgenza === v ? 'on' : ''} onClick={() => setUrgenza(v)}>
                   <span className="k-n" aria-hidden>{i + 1}</span>{l}</button>))}
             </div></div>
-          <p className="ct-script">Nessun appuntamento ora. Di' al cliente: «Entro 1 ora la ricontattiamo per confermarle l'appuntamento».</p>
         </>)}
         {richiesta === 'offerta' && canale !== 'tablet_tmq' && (
           <div className="ct-sub-panel">
             <div className="ct-big ct-big-gestione" role="radiogroup" aria-label="Chi gestisce l'offerta" onKeyDown={tastiRadio}>
-              {([['centralino', 'Gestita da Jennifer', 'Conferma «entro 60 minuti» e invio dell\'offerta'], ['commerciale', 'Passa al Tecnico Commerciale', 'Lo contatterà il commerciale entro 2 ore']] as const).map(([v, l, d], i) => (
+              {([['centralino', 'Gestita da Jennifer', 'Gestita da Jennifer'], ['commerciale', 'Passa al Commerciale', 'Passa al Tecnico Commerciale']] as const).map(([v, l, d], i) => (
                 <button type="button" key={v} role="radio" aria-checked={gestione === v} tabIndex={tabRoving(gestione === v, i, !!gestione)} className={gestione === v ? 'on' : ''} onClick={() => setGestione(v)}>
-                  <span className="ct-ico"><Ic n={v === 'centralino' ? 'offerta' : 'collega'} size={20} /></span><span className="ct-big-t"><b>{l}</b><span className="sub">{d}</span></span>
+                  <span className="ct-ico"><Ic n={v === 'centralino' ? 'offerta' : 'collega'} size={20} /></span><span className="ct-big-t" title={d}><b>{l}</b></span>
                   <span className="k-n" aria-hidden>{i + 1}</span><span className="ct-check" aria-hidden /></button>))}
             </div>
-            <div className="field ct-importo"><label htmlFor="ct-imp">Importo stimato (facoltativo)</label>
+            <div className="field ct-importo"><label htmlFor="ct-imp">Importo</label>
               <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>
           </div>)}
         {tipo === 'offerta_grande' && (
           <div className="ct-allarme ct-grande">
-            <b>Passata al Tecnico Commerciale: l'offerta la fa lui.</b>
+            <b>Commerciale</b>
             <div className="field"><label htmlFor="ct-com">Assegna a</label>
               <select id="ct-com" value={f.commerciale} onChange={e => setF({ ...f, commerciale: e.target.value })}>
                 <option value="">— scegli —</option>
                 {comms.map(c => <option key={c.nome} value={c.nome} >{c.nome} · {c.disponibile ? 'disponibile' : c.assente ? 'assente oggi' : !c.account && c.email ? 'senza account' : 'occupato'}</option>)}
               </select></div>
-            <label className="check"><input type="checkbox" checked={nessunoEff} disabled={comms.length > 0 && !disponibili.length} onChange={e => setNessuno(e.target.checked)} /> Nessuno disponibile ora</label>
-            <span className="sub">Di' al cliente: «Entro 2 ore la contatterà il nostro Tecnico Commerciale». Dopo il salvataggio: email al cliente, email di riepilogo al commerciale, richiamo entro 2 ore.</span>
+            <label className="check"><input type="checkbox" checked={nessunoEff} disabled={comms.length > 0 && !disponibili.length} onChange={e => setNessuno(e.target.checked)} /> Nessuno disponibile</label>
           </div>)}
 
-        <div className="ct-sez"><span className="ct-sez-n">3</span><b>{cliente_ ? 'Cliente' : infoChi.l}</b><span className="sub">dati minimi: nome e telefono bastano</span></div>
+        <div className="ct-sez"><span className="ct-sez-n">3</span><b>{cliente_ ? 'Cliente' : infoChi.l}</b></div>
         <div className="ct-cliente">
           <div className="field ct-ac">
             <label htmlFor="ct-cli">{infoChi.campo}</label>
-            <input id="ct-cli" ref={qRef} autoComplete="off" value={q} onChange={e => { setQ(e.target.value); setSuggSel(-1); if (cli) { setCli(null); setSedi([]); setSede(''); } }} placeholder={cliente_ ? 'Scrivi il nome o il codice cliente' : chi === 'fornitore' ? 'Nome del fornitore o P. IVA' : chi === 'collega' ? 'Nome del collega o tecnico' : 'Nome, ente o azienda'}
+            <input id="ct-cli" ref={qRef} autoComplete="off" value={q} onChange={e => { setQ(e.target.value); setSuggSel(-1); if (cli) { setCli(null); setSedi([]); setSede(''); } }} placeholder={cliente_ ? 'Nome o codice' : chi === 'fornitore' ? 'Nome del fornitore o P. IVA' : chi === 'collega' ? 'Nome del collega o tecnico' : 'Nome, ente o azienda'}
               role="combobox" aria-expanded={sugg.length > 0} aria-controls="ct-cli-pop" aria-autocomplete="list" aria-activedescendant={suggSel >= 0 ? `ct-cli-o${suggSel}` : undefined}
               onKeyDown={e => {
                 if (!sugg.length) return;
@@ -256,7 +252,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             {sugg.length > 0 && (
               <div className="ct-ac-pop" id="ct-cli-pop" role="listbox">
                 {sugg.map((c, i) => <button type="button" key={i} id={`ct-cli-o${i}`} role="option" aria-selected={i === suggSel} tabIndex={-1} className={i === suggSel ? 'sel' : ''} onMouseEnter={() => setSuggSel(i)} onClick={() => scegli(c)}><b>{c.nome}</b><span className="sub">{c.fonte === 'fornitore' ? [c.contatto, c.telefono, c.email].filter(Boolean).join(' · ') || 'fornitore' : c.fonte === 'taylor' ? `Cod. ${c.codice} · ${c.sedi} ${c.sedi === 1 ? 'sede' : 'sedi'}` : [c.contatto, c.telefono, c.comune].filter(Boolean).join(' · ') || 'già contattato'}</span></button>)}
-                <div className="ct-ac-nuovo sub">{chi === 'fornitore' ? 'Non c\'è? Aggiungilo ai fornitori con il pulsante.' : 'Non c\'è? Continua a scrivere: sarà un nuovo cliente.'} <span className="k-hint"><kbd>↑</kbd><kbd>↓</kbd> per scegliere · <kbd>Invio</kbd> per confermare</span></div>
+                <div className="ct-ac-nuovo sub">{chi === 'fornitore' ? 'Non c\'è? Aggiungilo.' : 'Non c\'è? Nuovo cliente.'}</div>
               </div>)}
           </div>
           {cliente_ && sedi.length > 0 && (
@@ -275,7 +271,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             <div className="field"><label htmlFor="ct-tel">Telefono</label><input id="ct-tel" type="tel" value={f.telefono} onChange={e => setF({ ...f, telefono: e.target.value })} /></div>
             <div className="field"><label htmlFor="ct-em">Email</label><input id="ct-em" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
           </div>
-          {cliente_ && cambiato && <label className="check ct-agg-rub"><input type="checkbox" checked={aggiornaRubrica} onChange={e => setAggiornaRubrica(e.target.checked)} /> Aggiorna anche nell'anagrafica del cliente? (resta nella storia e conta come aggiornamento anagrafica)</label>}
+          {cliente_ && cambiato && <label className="check ct-agg-rub"><input type="checkbox" checked={aggiornaRubrica} onChange={e => setAggiornaRubrica(e.target.checked)} /> Aggiorna in anagrafica</label>}
           {!sede && (tipo === 'manutenzione' || tipo === 'sopralluogo') && (
             <div className="ct-griglia">
               <div className="field"><label htmlFor="ct-ind">Indirizzo</label><input id="ct-ind" value={f.indirizzo} onChange={e => setF({ ...f, indirizzo: e.target.value })} /></div>
@@ -291,19 +287,16 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
           </select></div>}
 
-        <div className="ct-sez"><span className="ct-sez-n">5</span><b>Nota</b></div>
-        <textarea rows={3} value={f.descrizione} onChange={e => setF({ ...f, descrizione: e.target.value })} placeholder={cliente_ ? 'Cosa ha detto il cliente, in breve' : 'Cosa ha detto, in breve'} aria-label="Nota" />
+        <div className="ct-sez"><span className="ct-sez-n">4</span><b>Nota</b></div>
+        <textarea rows={3} value={f.descrizione} onChange={e => setF({ ...f, descrizione: e.target.value })} placeholder="In breve" aria-label="Nota" />
 
         <Appunti chiave="bozza" righe={4} onTesto={setAppunti} />
-        {cliente_ && <p className="hint">{REGOLA_ANAGRAFICA}</p>}
-        {tipo !== 'offerta_grande' && <label className="check ct-trasf-form"><input type="checkbox" checked={trasf} onChange={e => setTrasf(e.target.checked)} /> Chiamata per un responsabile (trasferita o non disponibile): lo registro subito dopo</label>}
-        {flusso?.nota_procedura && <p className="ct-proc"><b>Procedura:</b> {flusso.nota_procedura}</p>}
+        {tipo !== 'offerta_grande' && <label className="check ct-trasf-form"><input type="checkbox" checked={trasf} onChange={e => setTrasf(e.target.checked)} /> Per un responsabile</label>}
         {err && <Banner s="ko">{err}</Banner>}
         <div className="ct-salva">
           <div className="sub">
-            {scad && <>Prima scadenza: <b>{testoResiduo(scad)}</b> · </>}
+            {scad && <>Scadenza <b>{testoResiduo(scad)}</b> </>}
             {urgente && <span className="ct-sla rosso">urgente</span>}
-            <span className="ct-kbd-h"> · <kbd>Ctrl</kbd>+<kbd>Invio</kbd> per salvare · <kbd>?</kbd> scorciatoie</span>
           </div>
           <div className="row-flex"><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button><button className="btn" disabled={invio}>{invio ? 'Salvo…' : 'Salva'}</button></div>
         </div>

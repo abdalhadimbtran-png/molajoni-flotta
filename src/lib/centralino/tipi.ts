@@ -79,11 +79,11 @@ export const nomeCanale = (c: string) => CANALI.find(x => x.v === c)?.l ?? c;
 /** «Cosa chiede?»: le offerte sono un solo pulsante; poi si sceglie chi la gestisce (Jennifer o Tecnico Commerciale).
  * Fatture e Fornitori non sono pratiche: si girano con i pulsanti rapidi (↪). */
 export const RICHIESTE: { v: TipoPratica | 'offerta'; l: string; ic: string; breve: string }[] = [
-  { v: 'manutenzione', l: 'Intervento manutenzione', ic: 'manutenzione', breve: 'Guasto, ritardo, allarme' },
-  { v: 'sopralluogo', l: 'Sopralluogo tecnico', ic: 'sopralluogo', breve: 'Visita per valutare' },
-  { v: 'offerta', l: 'Richiesta offerta', ic: 'offerta', breve: 'Preventivo' },
-  { v: 'modifica', l: 'Modifica calendario / anagrafica / disdetta', ic: 'modifica', breve: 'Calendario, dati, disdetta' },
-  { v: 'informazione', l: 'Informazione al cliente', ic: 'informazione', breve: 'Risposta o → responsabile' },
+  { v: 'manutenzione', l: 'Intervento', ic: 'manutenzione', breve: 'Guasto, ritardo, allarme' },
+  { v: 'sopralluogo', l: 'Sopralluogo', ic: 'sopralluogo', breve: 'Visita per valutare' },
+  { v: 'offerta', l: 'Offerta', ic: 'offerta', breve: 'Preventivo' },
+  { v: 'modifica', l: 'Modifiche / Disdetta', ic: 'modifica', breve: 'Calendario, dati, disdetta' },
+  { v: 'informazione', l: 'Informazione', ic: 'informazione', breve: 'Risposta o → responsabile' },
 ];
 
 export const NOME_TIPO: Record<TipoPratica, string> = {

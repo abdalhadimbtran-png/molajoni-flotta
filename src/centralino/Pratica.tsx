@@ -165,7 +165,6 @@ export default function Pratica() {
               {p.tecnico_quando && <><dt>Tecnico</dt><dd>{p.assegnato_nome} · {p.tecnico_quando}</dd></>}
               {p.descrizione && <><dt>Richiesta</dt><dd>{p.descrizione}</dd></>}
             </dl>
-            {f?.nota_procedura && <p className="ct-proc">{f.nota_procedura}</p>}
           </section>
           {data.tr.length > 0 && <section className="ct-blocco"><h2>Chiamate per responsabili</h2>
             {data.tr.map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRiepilogo={ctx.scrive ? setRiep : undefined} onRichiamato={ctx.scrive ? async x => { if (await segnaRichiamato(x)) reload(); } : undefined} />)}</section>}

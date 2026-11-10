@@ -132,13 +132,13 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
             {ordinati.map(t => <option key={t.codice} value={t.codice}>{t.nome}{t.tipo_pratica === tipo ? ' ★' : ''}</option>)}
           </select></div>
         <div className="ct-griglia">
-          <div className="field"><label htmlFor="em-a">A</label><input id="em-a" type="email" value={a} onChange={e => setA(e.target.value)} placeholder="email del cliente" />
-            {!emailOk(a) && <p className="hint">Chiedi l'email al cliente.</p>}</div>
-          <div className="field"><label htmlFor="em-cc">CC</label><input id="em-cc" value={cc} onChange={e => setCc(e.target.value)} placeholder="separati da virgola" /></div>
+          <div className="field"><label htmlFor="em-a">A</label><input id="em-a" type="email" value={a} onChange={e => setA(e.target.value)} placeholder="email" />
+            {!emailOk(a) && <p className="hint">Manca email.</p>}</div>
+          <div className="field"><label htmlFor="em-cc">CC</label><input id="em-cc" value={cc} onChange={e => setCc(e.target.value)} placeholder="a, b" /></div>
         </div>
         {m?.cc_offerte_grandi && config && config.impostazioni.cc_offerte_grandi.some(x => !x.email) && <p className="hint">Mancano alcune email in copia ({config.impostazioni.cc_offerte_grandi.filter(x => !x.email).map(x => x.nome).join(', ')}): aggiungile in Flussi e impostazioni.</p>}
         <div className="field"><label htmlFor="em-ogg">Oggetto</label><input id="em-ogg" value={ogg} onChange={e => setOgg(e.target.value)} /></div>
-        <div className="field"><label>Testo (modificabile)</label>
+        <div className="field"><label>Testo</label>
           <div className="ct-anteprima" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
             onBlur={e => setCorpo((e.target as HTMLDivElement).innerHTML)} dangerouslySetInnerHTML={{ __html: corpo }} /></div>
         {finale && <details className="ct-anteprima-box" open><summary>Anteprima dell'email formattata</summary>
@@ -153,7 +153,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
           <button type="button" className="btn-ghost" onClick={copia} disabled={invio}>Copia testo</button>
           <button type="button" className="btn-ghost" onClick={onClose}>Più tardi</button>
         </div>
-        <p className="hint">«Apri in Outlook» apre subito il messaggio pronto: premi Invia. «Avvisato per telefono» segna il passo come fatto senza email. Tutto resta nella storia della pratica. <button type="button" className="ct-link" onClick={eml} disabled={invio}>Versione formattata (.eml)</button></p>
+        <p className="hint"><button type="button" className="ct-link" onClick={eml} disabled={invio}>Versione formattata (.eml)</button></p>
         {trasf && (
           <details open={senza} onToggle={e => setSenza((e.target as HTMLDetailsElement).open)}>
             <summary>Email non disponibile</summary>

@@ -231,27 +231,26 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
               {tecCoord.length > 0 && <optgroup label="Tecnici">{tecCoord.map(t => <option key={`t${t.id}`} value={`t:${t.id}`}>{t.nome} · {t.assente ? 'in ferie oggi' : `disponibile · ${t.interventi_oggi} interventi oggi`}{t.telefono ? ` · ${t.telefono}` : ''}</option>)}</optgroup>}
             </select>
             {!coord.length && <p className="hint">Nessun coordinatore: impostalo in Referenti («Coordinamento interventi/sopralluoghi»).</p>}
-            {tecDiretto && <p className="hint">Inviato direttamente al tecnico: sarà proposto come tecnico nel passo successivo (modificabile).{tecDiretto.assente ? ' Attenzione: è in ferie oggi.' : ''}</p>}</div>
-          {tecDiretto && <label className="check"><input type="checkbox" checked={avvisoCoordApp} onChange={e => setAvvisoCoordApp(e.target.checked)} /> Invia anche avviso nell'app del tecnico</label>}
+            {tecDiretto?.assente && <p className="hint">In ferie oggi.</p>}</div>
+          {tecDiretto && <label className="check"><input type="checkbox" checked={avvisoCoordApp} onChange={e => setAvvisoCoordApp(e.target.checked)} /> Avviso in app</label>}
           <button type="button" className={`btn-ghost ct-toggle ${telefonato ? 'on' : ''}`} aria-pressed={telefonato} onClick={() => setTelefonato(!telefonato)}>{telefonato ? '✓ Telefonato' : 'Telefonato'}</button>
         </>)}
         {has('tecnico') && (<>
-          <div className="field"><label htmlFor="av-tec">{tablet ? 'TMQ che firma il preventivo' : 'Tecnico'}</label>
+          <div className="field"><label htmlFor="av-tec">{tablet ? 'TMQ firmatario' : 'Tecnico'}</label>
             <select id="av-tec" value={tecId} onChange={e => setTecId(e.target.value ? Number(e.target.value) : '')}><option value="">— scegli —</option>
               {tecnici.map(t => <option key={t.id} value={t.id}>{t.nome} · {t.assente ? 'assente oggi' : `${t.interventi_oggi} interventi oggi`}</option>)}</select></div>
-          {tablet && <label className="check"><input type="checkbox" checked={verificato} onChange={e => setVerificato(e.target.checked)} /> Preventivo verificato in tutte le sue parti</label>}
+          {tablet && <label className="check"><input type="checkbox" checked={verificato} onChange={e => setVerificato(e.target.checked)} /> Preventivo verificato</label>}
           {!tablet && <><div className="segmented ct-chips" role="radiogroup" aria-label="Quando" onKeyDown={tastiRadio}>
             {QUANDO.map((q, i) => { const on = !quandoAt && quando === q; return <button type="button" key={q} role="radio" aria-checked={on} tabIndex={tabRoving(on, i, !quandoAt && QUANDO.includes(quando))} className={on ? 'on' : ''} onClick={() => { setQuando(q); setQuandoAt(''); }}><span className="k-n" aria-hidden>{i + 1}</span>{q}</button>; })}
           </div>
-          <div className="field"><label htmlFor="av-qat">Oppure data e ora</label><input id="av-qat" type="datetime-local" value={quandoAt} onChange={e => setQuandoAt(e.target.value)} /></div></>}
-          {tCliente && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Cliente informato a voce (senza email)</label>}
-          {tCliente && <p className="hint">Il cliente riceve: «La contatterà il nostro tecnico {tecnico?.nome ?? '…'} {quandoAt ? 'il giorno scelto' : quando}».{!emailOk(p.email) && ' Manca l\'email del cliente.'}</p>}
+          <div className="field"><label htmlFor="av-qat">Data e ora</label><input id="av-qat" type="datetime-local" value={quandoAt} onChange={e => setQuandoAt(e.target.value)} /></div></>}
+          {tCliente && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Informato a voce</label>}
+          {tCliente && !emailOk(p.email) && <p className="hint">Manca email cliente.</p>}
         </>)}
         {(has('buono') || has('avviso')) && (<>
-          {has('buono') && <div className="field"><label htmlFor="av-doc">N. buono di intervento (facoltativo)</label><input id="av-doc" value={doc} onChange={e => setDoc(e.target.value)} /></div>}
-          <label className="check"><input type="checkbox" checked={avvisato} onChange={e => setAvvisato(e.target.checked)} /> Tecnico avvisato: alert su Taylor + WhatsApp</label>
+          {has('buono') && <div className="field"><label htmlFor="av-doc">N. buono</label><input id="av-doc" value={doc} onChange={e => setDoc(e.target.value)} /></div>}
+          <label className="check"><input type="checkbox" checked={avvisato} onChange={e => setAvvisato(e.target.checked)} /> Tecnico avvisato</label>
           {p.tipo === 'sopralluogo' ? <label className="check"><input type="checkbox" checked={app} onChange={e => setApp(e.target.checked)} /> Invia anche l'avviso urgente nell'app{p.tecnico_dipendente_id ? '' : ' (tecnico senza app)'}</label> : p.tecnico_dipendente_id ? <label className="check"><input type="checkbox" checked={app} onChange={e => setApp(e.target.checked)} /> Invia anche l'avviso urgente nell'app</label> : null}
-          <p className="hint">Obiettivo: {p.urgenza === 'ordinario' ? 'intervento entro 2 giorni lavorativi' : 'intervento oggi'}.</p>
         </>)}
         {has('appuntamento') && (
           <div className="ct-riga">
@@ -259,8 +258,8 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             <select aria-label="Fascia" value={fascia} onChange={e => setFascia(e.target.value)}><option value="">— fascia —</option><option value="mattina">Mattina</option><option value="pomeriggio">Pomeriggio</option></select>
           </div>)}
         {has('taylor') && (<>
-          <label className="check"><input type="checkbox" checked={taylor} onChange={e => setTaylor(e.target.checked)} /> Alert inviato su Taylor</label>
-          <div className="field"><label htmlFor="av-doc2">N. Documento di Intervento</label><input id="av-doc2" value={doc} onChange={e => setDoc(e.target.value)} /></div>
+          <label className="check"><input type="checkbox" checked={taylor} onChange={e => setTaylor(e.target.checked)} /> Alert Taylor</label>
+          <div className="field"><label htmlFor="av-doc2">N. documento</label><input id="av-doc2" value={doc} onChange={e => setDoc(e.target.value)} /></div>
         </>)}
         {has('commerciale') && (
           <div className="field"><label htmlFor="av-com">Commerciale</label>
@@ -276,11 +275,10 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
             {email.cc.length > 0 && <p className="hint">CC: {email.cc.join(', ')}</p>}
             <div className="ct-anteprima" dangerouslySetInnerHTML={{ __html: email.corpo }} />
             <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Modifica il testo</button>
-            {!automatico && <p className="hint">Il pulsante principale apre Outlook con il messaggio pronto: premi Invia. L'email è registrata come inviata. La versione formattata (.eml) è in «Modifica il testo».</p>}
           </details>)}
         {allegato && <Banner s="warn">{AVVISO_ALLEGATO}: il messaggio non contiene allegati.</Banner>}
         {tExtra && <label className="check"><input type="checkbox" checked={extra} disabled={!emailOk(p.email)} onChange={e => setExtra(e.target.checked)} /> {s.extra_etichetta || tExtra.nome}{!emailOk(p.email) ? ' — manca l\'email di chi ha chiamato' : ''}</label>}
-        {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Email non disponibile: cliente informato a voce</label>}
+        {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Informato a voce</label>}
         {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? `Manca l'email di ${coordNome || 'questa persona'}: aggiungila in ${tecDiretto ? 'Dipendenti' : 'Referenti'} oppure basta «Telefonato».` : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}
         <details><summary>Nota (facoltativa)</summary><input aria-label="Nota" value={nota} onChange={e => setNota(e.target.value)} /></details>
         {err && <Banner s="ko">{err}</Banner>}

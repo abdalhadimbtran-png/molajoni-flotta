@@ -451,3 +451,4 @@ p.k-hint { margin:4px 0 0; }
 @media (prefers-reduced-motion:reduce) { .ct-nuovo .ct-big button, .ct-check { transition:none; } }
 .ct-bozza { margin:0; font-size:var(--t-xs); color:var(--ink-3); }
 .ct-conf { font-size:var(--t-s); color:var(--ink-2); margin-inline-end:var(--sp-2); }
+.ct-dest { margin: 4px 0 0; font-size: 14px; padding: 6px 10px; border-left: 3px solid var(--accent, #E30613); background: rgba(0,0,0,.03); }

@@ -10,6 +10,8 @@ import { useSalva } from '../lib/salva';
 import { apriBozza, apriEmail } from '../lib/centralino/mailto';
 import { useTastoTelefono } from './tastiera';
 import { AVVISO_ALLEGATO, avanzaConModello, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
+import { NOME_RUOLO, controllaEmail, destinatarioPerAzione, ruoloModello, type ContestoDest, type PersonaEmail } from '../lib/centralino/destinatari';
+import type { PersonaDisp } from '../lib/centralino/tipi';
 
 const emailOk = (s: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const lista = (s: string) => s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
@@ -38,6 +40,14 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   const [motivo, setMotivo] = useState('');
   const [telTec, setTelTec] = useState<string | null>(null);
   useEffect(() => { if (pratica?.tecnico_dipendente_id) rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => setTelTec((l ?? []).find(t => t.id === pratica.tecnico_dipendente_id)?.telefono ?? null), () => undefined); }, [pratica?.tecnico_dipendente_id]);
+  const [coordinatori, setCoordinatori] = useState<PersonaEmail[]>([]);
+  useEffect(() => { if (pratica && (pratica.tipo === 'manutenzione' || pratica.tipo === 'sopralluogo')) rpc<PersonaDisp[]>('centralino_coordinatori', { p_tipo: pratica.tipo }).then(l => setCoordinatori(l ?? []), () => undefined); }, [pratica?.tipo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctxDest = useMemo((): ContestoDest => {
+    const im = config?.impostazioni;
+    return { pratica, trasf, coordinatori, referenti: im?.destinatari_trasferimento ?? [], commerciali: [...(im?.commerciali_offerte_grandi ?? []), ...(im?.commerciali ?? [])] };
+  }, [config, pratica, trasf, coordinatori]);
+  /** indirizzi dei colleghi: mai come A di un'email al cliente */
+  const emailInterne = useMemo(() => { const im = config?.impostazioni; return [...(im?.destinatari_trasferimento ?? []), ...(im?.commerciali ?? []), ...(im?.commerciali_offerte_grandi ?? []), ...(im?.cc_offerte_grandi ?? []), ...coordinatori, ...(pratica?.commerciale_email ? [{ email: pratica.commerciale_email }] : [])].map(x => x.email); }, [config, coordinatori, pratica?.commerciale_email]);
   const prossimo = pratica && config ? prossimoStadio(config.flussi.find(f => f.tipo === pratica.tipo), pratica) : null;
 
   const valori: Valori | null = useMemo(() => {
@@ -58,7 +68,8 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   function scegli(t: Template) {
     if (!val || !config) return;
     setM(t);
-    if (t.codice === 'girata_referente' && pratica) { const r = config.impostazioni.destinatari_trasferimento.find(d => d.nome === pratica.assegnato_nome); if (r?.email) setA(r.email); }
+    // A sempre dal ruolo del modello: cliente ↔ collega non si mescolano cambiando modello
+    setA(destinatarioPerAzione(t.codice, ctxDest, t.oggetto).email ?? '');
     setOgg(compila(t.oggetto, val, false));
     setCorpo(compila(t.corpo_html, val));
     const c = [...t.cc_default];
@@ -76,12 +87,17 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
     scegli(pref);
   }, [ordinati, val]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { if (m && ruoloModello(m.codice, m.oggetto) === 'coordinatore') setA(destinatarioPerAzione(m.codice, ctxDest, m.oggetto).email ?? ''); }, [coordinatori]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dest = m ? destinatarioPerAzione(m.codice, ctxDest, m.oggetto) : null;
   const finale = useMemo(() => (m && val ? emailDaModello(m, val, corpo) : null), [m, val, corpo]);
   const html = () => finale?.html ?? '';
   async function registra(modo: 'resend' | 'copia' | 'outlook') {
     setErr(null);
-    if (!emailOk(a)) { setErr('Scrivi l\'indirizzo email del cliente.'); return false; }
     if (!ogg.trim()) { setErr('Scrivi l\'oggetto.'); return false; }
+    const errore = m ? controllaEmail({ codice: m.codice, oggetto: ogg, testo: finale?.testo ?? '', a, cc: lista(cc), numero: pratica?.numero,
+      clienteEmail: trasf?.cliente_email ?? pratica?.email, emailInterne, dati: pratica ? { ...pratica } : undefined, nomeDest: dest?.nome })
+      : (!emailOk(a) ? 'Scrivi l\'indirizzo email del destinatario.' : null);
+    if (errore) { setErr(errore); return false; }
     setInvio(true);
     const esito = await esegui(async () => {
       const testo = finale?.testo ?? '';
@@ -113,8 +129,8 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
     toast(richiedeAllegato(m) ? `${avviso} ${AVVISO_ALLEGATO}.` : avviso); onFatto();
   }
   /** Alternativa all'email: avvisato per telefono. Conta come l'email inviata (e avanza il passo se spuntato). */
-  const chi = m?.codice === 'girata_referente' ? 'referente' : m?.codice.endsWith('_coordinatore') ? 'coordinatore' : m?.codice === 'riepilogo_commerciale' ? 'commerciale' : 'cliente';
-  const nomeDest = chi === 'referente' ? pratica?.assegnato_nome : chi === 'coordinatore' ? pratica?.coordinatore_nome : chi === 'commerciale' ? pratica?.commerciale_nome : (trasf?.cliente_nome ?? pratica?.contatto_nome ?? pratica?.cliente_nome);
+  const chi = dest?.ruolo ?? 'cliente';
+  const nomeDest = dest?.nome || (trasf?.cliente_nome ?? pratica?.contatto_nome ?? pratica?.cliente_nome);
   async function telefono() {
     if (invio) return;
     setErr(null); setInvio(true);
@@ -143,7 +159,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
           </select></div>
         <div className="ct-griglia">
           <div className="field"><label htmlFor="em-a">A</label><input id="em-a" type="email" value={a} onChange={e => setA(e.target.value)} placeholder="email" />
-            {!emailOk(a) && <p className="hint">Manca email.</p>}</div>
+            {!emailOk(a) && <p className="hint">{dest?.errore ?? 'Manca email.'}</p>}</div>
           <div className="field"><label htmlFor="em-cc">CC</label><input id="em-cc" value={cc} onChange={e => setCc(e.target.value)} placeholder="a, b" /></div>
         </div>
         {m?.cc_offerte_grandi && config && config.impostazioni.cc_offerte_grandi.some(x => !x.email) && <p className="hint">Mancano alcune email in copia ({config.impostazioni.cc_offerte_grandi.filter(x => !x.email).map(x => x.nome).join(', ')}): aggiungile in Flussi e impostazioni.</p>}
@@ -156,6 +172,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
         {pratica && prossimo && <label className="check"><input type="checkbox" checked={avanza} onChange={e => setAvanza(e.target.checked)} /> Segna anche «{prossimo.nome}» come fatto</label>}
         {richiedeAllegato(m) && <Banner s="warn">{AVVISO_ALLEGATO}: il messaggio non contiene allegati.</Banner>}
         {err && <Banner s="ko">{err}</Banner>}
+        {dest && <p className="ct-dest" aria-live="polite"><b>A:</b> {dest.nome || '—'} ({NOME_RUOLO[dest.ruolo]}){emailOk(a) ? ` · ${a.trim()}` : ' · manca l\'email'}</p>}
         <div className="row-flex">
           <button className="btn" disabled={invio}>{invio ? 'Apertura…' : automatico ? 'Invia' : 'Apri in Outlook'}</button>
           {automatico && <button type="button" className="btn-ghost" onClick={outlook} disabled={invio}>Apri in Outlook</button>}

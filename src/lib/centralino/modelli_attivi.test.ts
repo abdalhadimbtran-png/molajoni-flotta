@@ -53,7 +53,7 @@ describe('girata e firme', () => {
   it('girata_referente: email interna al referente con chi chiama, link e sintesi', () => {
     const t = ATTIVI.find(x => x.codice === 'girata_referente')!;
     const e = emailDaModello(t, segnaposto(pratica('fornitori'), ''));
-    expect(e.oggetto).toBe('[Centralino] Richiesta da gestire – Ferramenta Bianchi srl – Fornitori');
+    expect(e.oggetto).toBe('[Centralino] Richiesta da gestire – CT-2026-000042 – Ferramenta Bianchi srl – Fornitori');
     expect(e.testo).toContain('Ciao Roberta Felci,');
     expect(e.testo).toContain('Chi chiama: fornitore');
     expect(e.html).toContain('/centralino/pratica/42');

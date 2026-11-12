@@ -26,7 +26,7 @@
   "codice": "intervento_coordinatore",
   "nome": "Al coordinatore – intervento da assegnare",
   "tipo_pratica": "manutenzione",
-  "oggetto": "[Centralino] Intervento da assegnare – {cliente} – {urgenza}",
+  "oggetto": "[Centralino] Intervento da assegnare{rif_pratica} – {cliente} – {urgenza}",
   "titolo": "Intervento da assegnare",
   "dati": [
    [
@@ -92,7 +92,7 @@
   "codice": "sopralluogo_coordinatore",
   "nome": "Al coordinatore – sopralluogo da assegnare",
   "tipo_pratica": "sopralluogo",
-  "oggetto": "[Centralino] Sopralluogo da assegnare – {cliente} – {urgenza}",
+  "oggetto": "[Centralino] Sopralluogo da assegnare{rif_pratica} – {cliente} – {urgenza}",
   "titolo": "Sopralluogo da assegnare",
   "dati": [
    [
@@ -223,7 +223,7 @@
   "codice": "riepilogo_commerciale",
   "nome": "Al Tecnico Commerciale – riepilogo preventivo da gestire",
   "tipo_pratica": "offerta_grande",
-  "oggetto": "[Centralino] Preventivo da gestire – {cliente} – richiamare entro le {scadenza_richiamo}",
+  "oggetto": "[Centralino] Preventivo da gestire{rif_pratica} – {cliente} – richiamare entro le {scadenza_richiamo}",
   "titolo": "Preventivo da gestire",
   "dati": [
    [
@@ -423,7 +423,7 @@
   "codice": "trasf_referente",
   "nome": "Al referente – chiamata trasferita",
   "tipo_pratica": "trasferimento_referente",
-  "oggetto": "[Centralino] Chiamata trasferita – {cliente} – {argomento}",
+  "oggetto": "[Centralino] Chiamata trasferita{rif_pratica} – {cliente} – {argomento}",
   "titolo": "Chiamata trasferita",
   "dati": [
    [
@@ -478,7 +478,7 @@
   "codice": "girata_referente",
   "nome": "Al referente – richiesta girata dal centralino",
   "tipo_pratica": null,
-  "oggetto": "[Centralino] Richiesta da gestire – {cliente} – {argomento}",
+  "oggetto": "[Centralino] Richiesta da gestire{rif_pratica} – {cliente} – {argomento}",
   "titolo": "Richiesta da gestire",
   "dati": [
    [

@@ -205,3 +205,14 @@ KPI nuovi nel registro: `cliente1h`, `sla_passo` (filtro `passo`), `urgenti_gior
 - «Avvisato per telefono» al coordinatore con avanzamento: nome del coordinatore e telefonata valgono come dati del passo. Il compositore non propone più «Segna anche come fatto» per il passo coordinatore (si usa la finestra del passo); per Anagrafica/Disdetta lo propone col modello giusto (`avanzaConModello`, test `passi.test.ts`).
 - Email dopo un passo (presa in carico, email al cliente del sopralluogo) si apre **dopo** il ricaricamento della pratica: segnaposto aggiornati (tecnico, quando) e il passo successivo non la sostituisce. Passo senza dati (Assegnato dal coordinatore) → si apre da solo il passo successivo.
 - Filtri per data (Pratiche, Report, Analisi, Direzione) sul giorno di Roma (`inizioGiornoRoma`, `fineGiornoRoma`, `primoDelMeseRoma` in `sla.ts`): prima «Mese» partiva dall'ultimo giorno del mese precedente.
+
+## Destinatari delle email (0081, 12/11/2026)
+Regola unica in `src/lib/centralino/destinatari.ts` (`RUOLO_MODELLO`, `destinatarioPerAzione`, `controllaEmail`), test in `destinatari.test.ts`.
+- **Cliente** (presa_*, intervento_cliente, sopralluogo_cliente, invio_offerta, presa_offerta_grande, preventivo_tmq, modifica_evasa, conferma_anagrafica/disdetta, girata_ufficio, girata_fornitore, riepilogo_trasferita/richiamo): A = email della pratica (o del trasferimento). Mai un indirizzo di un collega.
+- **Coordinatore** (intervento_/sopralluogo_coordinatore): scelto nel passo; altrimenti il primo coordinatore attivo disponibile con email (Alberto Chiaradonna → Antonella D'Orazio).
+- **Tecnico Commerciale** (riepilogo_commerciale): commerciale_email della pratica, altrimenti dall'elenco commerciali.
+- **Referente** (girata_referente, trasf_referente): dai Referenti attivi (destinatari_trasferimento); i referenti disattivati non sono mai usati.
+- Le email interne hanno l'oggetto «[Centralino] …{rif_pratica}» (numero pratica) e non possono andare all'email del cliente (A o CC): controllato nel browser e in `privato.ct_controlla_destinatario` (centralino_invia_email, centralino_trasf_email, centralino_trasf_email_referente).
+- Prima di «Apri in Outlook»/.eml/invio: oggetto con numero pratica, nessun «{…}» rimasto, dati essenziali presenti (sopralluogo_cliente: tecnico e quando; presa_offerta_grande/riepilogo_commerciale: commerciale; girate: referente). Email mancante → «Manca l'email di Nome (ruolo)… oppure usa «Avvisato per telefono»».
+- Nella finestra email la riga «A: Nome (ruolo) · indirizzo» mostra chi riceve.
+- Fuori dal Centralino: riepilogo Direzione → email dell'account che l'ha attivato (0067); notifiche ferie/flotta invariate.

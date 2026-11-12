@@ -7,6 +7,7 @@ import { giornoRoma } from '../lib/centralino/sla';
 import { emailDaModello, segnaposto } from '../lib/centralino/modelli';
 import { AVVISO_ALLEGATO, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
 import { useConfig } from './comune';
+import { NOME_RUOLO, controllaEmail, ruoloModello } from '../lib/centralino/destinatari';
 import { useSalva } from '../lib/salva';
 import { apriEmail } from '../lib/centralino/mailto';
 import type { Eml } from '../lib/centralino/emailHtml';
@@ -81,7 +82,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
 
   useEffect(() => {
     if (has('coordinatore')) {
-      rpc<PersonaDisp[]>('centralino_coordinatori', { p_tipo: p.tipo }).then(l => { setCoord(l ?? []); if (!coordNome) setCoordNome((l ?? []).find(x => x.disponibile)?.nome ?? l?.[0]?.nome ?? ''); }, () => undefined);
+      rpc<PersonaDisp[]>('centralino_coordinatori', { p_tipo: p.tipo }).then(l => { setCoord(l ?? []); if (!coordNome) setCoordNome(((l ?? []).find(x => x.disponibile && emailOk(x.email)) ?? (l ?? []).find(x => x.disponibile))?.nome ?? l?.[0]?.nome ?? ''); }, () => undefined);
       rpc<PersonaDisp[]>('centralino_altri_referenti', { p_tipo: p.tipo }).then(l => setAltri(l ?? []), () => undefined);
       if (p.tipo === 'sopralluogo') rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => setTecCoord(l ?? []), () => undefined);
     }
@@ -146,6 +147,9 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
   const apriSeServe = () => { const m = daAprire as Eml | null; if (m) toast(`${apriEmail({ a: m.a, cc: m.cc, oggetto: m.oggetto, testo: m.testo })}${allegato ? ` ${AVVISO_ALLEGATO}.` : ''}`); return !!m; };
   const avanza = (key: string, dati: Record<string, unknown>) => rpc('centralino_avanza', { p_id: p.id, p_stadio: key, p_dati: dati, p_testo: nota || null });
 
+  const emailInterne = [...destinatari, ...elencoComm, ...coord, ...altri, ...tecCoord, ...(config?.impostazioni.cc_offerte_grandi ?? [])].map(x => x.email ?? null).concat(p.commerciale_email);
+  const controlla = (e: { a: string; cc: string[]; oggetto: string; testo: string }, codice: string, dati: Record<string, unknown>, nome?: string | null) =>
+    controllaEmail({ codice, oggetto: e.oggetto, testo: e.testo, a: e.a, cc: e.cc, numero: p.numero, clienteEmail: p.email, emailInterne, dati: { ...p, ...extraDati, ...dati }, nomeDest: nome });
   async function salva(e?: FormEvent, tel = false) {
     e?.preventDefault(); if (!s) return; setErr(null);
     const dati: Record<string, unknown> = {};
@@ -178,6 +182,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
     if (has('informato') && voce) dati.informato_voce = true;
     const mandaEmail = !tel && !!email && !!tEmail && !(has('informato') && voce) && !(has('coordinatore') && !emailOk(destEmail));
     if (mandaEmail && !emailOk(destEmail)) return setErr(has('informato') ? 'Manca l\'email del cliente: spunta «Informato a voce».' : 'Manca l\'indirizzo email del destinatario.');
+    if (mandaEmail && email && tEmail) { const x = controlla({ ...email, a: destEmail }, tEmail.codice, dati, nomeTel); if (x) return setErr(x); }
     setInvio(true);
     const esito = await esegui(async () => {
       if (mandaEmail && email && tEmail) await inviaEmail({ ...email, a: destEmail }, tEmail.codice);
@@ -197,6 +202,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
           apriSeServe(); toast(`${p.numero}: tecnico ${dati.tecnico_nome}. Ora l'email al cliente: «Apri in Outlook».`); onFatto(); onEmail?.(dopo.template, true); return;
         } else if (emailOk(p.email)) {
           const ec = componi(tCliente, p, firma, p.email!, { tecnico_nome: String(dati.tecnico_nome), tecnico_quando: String(dati.tecnico_quando), tecnico_telefono: tecnico?.telefono ?? null } as Partial<Pratica>);
+          const x = controlla(ec, tCliente.codice, dati, p.contatto_nome || p.cliente_nome); if (x) { toast(`${p.numero}: tecnico ${dati.tecnico_nome}. ${x}`); onFatto(); onEmail?.(dopo.template, true); return; }
           await inviaEmail(ec, tCliente.codice);
           await avanza(dopo.key, {});
           toast(`${p.numero}: tecnico ${dati.tecnico_nome} · cliente informato`);
@@ -274,7 +280,7 @@ export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica
         {(has('email') || (has('informato') && !voce)) && !tEmail && <Banner s="warn">Questo passo richiede un'email. <button type="button" className="ct-link" onClick={() => onEmail?.(s.template)}>Scrivi l'email</button></Banner>}
         {email && (
           <details className="ct-anteprima-box">
-            <summary>Email a <b>{destEmail || '— manca l\'indirizzo —'}</b>: {email.oggetto}</summary>
+            <summary>A: <b>{nomeTel || '—'}</b> ({NOME_RUOLO[tecDiretto ? 'tecnico' : ruoloModello(tEmail?.codice, tEmail?.oggetto)]}) · {destEmail || 'manca l\'email'} — {email.oggetto}</summary>
             <div className="field"><label htmlFor="av-a">A</label><input id="av-a" type="email" value={destEmail} onChange={e => setAMod(e.target.value)} /></div>
             {email.cc.length > 0 && <p className="hint">CC: {email.cc.join(', ')}</p>}
             <div className="ct-anteprima" dangerouslySetInnerHTML={{ __html: email.corpo }} />

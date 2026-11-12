@@ -12,7 +12,7 @@ import type { Dataset } from '../lib/centralino/registro';
 import { Tessera } from './Tessera';
 import KpiTrasferimenti from './KpiTrasferimenti';
 import { fineGiornoRoma, giornoRoma, inizioGiornoRoma, primoDelMeseRoma, semaforo, testoResiduo } from '../lib/centralino/sla';
-import { CAMPI_PRATICA, useAdesso, useAggiornamento, useConfig } from './comune';
+import { CAMPI_PRATICA, tutteLeRighe, useAdesso, useAggiornamento, useConfig } from './comune';
 import { nomeStadio } from './componenti';
 import { trasferimenti } from './Trasferimento';
 import { useCtx } from './ShellCentralino';
@@ -22,18 +22,18 @@ export interface DatiPeriodo extends Dataset { pratiche: Pratica[]; eventi: (Eve
 /** Pratiche create nel periodo + chiuse nel periodo + eventi + tutte le aperte + trasferimenti + contatti informativi: base di KPI, dettagli e report. */
 export async function datiPeriodo(da: string, a: string): Promise<DatiPeriodo> {
   const fine = fineGiornoRoma(a), ini = inizioGiornoRoma(da);
+  // a blocchi da 1000 righe: l'API taglia ogni risposta a 1000 righe anche con .limit(5000)
   const [p, e, ap, t, inf, ch, ag] = await Promise.all([
-    supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').gte('created_at', ini).lte('created_at', fine).limit(5000),
-    supabase.from('pratiche_eventi').select('*, pratiche(numero,cliente_nome)').gte('at', ini).lte('at', fine).order('at', { ascending: false }).limit(5000),
-    supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').eq('esito', 'aperta').limit(2000),
-    supabase.from('chiamate_trasferite').select('*').gte('at', ini).lte('at', fine).order('at', { ascending: false }).limit(5000),
-    supabase.from('centralino_chiamate_info').select('*').gte('at', ini).lte('at', fine).limit(5000),
-    supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').gte('closed_at', ini).lte('closed_at', fine).limit(5000),
-    supabase.from('clienti_contatti_storia').select('contatto_id,at,campo,a,autore_nome').gte('at', ini).lte('at', fine).neq('campo', 'nuovo').limit(5000),
+    tutteLeRighe((x, y) => supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').gte('created_at', ini).lte('created_at', fine).order('id').range(x, y)),
+    tutteLeRighe((x, y) => supabase.from('pratiche_eventi').select('*, pratiche(numero,cliente_nome)').gte('at', ini).lte('at', fine).order('at', { ascending: false }).order('id', { ascending: false }).range(x, y)),
+    tutteLeRighe((x, y) => supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').eq('esito', 'aperta').order('id').range(x, y), 2000),
+    tutteLeRighe((x, y) => supabase.from('chiamate_trasferite').select('*').gte('at', ini).lte('at', fine).order('at', { ascending: false }).order('id', { ascending: false }).range(x, y)),
+    tutteLeRighe((x, y) => supabase.from('centralino_chiamate_info').select('*').gte('at', ini).lte('at', fine).order('id').range(x, y)),
+    tutteLeRighe((x, y) => supabase.from('pratiche').select(CAMPI_PRATICA).not('tipo', 'in', '(amministrazione,fornitori)').gte('closed_at', ini).lte('closed_at', fine).order('id').range(x, y)),
+    tutteLeRighe((x, y) => supabase.from('clienti_contatti_storia').select('id,contatto_id,at,campo,a,autore_nome').gte('at', ini).lte('at', fine).neq('campo', 'nuovo').order('id').range(x, y)),
   ]);
-  const err = p.error || e.error || ap.error || t.error || inf.error || ch.error || ag.error; if (err) throw err;
-  return { pratiche: (p.data ?? []) as Pratica[], eventi: (e.data ?? []) as DatiPeriodo['eventi'], aperte: (ap.data ?? []) as Pratica[], trasf: (t.data ?? []) as Trasferimento[],
-    info: (inf.data ?? []) as Dataset['info'], chiuse: (ch.data ?? []) as Pratica[], agg: (ag.data ?? []) as Dataset['agg'] };
+  return { pratiche: p as Pratica[], eventi: e as DatiPeriodo['eventi'], aperte: ap as Pratica[], trasf: t as Trasferimento[],
+    info: inf as Dataset['info'], chiuse: ch as Pratica[], agg: ag as Dataset['agg'] };
 }
 const pc = (n: number | null) => (n == null ? '—' : `${n}%`);
 const iso = (d: Date) => giornoRoma(d);

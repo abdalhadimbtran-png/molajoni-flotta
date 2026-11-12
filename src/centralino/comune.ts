@@ -45,10 +45,6 @@ export async function praticheAperte(): Promise<Pratica[]> {
   const { data, error } = await supabase.from('pratiche').select(CAMPI_PRATICA).eq('esito', 'aperta').order('sla_scadenza', { ascending: true, nullsFirst: false }).limit(1000);
   if (error) throw error; return (data ?? []) as Pratica[];
 }
-export async function praticheChiuseDal(da: string): Promise<Pratica[]> {
-  const { data, error } = await supabase.from('pratiche').select(CAMPI_PRATICA).neq('esito', 'aperta').gte('closed_at', da).order('closed_at', { ascending: false }).limit(500);
-  if (error) throw error; return (data ?? []) as Pratica[];
-}
 export async function pratica(id: number) {
   const [p, e, a] = await Promise.all([
     supabase.from('pratiche').select(CAMPI_PRATICA).eq('id', id).maybeSingle(),
@@ -66,13 +62,35 @@ export async function cerca(q: string): Promise<Pratica[]> {
   const x = q.trim().replace(/[,()*%\\]/g, ' ').trim();
   if (x.length < 2) return [];
   const tel = x.replace(/[\s./-]/g, '');
+  // Prima l'RPC (0082: SECURITY DEFINER, usa gli indici trigram che la RLS impedisce sulle query dirette);
+  // se non c'è ancora (migrazione non applicata) si torna alla query diretta.
+  const r = await supabase.rpc('centralino_cerca', { p_q: x });
+  if (!r.error) return (r.data ?? []) as Pratica[];
+  if (r.error.code !== 'PGRST202' && r.error.code !== '42883') throw r.error;
   const or = [`numero.ilike.*${x}*`, `cliente_nome.ilike.*${x}*`, `contatto_nome.ilike.*${x}*`, `email.ilike.*${x}*`, `cliente_codice.ilike.*${x}*`];
-  // «fornitore», «collega», «altro»: anche per tipo di contatto
-  const chi = ({ fornitore: 'fornitore', fornitori: 'fornitore', collega: 'collega', colleghi: 'collega', tecnico: 'collega', altro: 'altro' } as Record<string, string>)[x.toLowerCase()];
-  if (chi) or.push(`tipo_contatto.eq.${chi}`);
   if (/^\+?\d{3,}$/.test(tel)) or.push(`telefono.ilike.*${tel.slice(-6)}*`); else or.push(`telefono.ilike.*${x}*`);
   const { data, error } = await supabase.from('pratiche').select(CAMPI_PRATICA).or(or.join(',')).order('created_at', { ascending: false }).limit(30);
   if (error) throw error; return (data ?? []) as Pratica[];
+}
+
+/** Massimo di righe per richiesta imposto dall'API (Supabase «Max rows», 1000 di default): oltre si legge a blocchi. */
+export const BLOCCO_RIGHE = 1000;
+type Pagina<T> = PromiseLike<{ data: T[] | null; error: unknown }>;
+/**
+ * Legge tutte le righe (fino a `max`) a blocchi con `.range(da, a)`: un `.limit(5000)` da solo viene tagliato
+ * dall'API a 1000 righe senza errore. La query deve avere un ordinamento stabile (es. … , id).
+ */
+export async function tutteLeRighe<T>(pagina: (da: number, a: number) => Pagina<T>, max = 5000, blocco = BLOCCO_RIGHE): Promise<T[]> {
+  const out: T[] = [];
+  for (let da = 0; da < max; da += blocco) {
+    const a = Math.min(da + blocco, max) - 1;
+    const { data, error } = await pagina(da, a);
+    if (error) throw error;
+    const l = data ?? [];
+    out.push(...l);
+    if (l.length < a - da + 1) break;
+  }
+  return out;
 }
 
 const MIME: Record<string, string> = {

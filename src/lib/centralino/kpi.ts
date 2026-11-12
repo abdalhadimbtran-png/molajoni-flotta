@@ -104,4 +104,3 @@ export function calcolaTrasf(l: TrasfKpi[], ora = new Date()) {
     perDestinatario: dest, perArgomento: arg, perStatoCliente: stato, perTipoContatto: chi,
   };
 }
-export const pctG = (a: number, b: number) => pct(a, b);

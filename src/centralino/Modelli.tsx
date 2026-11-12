@@ -72,7 +72,7 @@ function Editor({ t, scrive, onClose, onSalvato }: { t: Template | null; scrive:
           <label className="check"><input type="checkbox" checked={f.attivo} onChange={e => setF({ ...f, attivo: e.target.checked })} /> Attivo</label>
         </fieldset>
         <div className="field"><label>Anteprima con dati di prova</label>
-          <iframe title="Anteprima" className="ct-iframe" srcDoc={emailDaModello({ ...f, dati }, { ...PROVA, argomento: 'preventivo estintori', referente: 'Mario Bianchi', entro: 'entro le 15:30', scadenza: 'oggi entro le 15:30' }).html} /></div>
+          <iframe title="Anteprima" sandbox="" className="ct-iframe" srcDoc={emailDaModello({ ...f, dati }, { ...PROVA, argomento: 'preventivo estintori', referente: 'Mario Bianchi', entro: 'entro le 15:30', scadenza: 'oggi entro le 15:30' }).html} /></div>
         {err && <Banner s="ko">{err}</Banner>}
         <div className="row-flex">{scrive && <button className="btn">Salva</button>}<button type="button" className="btn-ghost" onClick={onClose}>Chiudi</button></div>
       </form>

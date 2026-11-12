@@ -168,7 +168,7 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
           <div className="ct-anteprima" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
             onBlur={e => setCorpo((e.target as HTMLDivElement).innerHTML)} dangerouslySetInnerHTML={{ __html: corpo }} /></div>
         {finale && <details className="ct-anteprima-box" open><summary>Anteprima dell'email formattata</summary>
-          <iframe title="Anteprima email" className="ct-iframe ct-iframe-email" srcDoc={finale.html} /></details>}
+          <iframe title="Anteprima email" sandbox="" className="ct-iframe ct-iframe-email" srcDoc={finale.html} /></details>}
         {pratica && prossimo && <label className="check"><input type="checkbox" checked={avanza} onChange={e => setAvanza(e.target.checked)} /> Segna anche «{prossimo.nome}» come fatto</label>}
         {richiedeAllegato(m) && <Banner s="warn">{AVVISO_ALLEGATO}: il messaggio non contiene allegati.</Banner>}
         {err && <Banner s="ko">{err}</Banner>}

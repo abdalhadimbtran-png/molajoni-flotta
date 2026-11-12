@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
-import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, STATI_CLIENTE, eCliente, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento, type Commerciale } from '../lib/centralino/tipi';
+import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, RUOLI_DISMESSI, STATI_CLIENTE, campiCambiati, conTecnicoScelto, eCliente, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento, type Commerciale } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 import { ESTENSIONI, apriAllegato, caricaAllegato, pratica, useAdesso, useAggiornamento, useConfig } from './comune';
 import { ChiBadge, Ic, SlaChip, Trascorso, regolaDi, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
@@ -213,18 +213,25 @@ function ModaleNota({ p, tipo, onClose, onFatto }: { p: P; tipo: 'nota' | 'chiam
 
 function ModaleDati({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatto: () => void }) {
   const { config } = useConfig();
-  const [f, setF] = useState({
+  const [iniziale] = useState(() => ({
     cliente_nome: p.cliente_nome, contatto_nome: p.contatto_nome ?? '', telefono: p.telefono ?? '', email: p.email ?? '', indirizzo: p.indirizzo ?? '', cap: p.cap ?? '', comune: p.comune ?? '',
     descrizione: p.descrizione ?? '', priorita: p.priorita, importo_stimato: p.importo_stimato == null ? '' : String(p.importo_stimato),
     assegnato_ruolo: p.assegnato_ruolo ?? '', assegnato_nome: p.assegnato_nome ?? '', tecnico_nome: p.tecnico_nome ?? '', commerciale_nome: p.commerciale_nome ?? '', commerciale_email: p.commerciale_email ?? '',
     appuntamento_data: p.appuntamento_data ?? '', appuntamento_fascia: p.appuntamento_fascia ?? '', nota: '',
-  });
+  }));
+  const [f, setF] = useState(iniziale);
+  const [invio, setInvio] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const comm = p.tipo === 'offerta_grande' ? (config?.impostazioni.commerciali_offerte_grandi ?? []) : [...(config?.impostazioni.commerciali ?? []), ...(config?.impostazioni.commerciali_offerte_grandi ?? [])];
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   async function salva(e: FormEvent) {
     e.preventDefault(); setErr(null);
-    try { await rpc('centralino_aggiorna', { p_id: p.id, p: f }); toast('Pratica aggiornata'); onFatto(); } catch (x) { setErr(testoErrore(x)); }
+    if (invio) return;
+    // solo i campi cambiati: se un collega ha modificato altri campi nel frattempo, le sue modifiche restano
+    const cambi = campiCambiati(iniziale, f);
+    if (!Object.keys(cambi).length) { onClose(); return; }
+    setInvio(true);
+    try { await rpc('centralino_aggiorna', { p_id: p.id, p: cambi }); toast('Pratica aggiornata'); onFatto(); } catch (x) { setErr(testoErrore(x)); } finally { setInvio(false); }
   }
   return (
     <Modal titolo="Dati e assegnazione" onClose={onClose}>
@@ -239,9 +246,9 @@ function ModaleDati({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatt
         </div>
         <div className="ct-griglia">
           <div className="field"><label htmlFor="d-ruolo">Assegnata a (ruolo)</label>
-            <select id="d-ruolo" value={f.assegnato_ruolo} onChange={set('assegnato_ruolo')}><option value="">—</option>{RUOLI_ASSEGNA.map(r => <option key={r.v} value={r.v}>{r.l}</option>)}</select></div>
+            <select id="d-ruolo" value={f.assegnato_ruolo} onChange={set('assegnato_ruolo')}><option value="">—</option>{RUOLI_ASSEGNA.map(r => <option key={r.v} value={r.v}>{r.l}</option>)}{RUOLI_DISMESSI[iniziale.assegnato_ruolo] && <option value={iniziale.assegnato_ruolo}>{RUOLI_DISMESSI[iniziale.assegnato_ruolo]}</option>}</select></div>
           <div className="field"><label htmlFor="d-nome">Persona</label><input id="d-nome" value={f.assegnato_nome} onChange={set('assegnato_nome')} /></div>
-          <div className="field"><label htmlFor="d-tec">Tecnico</label><input id="d-tec" value={f.tecnico_nome} onChange={set('tecnico_nome')} /></div>
+          {(conTecnicoScelto(p.tipo) || !!iniziale.tecnico_nome) && <div className="field"><label htmlFor="d-tec">Tecnico</label><input id="d-tec" value={f.tecnico_nome} onChange={set('tecnico_nome')} /></div>}
           <div className="field"><label htmlFor="d-cm">Commerciale</label>
             <select id="d-cm" value={f.commerciale_nome} onChange={e => { const c = comm.find(x => x.nome === e.target.value); setF({ ...f, commerciale_nome: e.target.value, commerciale_email: c?.email ?? f.commerciale_email }); }}>
               <option value="">—</option>{comm.map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)}{f.commerciale_nome && !comm.some(c => c.nome === f.commerciale_nome) && <option value={f.commerciale_nome}>{f.commerciale_nome}</option>}
@@ -250,15 +257,13 @@ function ModaleDati({ p, onClose, onFatto }: { p: P; onClose: () => void; onFatt
           <div className="field"><label htmlFor="d-imp">Importo stimato €</label><input id="d-imp" inputMode="decimal" value={f.importo_stimato} onChange={set('importo_stimato')} /></div>
         </div>
         <div className="ct-riga">
-          {!p.appuntamento_data && <><input type="date" aria-label="Appuntamento" value={f.appuntamento_data} onChange={set('appuntamento_data')} />
-          <select aria-label="Fascia" value={f.appuntamento_fascia} onChange={set('appuntamento_fascia')}><option value="">—</option><option value="mattina">Mattina</option><option value="pomeriggio">Pomeriggio</option></select></>}
           <select aria-label="Priorità" value={f.priorita} onChange={set('priorita')}><option value="normale">Normale</option><option value="urgente">Urgente</option></select>
         </div>
         <p className="hint">{REGOLA_ANAGRAFICA}</p>
         <div className="field"><label htmlFor="d-desc">Richiesta</label><textarea id="d-desc" rows={2} value={f.descrizione} onChange={set('descrizione')} /></div>
         <div className="field"><label htmlFor="d-nota">Motivo del cambio (facoltativo)</label><input id="d-nota" value={f.nota} onChange={set('nota')} /></div>
         {err && <Banner s="ko">{err}</Banner>}
-        <div className="row-flex"><button className="btn">Salva</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
+        <div className="row-flex"><button className="btn" disabled={invio}>{invio ? 'Salvataggio…' : 'Salva'}</button><button type="button" className="btn-ghost" onClick={onClose}>Annulla</button></div>
       </form>
     </Modal>
   );

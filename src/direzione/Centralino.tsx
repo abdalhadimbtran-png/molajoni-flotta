@@ -5,7 +5,7 @@ import { fmtEuro } from '../lib/format';
 import { Errore, useLoad } from '../ui';
 import { useCtx } from '../centralino/ShellCentralino';
 import { datiPeriodo } from '../centralino/Direzione';
-import { useAdesso, useAggiornamento, useConfig } from '../centralino/comune';
+import { tutteLeRighe, useAdesso, useAggiornamento, useConfig } from '../centralino/comune';
 import { Scheletro } from '../centralino/Scheletro';
 import { nomeStadio } from '../centralino/componenti';
 import KpiTrasferimenti from '../centralino/KpiTrasferimenti';
@@ -24,8 +24,9 @@ const PASSI = [['coordinatore', 'Inviato al coordinatore'], ['tecnico', 'Tecnico
 const SEZ = [['volumi', 'Volumi'], ['servizio', 'Servizio'], ['offerte', 'Offerte'], ['trasferimenti', 'Trasferimenti'], ['qualita', 'Qualità'], ['registro', 'Registro di Jennifer'], ['movimenti', 'Movimenti']] as const;
 
 async function carica90(da: string) {
-  const { data, error } = await supabase.from('pratiche').select('created_at').gte('created_at', inizioGiornoRoma(da)).limit(10000);
-  if (error) throw error; return (data ?? []) as { created_at: string }[];
+  // a blocchi: l'API restituisce al massimo 1000 righe per richiesta; fatture/fornitori non sono pratiche
+  return tutteLeRighe<{ created_at: string }>((x, y) => supabase.from('pratiche').select('id,created_at').not('tipo', 'in', '(amministrazione,fornitori)')
+    .gte('created_at', inizioGiornoRoma(da)).order('id').range(x, y), 20000);
 }
 
 /** /direzione/centralino: tutto quello che succede al centralino, con periodo e confronto. Sola lettura. */

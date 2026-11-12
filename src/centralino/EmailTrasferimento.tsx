@@ -166,7 +166,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
         <p className="ct-dest"><b>A:</b> {chi === 'ref' ? `${trasf.destinatario_nome} (referente)` : `${trasf.cliente_nome || p?.contatto_nome || p?.cliente_nome || 'Cliente'} (cliente)`}{emailOk(b.a) ? ` · ${b.a.trim()}` : ' · manca l\'email'}</p>
         <div className="field"><label>Oggetto</label><input value={b.oggetto} disabled={fatta} onChange={e => set({ ...b, oggetto: e.target.value })} /></div>
         <div className="ct-anteprima" contentEditable={!fatta} suppressContentEditableWarning onBlur={e => set({ ...b, corpo: (e.target as HTMLDivElement).innerHTML })} dangerouslySetInnerHTML={{ __html: b.corpo }} />
-        {b.t && valori && <details className="ct-anteprima-box"><summary>Anteprima formattata</summary><iframe title="Anteprima email" className="ct-iframe ct-iframe-email" srcDoc={fin(b).html} /></details>}
+        {b.t && valori && <details className="ct-anteprima-box"><summary>Anteprima formattata</summary><iframe title="Anteprima email" sandbox="" className="ct-iframe ct-iframe-email" srcDoc={fin(b).html} /></details>}
         {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => telefono(chi)} disabled={invio}>Avvisato per telefono</button><button type="button" className="ct-link" onClick={() => eml(chi)}>Versione formattata (.eml)</button></div>}
       </>}
     </section>

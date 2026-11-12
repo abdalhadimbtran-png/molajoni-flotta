@@ -41,7 +41,6 @@ export const eCliente = (x: { tipo_contatto?: string | null }) => (x.tipo_contat
 export type StatoCliente = 'nuovo' | 'ex_cliente' | 'attivo';
 export const STATI_CLIENTE: Record<StatoCliente, [string, string]> = { nuovo: ['info', 'Nuovo'], ex_cliente: ['warn', 'Ex cliente'], attivo: ['ok', 'Cliente attivo'] };
 export type EsitoTrasf = 'risposto' | 'non_risposto' | 'occupato' | 'richiamera';
-export const ESITI_TRASF: Record<EsitoTrasf, string> = { risposto: 'Risposto', non_risposto: 'Non risposto', occupato: 'Occupato', richiamera: 'Richiamerà' };
 export interface Trasferimento {
   id: number; pratica_id: number | null; cliente_codice: string | null; cliente_nome: string | null; telefono: string | null;
   destinatario_nome: string; destinatario_ruolo: string | null; destinatario_user: string | null; argomento: string | null; tipo_argomento: string | null;
@@ -93,10 +92,15 @@ export const NOME_TIPO: Record<TipoPratica, string> = {
 export const ESITI: Record<Esito, [string, string]> = {
   aperta: ['info', 'Aperta'], chiusa_ok: ['ok', 'Chiusa'], chiusa_ko: ['ko', 'Chiusa (negativa)'], annullata: ['na', 'Annullata'],
 };
+/** Tipi dismessi (0071–0073): fatture e fornitori non sono più pratiche. I dati restano leggibili, ma non si propongono nei filtri. */
+export const TIPI_DISMESSI: string[] = ['amministrazione', 'fornitori'];
+/** Ruoli proponibili in «Dati e assegnazione» (amministrazione/fornitori tolti con 0071: restano solo se già sulla pratica). */
 export const RUOLI_ASSEGNA: { v: string; l: string }[] = [
-  { v: 'tecnico', l: 'Tecnico' }, { v: 'tecnico_commerciale', l: 'Tecnico commerciale' }, { v: 'amministrazione', l: 'Amministrazione (Simona)' },
-  { v: 'fornitori', l: 'Fornitori (Roberta)' }, { v: 'responsabile', l: 'Responsabile' }, { v: 'centralino', l: 'Centralino' },
+  { v: 'tecnico', l: 'Tecnico' }, { v: 'tecnico_commerciale', l: 'Tecnico commerciale' }, { v: 'responsabile', l: 'Responsabile' }, { v: 'centralino', l: 'Centralino' },
 ];
+export const RUOLI_DISMESSI: Record<string, string> = { amministrazione: 'Amministrazione (Simona)', fornitori: 'Fornitori (Roberta)' };
+/** Il tecnico si nomina solo dove la procedura lo prevede (sopralluogo, offerta da tablet TMQ); per intervento/manutenzione lo decide il coordinatore (0075). */
+export const conTecnicoScelto = (tipo: string) => tipo === 'sopralluogo' || tipo === 'offerta_tablet';
 export const FASCE: Record<'mattina' | 'pomeriggio', string> = { mattina: 'mattina (8:30–13:00)', pomeriggio: 'pomeriggio (13:00–17:30)' };
 
 export const SCRIPT_TELEFONO = 'Molajoni dal 1930, buongiorno, sono Jennifer: come posso aiutarla?';
@@ -110,9 +114,19 @@ export const prossimoStadio = (f: Flusso | undefined, p: Pratica) => {
   const i = indiceStadio(f, p.stato_corrente);
   return f && i >= 0 && i < f.stadi.length - 1 ? f.stadi[i + 1] : null;
 };
-export const richiedeAppuntamento = (t: string) => t === 'manutenzione' || t === 'sopralluogo';
 
 /** Chiamata trasferita senza email di riepilogo (né motivo): segnale rosso. */
 export const senzaCliente = (t: Trasferimento) => !t.email_cliente_inviata_at && !t.email_riepilogo_at && !t.email_non_disponibile;
 export const senzaReferente = (t: Trasferimento) => !t.email_referente_inviata_at;
 export const senzaRiepilogo = (t: Trasferimento) => !t.solo_commerciale && (senzaCliente(t) || senzaReferente(t));
+
+/**
+ * «Dati e assegnazione»: solo i campi cambiati rispetto a quando la finestra è stata aperta (più il motivo, se c'è).
+ * Così due persone sulla stessa pratica non si sovrascrivono i campi a vicenda (vince l'ultima solo sullo stesso campo).
+ */
+export function campiCambiati<T extends Record<string, string>>(prima: T, dopo: T): Partial<T> {
+  const out: Record<string, string> = {};
+  for (const k of Object.keys(dopo)) if (k !== 'nota' && dopo[k] !== prima[k]) out[k] = dopo[k];
+  if (Object.keys(out).length && dopo.nota?.trim()) out.nota = dopo.nota.trim();
+  return out as Partial<T>;
+}

@@ -155,7 +155,11 @@ function StatoLive({ base, versione }: { base: string; versione: number }) {
     const carica = () => Promise.all([
       supabase.from('pratiche').select('id,sla_scadenza').eq('esito', 'aperta').not('sla_scadenza', 'is', null).limit(2000),
       supabase.from('chiamate_trasferite').select('richiamo_scadenza,richiamato_at').is('richiamato_at', null).not('richiamo_scadenza', 'is', null).eq('solo_commerciale', false).limit(2000),
-    ]).then(([a, t]) => ok && setD({ ap: (a.data ?? []) as Pratica[], tr: (t.data ?? []) as { richiamo_scadenza: string | null; richiamato_at: string | null }[] }));
+    ]).then(([a, t]) => {
+      // rete o Supabase non disponibili: si tengono gli ultimi numeri (mai «0 scadute» per un errore)
+      if (!ok || a.error || t.error) return;
+      setD({ ap: (a.data ?? []) as Pratica[], tr: (t.data ?? []) as { richiamo_scadenza: string | null; richiamato_at: string | null }[] });
+    }, () => undefined);
     carica(); const k = window.setInterval(carica, 60000);
     return () => { ok = false; window.clearInterval(k); };
   }, [versione]);
@@ -189,8 +193,10 @@ function Ricerca({ base }: { base: string }) {
   }, []);
   useEffect(() => {
     if (q.trim().length < 2) { setR(null); return; }
-    const k = window.setTimeout(() => { cerca(q).then(x => { setR(x); setSel(0); }, () => setR([])); }, 220);
-    return () => window.clearTimeout(k);
+    // `attuale`: una risposta lenta di una ricerca precedente non sovrascrive quella nuova
+    let attuale = true;
+    const k = window.setTimeout(() => { cerca(q).then(x => { if (attuale) { setR(x); setSel(0); } }, () => { if (attuale) setR([]); }); }, 220);
+    return () => { attuale = false; window.clearTimeout(k); };
   }, [q]);
   useEffect(() => {
     const f = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setR(null); };

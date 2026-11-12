@@ -55,22 +55,6 @@ export function compila(modello: string, v: Valori, html = true): string {
   });
 }
 
-/** Da HTML semplice a testo (per «Copia testo», Outlook e la versione testo dell'email). */
-export function inTesto(html: string): string {
-  const d = document.createElement('div');
-  d.innerHTML = html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>\s*/gi, '\n\n');
-  return (d.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/** Guscio dell'email (stile del portale, compatibile con i client di posta). */
-export function guscioEmail(corpo: string): string {
-  return `<!doctype html><html lang="it"><body style="margin:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-top:4px solid #E30613">
-<tr><td style="padding:18px 28px 0;font-size:11px;letter-spacing:.12em;color:#E30613;font-weight:700">MOLAJONI ANTINCENDI · DAL 1930</td></tr>
-<tr><td style="padding:12px 28px 24px;font-size:15px;line-height:1.55;color:#1a1a1a">${corpo}</td></tr></table></td></tr></table></body></html>`;
-}
-
 /** Modello → email completa (oggetto, HTML premium, testo). `corpo` = corpo già compilato (eventualmente modificato a mano). */
 export function emailDaModello(t: Pick<Template, 'oggetto' | 'corpo_html'> & Partial<Pick<Template, 'titolo' | 'dati' | 'firma_tipo' | 'tipo_pratica' | 'codice'>>, v: Valori, corpo?: string) {
   const c = corpo ?? compila(t.corpo_html, v);

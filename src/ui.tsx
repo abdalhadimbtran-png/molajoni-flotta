@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import type { Livello, Messaggio } from './lib/format';
 import { testoErrore } from './lib/supabase';
 import { useT } from './lib/i18n';
@@ -38,14 +38,27 @@ export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   const [caricamento, setCaricamento] = useState(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const run = useCallback(fn, deps);
+  // dati già mostrati: un aggiornamento in background fallito (rete, Supabase lento) non li sostituisce con la
+  // schermata d'errore — le finestre aperte e quanto si sta scrivendo restano; avviso discreto e si riprova al prossimo giro
+  // (solo se i dati mostrati sono della stessa richiesta: cambiati i filtri, l'errore si mostra)
+  const caricataDa = useRef<unknown>(null);
   const reload = useCallback(async () => {
     setCaricamento(true);
-    try { setData(await run()); setErrore(null); }
-    catch (e) { setErrore(testoErrore(e)); }
+    try { setData(await run()); caricataDa.current = run; setErrore(null); }
+    catch (e) { if (caricataDa.current === run) avvisoNonAggiornato(); else setErrore(testoErrore(e)); }
     finally { setCaricamento(false); }
   }, [run]);
   useEffect(() => { reload(); }, [reload]);
   return { data, errore, caricamento, reload };
+}
+
+let ultimoAvviso = 0;
+/** Al massimo un avviso al minuto. */
+function avvisoNonAggiornato() {
+  const ora = Date.now();
+  if (ora - ultimoAvviso < 60000) return;
+  ultimoAvviso = ora;
+  toast('Connessione instabile: i dati mostrati potrebbero non essere aggiornati. Riprovo da solo.');
 }
 
 let toastTimer: number | undefined;

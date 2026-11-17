@@ -201,3 +201,9 @@ tbody tr:hover td { background: var(--surface-2); }
 .kpi .lbl { min-height: 2.6em; line-height: 1.3; align-items: flex-start; }
 .kpi.warn .lbl::before { background: var(--sla-warn); }
 .kpi.ko .lbl::before, .kpi.warn .lbl::before { margin-top: .35em; }
+
+/* «Vedi come»: fascia fissa ambra in cima (sola lettura) */
+.vedi-come { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 16px; background: var(--warn-bg); color: var(--warn); border-bottom: 1px solid var(--warn-line); font-size: 14px; }
+.vedi-come button { border: 1px solid var(--warn-line); background: #fff; color: var(--warn); border-radius: 999px; padding: 4px 14px; font-weight: 600; cursor: pointer; }
+.vedi-come button:hover { background: var(--warn-line); }

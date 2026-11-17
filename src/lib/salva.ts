@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { testoErrore } from './supabase';
 import { toast } from '../ui';
+import { leggi as vistaAttiva, messaggioSolaLettura } from './vediCome';
 
 /**
  * Salvataggio condiviso: un solo invio alla volta, 1 nuovo tentativo sugli errori di rete
@@ -65,9 +66,11 @@ export async function conRiprova<T>(fn: () => Promise<T>, o: OpzioniSalva = {}):
  * Crea un esecutore con blocco anti-doppio-clic proprio.
  * `notifica` è iniettabile per i test (default: toast dell'app).
  */
-export function creaSalva(notifica: (msg: string) => void = toast) {
+export function creaSalva(notifica: (msg: string) => void = toast, vista: typeof vistaAttiva = vistaAttiva) {
   let occupato = false;
   async function esegui<T>(fn: () => Promise<T>, o: OpzioniSalva = {}): Promise<EsitoSalva<T>> {
+    const v = vista();
+    if (v) { const messaggio = messaggioSolaLettura(v.nome); notifica(messaggio); return { ok: false, duplicato: false, messaggio }; }
     if (occupato) return { ok: false, duplicato: true, messaggio: '' };
     occupato = true;
     try {

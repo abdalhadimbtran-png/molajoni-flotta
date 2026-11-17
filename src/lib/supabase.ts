@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { ErroreSolaLettura, installaGuardia, leggi as vistaAttiva, RPC_LETTURA } from './vediCome';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
 export const configurato = Boolean(url && key);
+// «Vedi come»: in sola lettura nessuna scrittura parte verso Supabase (anche dalle chiamate dirette)
+if (url) installaGuardia([url]);
 
 /** Oltre questo tempo una richiesta (non di caricamento file) si interrompe con «Il server non risponde». */
 export const TIMEOUT_MS = 30000;
@@ -30,6 +33,7 @@ export const supabase = createClient(url ?? 'http://localhost', key ?? 'missing'
 export function testoErrore(e: unknown): string {
   if (!e) return 'Errore sconosciuto';
   if (typeof e === 'string') return e;
+  if ((e as { code?: string }).code === 'SOLA_LETTURA') return (e as Error).message;
   const m = (e as { message?: string }).message;
   if (m) {
     if (m.includes('permission denied')) return 'Permesso negato per questa operazione.';
@@ -47,6 +51,8 @@ export function testoErrore(e: unknown): string {
 
 /** Chiamata RPC che solleva l'errore come eccezione. */
 export async function rpc<T = unknown>(nome: string, args: Record<string, unknown>): Promise<T> {
+  const v = vistaAttiva();
+  if (v && !RPC_LETTURA.has(nome)) throw new ErroreSolaLettura(v.nome);
   const { data, error } = await supabase.rpc(nome, args);
   if (error) throw error;
   return data as T;

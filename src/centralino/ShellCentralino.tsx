@@ -52,7 +52,7 @@ export default function ShellCentralino() {
     if (!s.sessione || !(s.centralino || s.direzione)) return;
     let k = 0;
     const agg = () => { window.clearTimeout(k); k = window.setTimeout(() => setVersione(v => v + 1), 400); };
-    const uid = s.sessione.user.id;
+    const uid = s.vediCome?.userId ?? s.sessione.user.id;
     const ch = supabase.channel('centralino-vivo')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pratiche' }, agg)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pratiche_eventi' }, agg)

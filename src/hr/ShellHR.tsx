@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { idEffettivo } from '../lib/vediCome';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -6,6 +7,7 @@ import { fmtOra } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { Caricamento } from '../ui';
 import { Icona, Layout, type Gruppo } from '../admin/Barra';
+import * as vista from '../lib/vediCome';
 import { InstallaApp } from '../Installa';
 import type { CtxHR } from './comune';
 
@@ -22,14 +24,19 @@ export function useSessioneHR() {
     async function verifica(s: Session | null) {
       if (!attivo) return;
       setSessione(s);
-      if (!s) { setStato('anonimo'); return; }
-      const [h, a, r] = await Promise.all([
-        supabase.rpc('is_hr'), supabase.rpc('is_admin'),
-        supabase.from('responsabili').select('nome,dipendente_id').eq('user_id', s.user.id).maybeSingle(),
+      if (!s) { vista.cancella(); setStato('anonimo'); return; }
+      const a = await supabase.rpc('is_admin');
+      const adminReale = !a.error && a.data === true;
+      // «Vedi come» (solo amministratore reale): ruoli e account collegato della persona simulata
+      const v = adminReale ? vista.leggi() : null;
+      const uid = v?.userId ?? s.user.id;
+      const [h, r] = await Promise.all([
+        v ? Promise.resolve({ error: null, data: v.ruoli.hr }) : supabase.rpc('is_hr'),
+        supabase.from('responsabili').select('nome,dipendente_id').eq('user_id', uid).maybeSingle(),
       ]);
       if (!attivo) return;
-      setAdmin(!a.error && a.data === true);
-      setMio({ dipendente: (r.data?.dipendente_id as number | null) ?? null, nome: (r.data?.nome as string | null) || s.user.email || '' });
+      setAdmin(adminReale && !v);
+      setMio({ dipendente: (r.data?.dipendente_id as number | null) ?? null, nome: (r.data?.nome as string | null) || (v ? v.nome : s.user.email) || '' });
       setStato(!h.error && h.data === true ? 'ok' : 'non_abilitato');
     }
     supabase.auth.getSession().then(({ data }) => verifica(data.session));
@@ -110,7 +117,7 @@ function CampanellaHR() {
   const carica = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const { data } = await supabase.from('notifiche').select('id,tipo,dati,link,creato_il,letta_il').eq('user_id', u.user.id).order('creato_il', { ascending: false }).limit(20);
+    const { data } = await supabase.from('notifiche').select('id,tipo,dati,link,creato_il,letta_il').eq('user_id', idEffettivo(u.user.id) ?? u.user.id).order('creato_il', { ascending: false }).limit(20);
     setL((data ?? []) as N[]);
   }, []);
   useEffect(() => { carica(); const k = window.setInterval(carica, 60000); return () => window.clearInterval(k); }, [carica]);

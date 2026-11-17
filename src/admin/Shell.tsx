@@ -7,6 +7,7 @@ import { Caricamento } from '../ui';
 import { Icona, Layout, type Gruppo } from './Barra';
 import Campanella from './Campanella';
 import { InstallaApp } from '../Installa';
+import * as vista from '../lib/vediCome';
 
 type Stato = 'caricamento' | 'anonimo' | 'non_abilitato' | 'ok';
 /** Area dell'account: null per l'amministratore (entra ovunque) o per un account non abilitato. */
@@ -23,25 +24,31 @@ export function useSessione() {
   const [sessione, setSessione] = useState<Session | null>(null);
   const [stato, setStato] = useState<Stato>('caricamento');
   const [ruoli, setRuoli] = useState<Ruoli>(NESSUNO);
+  const [vediCome, setVedi] = useState<vista.VediCome | null>(null);
   useEffect(() => {
     let attivo = true;
     async function verifica(s: Session | null) {
       if (!attivo) return;
       setSessione(s);
-      if (!s) { setRuoli(NESSUNO); setStato('anonimo'); return; }
+      if (!s) { vista.cancella(); setRuoli(NESSUNO); setStato('anonimo'); return; }
       const [r, a, h, f, c, d] = await Promise.all([supabase.rpc('is_responsabile'), supabase.rpc('is_admin'), supabase.rpc('is_hr'), supabase.rpc('is_formazione'), supabase.rpc('is_centralino'), supabase.rpc('is_direzione')]);
       if (!attivo) return;
       const nuovi = { admin: !a.error && a.data === true, flotta: !r.error && r.data === true, hr: !h.error && h.data === true, formazione: !f.error && f.data === true,
         centralino: !c.error && c.data === true, direzione: !d.error && d.data === true };
-      setRuoli(nuovi);
-      setStato(nuovi.flotta ? 'ok' : 'non_abilitato');
+      // «Vedi come»: vale solo per l'amministratore reale; per gli altri la chiave viene ignorata e tolta
+      const v = vista.leggi();
+      if (v && !nuovi.admin) vista.cancella();
+      const eff = vista.ruoliEffettivi(nuovi, nuovi.admin ? v : null);
+      setVedi(nuovi.admin ? v : null);
+      setRuoli(eff);
+      setStato(eff.flotta ? 'ok' : 'non_abilitato');
     }
     supabase.auth.getSession().then(({ data }) => verifica(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { verifica(s); });
     return () => { attivo = false; sub.subscription.unsubscribe(); };
   }, []);
   const area: Area = ruoli.admin ? null : ruoli.flotta ? 'flotta' : ruoli.hr ? 'hr' : ruoli.formazione ? 'formazione' : ruoli.centralino ? 'centralino' : ruoli.direzione ? 'direzione' : null;
-  return { sessione, stato, ...ruoli, area };
+  return { sessione, stato, ...ruoli, area, vediCome };
 }
 
 /** Pagina iniziale per ruolo: amministratore → /admin, responsabile flotta → /cruscotto, ufficio personale → /hr. */

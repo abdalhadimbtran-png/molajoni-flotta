@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { leggiAppunti, salvaAppunti } from './comune';
+import { attiva as vistaAttiva } from '../lib/vediCome';
 
 /** Appunti personali durante la chiamata: li vede solo chi li scrive (RLS). Salvataggio automatico. */
-export default function Appunti({ chiave, righe = 6, onTesto }: { chiave: string; righe?: number; onTesto?: (t: string) => void }) {
+/** In «Vedi come» gli appunti privati restano nascosti. */
+export default function Appunti(props: { chiave: string; righe?: number; onTesto?: (t: string) => void }) {
+  return vistaAttiva() ? null : <AppuntiPrivati {...props} />;
+}
+
+function AppuntiPrivati({ chiave, righe = 6, onTesto }: { chiave: string; righe?: number; onTesto?: (t: string) => void }) {
   const [t, setT] = useState('');
   const [stato, setStato] = useState<'' | 'salvo' | 'salvato'>('');
   const pronto = useRef(false);

@@ -5,6 +5,8 @@ import { rpc, supabase, testoErrore } from '../../lib/supabase';
 import { almenoUno, confermaEliminazione, mailtoInvito, normalizza, NESSUN_PANNELLO, PANNELLI, STATO_EMAIL, type Pannelli, type StatoEmail } from '../../lib/account';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../../ui';
 import { chiamaAccount } from './AreaAdmin';
+import { homeDi } from '../Shell';
+import { salva as salvaVista, type VediCome } from '../../lib/vediCome';
 
 type StatoAcc = 'invitato' | 'attivo' | 'disattivato';
 interface Acc {
@@ -58,6 +60,17 @@ export default function Account() {
     finally { setLavoro(null); }
   }
 
+  async function vediCome(a: Acc) {
+    const v: VediCome = { userId: a.user_id, nome: a.nome, email: a.email, dipendenteId: a.dipendente_id,
+      ruoli: { admin: false, flotta: a.flotta, hr: a.hr, formazione: a.formazione, centralino: a.centralino, direzione: a.direzione } };
+    setLavoro(a.user_id);
+    try { await rpc('admin_vedi_come', { p_user: a.user_id }); } // registro: chi ha visto come chi
+    catch (e) { toast(tm(testoErrore(e))); setLavoro(null); return; }
+    salvaVista(v);
+    window.location.assign(homeDi(v.ruoli) ?? '/');
+  }
+  const puoVedere = (a: Acc) => !a.io && a.ruolo !== 'admin' && almenoUno(pannelliDi(a));
+
   return (
     <>
       <div className="page-hero">
@@ -76,7 +89,9 @@ export default function Account() {
           const p = pannelliDi(a);
           return (
             <tr key={a.user_id} className={a.attivo ? '' : 'muted'}>
-              <td><span style={{ fontWeight: 600 }}>{a.nome}</span>{a.io && <span className="sub"> · {t('tu')}</span>}
+              <td>{puoVedere(a)
+                  ? <button type="button" className="link-btn" style={{ fontWeight: 600, padding: 0, border: 0, background: 'none', color: 'var(--accent, inherit)', cursor: 'pointer' }} title={t('Vedi come')} onClick={() => vediCome(a)}>{a.nome}</button>
+                  : <span style={{ fontWeight: 600 }}>{a.nome}</span>}{a.io && <span className="sub"> · {t('tu')}</span>}
                 {d && <div className="sub">{t('Dipendente: {n}', { n: `${d.nome} ${d.cognome}` })}</div>}</td>
               <td className="mono" dir="ltr">{a.email}</td>
               <td><div className="row-flex" style={{ gap: 4, flexWrap: 'wrap' }}>
@@ -86,6 +101,7 @@ export default function Account() {
                 {a.cambio_password && a.attivo && <div className="sub">{t('cambio password al primo accesso')}</div>}</td>
               <td className="mono">{a.ultimo_accesso ? fmtOra(a.ultimo_accesso, locale) : '—'}</td>
               <td className="nowrap actions">
+                {puoVedere(a) && <button className="btn-ghost btn-sm" disabled={lavoro === a.user_id} onClick={() => vediCome(a)}>{t('Vedi come')}</button>}
                 <button className="btn-ghost btn-sm" onClick={() => setRuoli(a)}>{a.io ? t('Collega dipendente') : t('Modifica ruoli')}</button>
                 {a.attivo && <button className="btn-ghost btn-sm" disabled={lavoro === a.user_id} onClick={() => inviaLink(a)}>
                   {lavoro === a.user_id ? t('Invio…') : a.stato === 'invitato' ? t('Reinvia invito') : t('Link nuova password')}</button>}
@@ -93,7 +109,7 @@ export default function Account() {
                 {!a.io && (a.attivo
                   ? <button className="btn-ghost btn-sm" onClick={() => setDisattiva(a)}>{t('Disattiva')}</button>
                   : <button className="btn-ghost btn-sm" onClick={() => cambiaStato(a, true)}>{t('Riattiva')}</button>)}
-                <button className="btn-ghost btn-sm" style={{ color: 'var(--ko)' }} disabled={a.io} title={a.io ? t('Non puoi eliminare il tuo stesso account') : undefined} onClick={() => setElimina(a)}>{t('Elimina')}</button>
+                {!a.io && <button className="btn-ghost btn-sm" style={{ color: 'var(--ko)' }} onClick={() => setElimina(a)}>{t('Elimina')}</button>}
               </td>
             </tr>
           );

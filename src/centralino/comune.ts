@@ -1,3 +1,4 @@
+import { attiva as vistaAttiva } from '../lib/vediCome';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Evento, Flusso, Impostazioni, Pratica, Template } from '../lib/centralino/tipi';
@@ -137,6 +138,7 @@ export function useAdesso(ms = 30000) {
 
 /** Appunti privati (solo l'autore): salvataggio automatico. chiave = 'bozza' | 'p:<id>'. */
 export async function leggiAppunti(chiave: string): Promise<string> {
+  if (vistaAttiva()) return '';
   const { data } = await supabase.from('appunti').select('testo').eq('chiave', chiave).maybeSingle();
   return (data as { testo: string } | null)?.testo ?? '';
 }

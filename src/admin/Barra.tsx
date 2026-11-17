@@ -3,6 +3,7 @@ import { NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { NESSUN_PANNELLO, PANNELLI, pannelliAperti, pannelloDi, type Pannelli } from '../lib/account';
 import { useT } from '../lib/i18n';
+import { cancella as esciVista, idEffettivo, leggi as leggiVista } from '../lib/vediCome';
 
 /** Icone di navigazione: tratto 1.75, stessa griglia 24×24. */
 const P: Record<string, ReactNode> = {
@@ -53,7 +54,10 @@ export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children 
   const iniziali = (email.split('@')[0].split(/[._-]/).filter(Boolean).slice(0, 2).map(x => x[0]).join('') || '?').toUpperCase();
   // password temporanea: cambio obbligatorio prima di usare il portale
   if (io?.cambio) return <Navigate to="/imposta-password?obbligo=1" replace />;
+  const vista = leggiVista();
   return (
+    <>
+    {vista && <BannerVista nome={vista.nome} />}
     <div className={`gest ${aperto ? 'menu-aperto' : ''}`}>
       <aside className="side no-print">
         <div className="side-brand">
@@ -95,6 +99,18 @@ export function Layout({ prodotto, gruppi, utilita, email, menuUtente, children 
         <main className="gest-main"><div className="wrap">{children}</div></main>
       </div>
     </div>
+    </>
+  );
+}
+
+/** Fascia fissa di «Vedi come»: sola lettura, Esci torna ad Account e ruoli. */
+function BannerVista({ nome }: { nome: string }) {
+  const esci = () => { esciVista(); window.location.assign('/admin/account'); };
+  return (
+    <div className="vedi-come no-print" role="status">
+      <span>Stai vedendo il portale come <b>{nome}</b> · sola lettura</span>
+      <button type="button" onClick={esci}>Esci</button>
+    </div>
   );
 }
 
@@ -106,9 +122,10 @@ function useMioAccount() {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) return;
-      const { data } = await supabase.from('responsabili').select('ruolo,flotta,hr,formazione,centralino,direzione,cambio_password,attivo').eq('user_id', s.session.user.id).maybeSingle();
+      const { data } = await supabase.from('responsabili').select('ruolo,flotta,hr,formazione,centralino,direzione,cambio_password,attivo').eq('user_id', idEffettivo(s.session.user.id) ?? s.session.user.id).maybeSingle();
       if (!vivo || !data || !data.attivo) return;
-      setV({ cambio: !!data.cambio_password, pannelli: { ...NESSUN_PANNELLO, admin: data.ruolo === 'admin', flotta: !!data.flotta, hr: !!data.hr,
+      const simulato = leggiVista() !== null;
+      setV({ cambio: !simulato && !!data.cambio_password, pannelli: { ...NESSUN_PANNELLO, admin: !simulato && data.ruolo === 'admin', flotta: !!data.flotta, hr: !!data.hr,
         formazione: !!data.formazione, centralino: !!data.centralino, direzione: !!data.direzione } });
     })();
     return () => { vivo = false; };

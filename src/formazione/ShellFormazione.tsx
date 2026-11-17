@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { idEffettivo } from '../lib/vediCome';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
@@ -52,7 +53,7 @@ export function Campanella() {
   const [aperta, setAperta] = useState(false);
   const carica = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser(); if (!u.user) return;
-    const { data } = await supabase.from('notifiche').select('id,dati,link,creato_il,letta_il').eq('user_id', u.user.id).order('creato_il', { ascending: false }).limit(30);
+    const { data } = await supabase.from('notifiche').select('id,dati,link,creato_il,letta_il').eq('user_id', idEffettivo(u.user.id) ?? u.user.id).order('creato_il', { ascending: false }).limit(30);
     setL((data ?? []) as N[]);
   }, []);
   useEffect(() => { carica(); const k = window.setInterval(carica, 60000); return () => window.clearInterval(k); }, [carica]);

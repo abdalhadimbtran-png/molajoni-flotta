@@ -56,9 +56,9 @@ export interface Dipendente {
   categoria: Categoria; reparto: string | null; data_assunzione: string | null; data_cessazione: string | null;
   contratto: 'full-time' | 'part-time' | null; ore_giornaliere: number; giorni_riposo: string;
   patente_categoria: string | null; patente_scadenza: string | null; attivo: boolean; ha_pin: boolean;
-  tentativi_falliti: number; bloccato_fino: string | null;
+  tentativi_falliti: number; bloccato_fino: string | null; note?: string | null;
 }
-export const SEL_DIP = 'id,codice,nome,cognome,ruolo,telefono,email,categoria,reparto,data_assunzione,data_cessazione,contratto,ore_giornaliere,giorni_riposo,patente_categoria,patente_scadenza,attivo,ha_pin,tentativi_falliti,bloccato_fino';
+export const SEL_DIP = 'id,codice,nome,cognome,ruolo,telefono,email,categoria,reparto,data_assunzione,data_cessazione,contratto,ore_giornaliere,giorni_riposo,patente_categoria,patente_scadenza,attivo,ha_pin,tentativi_falliti,bloccato_fino,note';
 
 export interface TipoAssenza { codice: string; descrizione: string; unita: Unita; con_saldo: boolean; mezza_giornata: boolean; etichetta_piano: string; richiedibile: boolean; ordine: number; attivo: boolean }
 

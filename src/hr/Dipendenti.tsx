@@ -118,7 +118,7 @@ function FormDipendente({ x, onClose, onSalvato }: { x: Dipendente | null; onClo
     codice: x?.codice ?? '', categoria: (x?.categoria ?? 'UFFICIO') as Categoria, reparto: x?.reparto ?? '', ruolo: x?.ruolo ?? '',
     data_assunzione: x?.data_assunzione ?? '', contratto: x?.contratto ?? 'full-time', ore_giornaliere: String(x?.ore_giornaliere ?? 8),
     giorni_riposo: x?.giorni_riposo ?? '0000011', patente_categoria: x?.patente_categoria ?? 'B', patente_scadenza: x?.patente_scadenza ?? '',
-    data_cessazione: x?.data_cessazione ?? '', attivo: x?.attivo ?? true,
+    data_cessazione: x?.data_cessazione ?? '', attivo: x?.attivo ?? true, note: x?.note ?? '',
   });
   const [err, setErr] = useState<string | null>(null);
   const [conferma, setConferma] = useState(false);
@@ -140,7 +140,7 @@ function FormDipendente({ x, onClose, onSalvato }: { x: Dipendente | null; onClo
       data_assunzione: f.data_assunzione || null, contratto: f.contratto, ore_giornaliere: Number(String(f.ore_giornaliere).replace(',', '.')),
       giorni_riposo: f.giorni_riposo, patente_categoria: tec ? f.patente_categoria.trim() || null : x?.patente_categoria ?? null,
       patente_scadenza: tec ? f.patente_scadenza || null : x?.patente_scadenza ?? null,
-      data_cessazione: f.data_cessazione || null, attivo: x ? f.attivo : true,
+      data_cessazione: f.data_cessazione || null, attivo: x ? f.attivo : true, note: f.note.trim() || null,
     };
     const esito = await esegui(async () => {
       const r = x ? await supabase.from('dipendenti').update(rec).eq('id', x.id).select(SEL_DIP).single()
@@ -196,6 +196,8 @@ function FormDipendente({ x, onClose, onSalvato }: { x: Dipendente | null; onClo
           <div className="field"><label htmlFor="d-pc">Categoria patente</label><input id="d-pc" value={f.patente_categoria} onChange={set('patente_categoria')} /></div>
           <div className="field"><label htmlFor="d-ps">Scadenza patente</label><input id="d-ps" type="date" value={f.patente_scadenza} onChange={set('patente_scadenza')} /></div>
         </>}
+
+        <div className="field span2"><label htmlFor="d-note">Note</label><textarea id="d-note" rows={2} maxLength={2000} value={f.note} onChange={set('note')} placeholder="Es. altre patenti, telefono personale" /></div>
 
         {x && <>
           <div className="lbl-sm span2 hr-blocco">Rapporto</div>
@@ -279,6 +281,7 @@ function SchedaDipendente({ x, onClose, onModifica }: { x: Dipendente; onClose: 
       <div className="form">
         <p className="sub" style={{ marginTop: -8 }}>{nomeCategoria(x.categoria)}{x.reparto ? ` · ${x.reparto}` : ''} · codice <span className="mono">{x.codice}</span>
           {x.data_assunzione ? ` · assunto il ${fmtData(x.data_assunzione)}` : ''} · {x.contratto === 'part-time' ? 'part-time' : 'tempo pieno'}, {String(x.ore_giornaliere).replace('.', ',')} ore al giorno</p>
+        {x.note && <p className="sub" style={{ whiteSpace: 'pre-line' }}><b>Note:</b> {x.note}</p>}
         {errore && <Errore testo={errore} onRetry={reload} />}
         {!data ? <p className="sub">Caricamento…</p> : <>
           <div className="lbl-sm">Saldi {anno}</div>

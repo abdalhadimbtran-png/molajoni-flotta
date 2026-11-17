@@ -333,6 +333,30 @@ async function account(req: Request) {
     await traccia("STATO", id, { attivo });
     return json({ ok: true });
   }
+  if (b.azione === "elimina") {
+    // eliminazione definitiva: storico conservato (riferimenti a NULL), cose personali cancellate, poi utente auth
+    const id = String(b.user_id ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ errore: "Richiesta non valida" }, 400);
+    if (id === io.user.id) return json({ errore: "Non puoi eliminare il tuo stesso account" }, 400);
+    const r = await leggi(id);
+    if (!r) return json({ errore: "Account non trovato" }, 404);
+    if (String(b.conferma ?? "").trim().toLowerCase() !== r.email.toLowerCase() && String(b.conferma ?? "").trim() !== "ELIMINA")
+      return json({ errore: "Conferma non valida" }, 400);
+    // prima blocco l'accesso, così non resta mai un utente attivo senza scheda
+    await db.auth.admin.updateUserById(id, { ban_duration: "876000h" });
+    const { error } = await db.rpc("admin_elimina_account", { p_user: id, p_autore: io.user.id });
+    if (error) {
+      if (r.attivo) await db.auth.admin.updateUserById(id, { ban_duration: "none" });
+      const noti = ["tuo stesso", "ultimo amministratore", "non trovato", "riservato"];
+      return json({ errore: noti.some(n => error.message.includes(n)) ? error.message : "Eliminazione non riuscita" }, 400);
+    }
+    const del = await db.auth.admin.deleteUser(id);
+    if (del.error) {
+      await traccia("ELIMINA_AUTH_ERRORE", id, { email: r.email, errore: del.error.message.slice(0, 200) });
+      return json({ ok: true, avviso: "Scheda eliminata; accesso bloccato ma utente di login non rimosso." });
+    }
+    return json({ ok: true });
+  }
   return json({ errore: "Richiesta non valida" }, 400);
 }
 

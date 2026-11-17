@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { fmtOra } from '../../lib/format';
 import { useT } from '../../lib/i18n';
 import { rpc, supabase, testoErrore } from '../../lib/supabase';
-import { almenoUno, mailtoInvito, normalizza, NESSUN_PANNELLO, PANNELLI, STATO_EMAIL, type Pannelli, type StatoEmail } from '../../lib/account';
+import { almenoUno, confermaEliminazione, mailtoInvito, normalizza, NESSUN_PANNELLO, PANNELLI, STATO_EMAIL, type Pannelli, type StatoEmail } from '../../lib/account';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../../ui';
 import { chiamaAccount } from './AreaAdmin';
 
@@ -38,6 +38,7 @@ export default function Account() {
   const [link, setLink] = useState<{ a: Acc; esito: EsitoLink } | null>(null);
   const [disattiva, setDisattiva] = useState<Acc | null>(null);
   const [lavoro, setLavoro] = useState<string | null>(null);
+  const [elimina, setElimina] = useState<Acc | null>(null);
   const elenco = useMemo(() => {
     const q = cerca.trim().toLowerCase();
     return (data?.account ?? []).filter(a => !q || a.nome.toLowerCase().includes(q) || a.email.toLowerCase().includes(q));
@@ -92,18 +93,20 @@ export default function Account() {
                 {!a.io && (a.attivo
                   ? <button className="btn-ghost btn-sm" onClick={() => setDisattiva(a)}>{t('Disattiva')}</button>
                   : <button className="btn-ghost btn-sm" onClick={() => cambiaStato(a, true)}>{t('Riattiva')}</button>)}
+                <button className="btn-ghost btn-sm" style={{ color: 'var(--ko)' }} disabled={a.io} title={a.io ? t('Non puoi eliminare il tuo stesso account') : undefined} onClick={() => setElimina(a)}>{t('Elimina')}</button>
               </td>
             </tr>
           );
         })}</tbody>
       </table></div>
-      <p className="hint">{t('Gli account non si cancellano: si disattivano (accesso bloccato), così lo storico resta leggibile. Ogni modifica è registrata nel registro movimenti.')}</p>
+      <p className="hint">{t("«Disattiva» blocca l'accesso ed è reversibile; «Elimina» è definitivo. In entrambi i casi lo storico resta. Ogni modifica è registrata nel registro movimenti.")}</p>
       {nuovo && <NuovoAccount dipendenti={data.dipendenti} collegati={data.account} onClose={() => setNuovo(false)} onSalvato={() => { setNuovo(false); reload(); }} />}
       {ruoli && <ModaleRuoli a={ruoli} dipendenti={data.dipendenti} collegati={data.account} onClose={() => setRuoli(null)} onSalvato={() => { setRuoli(null); reload(); }} />}
       {pw && <PasswordTemporanea a={pw} onClose={() => { setPw(null); reload(); }} />}
       {link && <Modal titolo={link.a.stato === 'invitato' ? t('Invito per {n}', { n: link.a.nome }) : t('Link nuova password per {n}', { n: link.a.nome })} onClose={() => setLink(null)}>
         <div className="form"><InvioLink email={link.a.email} esito={link.esito} /><button className="btn" onClick={() => setLink(null)}>{t('Fatto')}</button></div>
       </Modal>}
+      {elimina && <EliminaAccount a={elimina} onClose={() => setElimina(null)} onFatto={() => { setElimina(null); reload(); }} />}
       {disattiva && (
         <Modal titolo={t('Disattivare {n}?', { n: disattiva.nome })} onClose={() => setDisattiva(null)}>
           <div className="form">
@@ -286,6 +289,37 @@ function PasswordTemporanea({ a, onClose }: { a: Acc; onClose: () => void }) {
           <Banner s="ok">{t('Password temporanea impostata: {p}. Comunicala di persona; al primo accesso dovrà sceglierne una nuova.', { p: pw })}</Banner>
           <button className="btn" onClick={onClose}>{t('Fatto')}</button>
         </>}
+      </div>
+    </Modal>
+  );
+}
+
+/** Eliminazione definitiva: bisogna scrivere l'email (o ELIMINA) per abilitare il pulsante. */
+function EliminaAccount({ a, onClose, onFatto }: { a: Acc; onClose: () => void; onFatto: () => void }) {
+  const { t, tm } = useT();
+  const [scritto, setScritto] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [invio, setInvio] = useState(false);
+  const ok = confermaEliminazione(scritto, a.email) && !a.io;
+  async function conferma() {
+    setErr(null); setInvio(true);
+    try {
+      const r = await chiamaAccount<{ ok: boolean; avviso?: string }>({ azione: 'elimina', user_id: a.user_id, conferma: scritto.trim() });
+      toast(r.avviso ? tm(r.avviso) : t('Account eliminato')); onFatto();
+    } catch (x) { setErr(tm((x as Error).message)); setInvio(false); }
+  }
+  return (
+    <Modal titolo={t('Eliminare {n}?', { n: a.nome })} onClose={onClose}>
+      <div className="form">
+        <p><b>{a.nome}</b> · <span className="mono" dir="ltr">{a.email}</span></p>
+        <Banner s="ko">{t("Eliminazione definitiva: l'accesso viene rimosso. Lo storico (pratiche, eventi) resta.")}</Banner>
+        <div className="field"><label htmlFor="el-conf">{t("Scrivi l'email o ELIMINA per confermare")}</label>
+          <input id="el-conf" dir="ltr" autoComplete="off" value={scritto} onChange={e => setScritto(e.target.value)} /></div>
+        {err && <Banner s="ko">{err}</Banner>}
+        <div className="row-flex">
+          <button className="btn" style={{ background: 'var(--ko)', borderColor: 'var(--ko)' }} disabled={!ok || invio} onClick={conferma}>{invio ? t('Eliminazione…') : t('Elimina definitivamente')}</button>
+          <button className="btn-ghost" autoFocus onClick={onClose}>{t('Annulla')}</button>
+        </div>
       </div>
     </Modal>
   );

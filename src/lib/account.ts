@@ -56,3 +56,9 @@ export function controllaPassword(pw: string, conferma: string): string | null {
   if (pw !== conferma) return 'Le due password non coincidono.';
   return null;
 }
+
+/** Conferma dell'eliminazione definitiva: l'email dell'account (senza maiuscole/spazi) oppure «ELIMINA». */
+export function confermaEliminazione(scritto: string, email: string): boolean {
+  const s = scritto.trim();
+  return s === 'ELIMINA' || (s.length > 0 && s.toLowerCase() === email.trim().toLowerCase());
+}

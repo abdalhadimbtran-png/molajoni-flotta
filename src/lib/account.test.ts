@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { almenoUno, controllaPassword, mailtoInvito, normalizza, NESSUN_PANNELLO, pannelliAperti, pannelloDi } from './account';
+import { almenoUno, confermaEliminazione, controllaPassword, mailtoInvito, normalizza, NESSUN_PANNELLO, pannelliAperti, pannelloDi } from './account';
 
 describe('account e ruoli', () => {
   it('admin apre tutti i pannelli', () => {
@@ -28,5 +28,17 @@ describe('account e ruoli', () => {
     expect(controllaPassword('lunghissima', 'lunghissima')).not.toBeNull();
     expect(controllaPassword('Molajoni1930', 'Molajoni1931')).toMatch(/coincidono/);
     expect(controllaPassword('Molajoni1930', 'Molajoni1930')).toBeNull();
+  });
+});
+
+describe('conferma eliminazione account', () => {
+  it('accetta email o ELIMINA', () => {
+    expect(confermaEliminazione(' Mario.Rossi@molajoni.it ', 'mario.rossi@molajoni.it')).toBe(true);
+    expect(confermaEliminazione('ELIMINA', 'x@y.it')).toBe(true);
+  });
+  it('rifiuta il resto', () => {
+    expect(confermaEliminazione('', 'x@y.it')).toBe(false);
+    expect(confermaEliminazione('elimina', 'x@y.it')).toBe(false);
+    expect(confermaEliminazione('x@y.i', 'x@y.it')).toBe(false);
   });
 });

@@ -212,10 +212,10 @@ async function accoda(dest: string, c: { oggetto: string; html: string; testo: s
   return { id: riga.id, stato: statoEmail(r) };
 }
 
-async function inviaLink(r: { user_id: string; nome: string; email: string; ruolo: string } & Record<string, unknown>, preferisci: "invite" | "recovery", saluto?: Saluto) {
+async function inviaLink(r: { user_id: string; nome: string; email: string; ruolo: string } & Record<string, unknown>, preferisci: "invite" | "recovery", saluto?: Saluto, firma?: string) {
   const l = await creaLink(r.email, r.nome, preferisci);
   if ("errore" in l) return { errore: "Link non creato. Riprova tra poco." };
-  const c = componiEmail(l.tipo === "invite" ? "invito" : "recupero", { nome: r.nome, email: r.email, link: l.link, saluto, pannelli: pannelliDi(r) });
+  const c = componiEmail(l.tipo === "invite" ? "invito" : "recupero", { nome: r.nome, email: r.email, link: l.link, saluto, pannelli: pannelliDi(r), firma });
   const e = await accoda(r.email, c, { tipo: l.tipo === "invite" ? "invito_account" : "recupero_password", user_id: r.user_id });
   return { link: l.link, tipo: l.tipo, oggetto: c.oggetto, testo: c.testo, email: e };
 }
@@ -242,7 +242,7 @@ async function account(req: Request) {
   const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const { data: io, error: e1 } = await db.auth.getUser(jwt);
   if (e1 || !io?.user) return json({ errore: "Sessione non valida: accedi di nuovo." }, 401);
-  const { data: me } = await db.from("responsabili").select("ruolo,attivo").eq("user_id", io.user.id).maybeSingle();
+  const { data: me } = await db.from("responsabili").select("ruolo,attivo,nome").eq("user_id", io.user.id).maybeSingle();
   if (!me || !me.attivo || me.ruolo !== "admin") return json({ errore: "Accesso riservato all'amministratore" }, 403);
   const b = await req.json().catch(() => ({}));
   const traccia = (azione: string, record: string, dopo: unknown) =>
@@ -288,7 +288,7 @@ async function account(req: Request) {
       return json({ errore: /dipendente/i.test(ins.error.message) ? "Questo dipendente è già collegato a un altro account." : "Creazione account non riuscita" }, 500);
     }
     await traccia("CREA", uid, { email, nome, pannelli: pannelliDi(riga), dipendente_id: dip });
-    const c = componiEmail("invito", { nome, email, link: l.link, saluto, pannelli: pannelliDi(riga) });
+    const c = componiEmail("invito", { nome, email, link: l.link, saluto, pannelli: pannelliDi(riga), firma: me.nome });
     const e = await accoda(email, c, { tipo: "invito_account", user_id: uid });
     await traccia("INVITO", uid, { email_id: e.id, stato: e.stato });
     return json({ ok: true, user_id: uid, link: l.link, oggetto: c.oggetto, testo: c.testo, email: e });
@@ -300,7 +300,7 @@ async function account(req: Request) {
     if (!r.attivo) return json({ errore: "Account disattivato: riattivalo prima." }, 400);
     const { data: u } = await db.auth.admin.getUserById(r.user_id);
     const mai = !u?.user?.last_sign_in_at;
-    const out = await inviaLink(r, mai ? "invite" : "recovery", ["Benvenuta", "Benvenuto"].includes(b.saluto) ? b.saluto : undefined);
+    const out = await inviaLink(r, mai ? "invite" : "recovery", ["Benvenuta", "Benvenuto"].includes(b.saluto) ? b.saluto : undefined, me.nome);
     if ("errore" in out) return json({ errore: out.errore }, 400);
     if (mai) await db.from("responsabili").update({ invitato_il: new Date().toISOString() }).eq("user_id", r.user_id);
     await traccia(mai ? "INVITO" : "LINK_PASSWORD", r.user_id, { email_id: out.email.id, stato: out.email.stato });

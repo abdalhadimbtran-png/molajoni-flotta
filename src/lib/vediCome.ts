@@ -64,7 +64,7 @@ export const RPC_LETTURA = new Set([
   'admin_centralino_conteggi', 'admin_get_impostazioni', 'admin_personale_flotta_conteggi', 'analisi_admin', 'anomalie_carburante', 'anteprima_elimina_importazione',
   'centralino_altri_referenti', 'centralino_cerca', 'centralino_clienti', 'centralino_commerciali', 'centralino_contatti', 'centralino_coordinatori', 'centralino_copertura',
   'centralino_fornitori', 'centralino_prossimo', 'centralino_referenti_avvisi', 'centralino_registro_giorno', 'centralino_sedi', 'centralino_stato_cliente', 'centralino_tecnici',
-  'conducente_alle', 'direzione_digest_stato', 'formazione_dati', 'geocache_leggi',
+  'conducente_alle', 'direzione_digest_stato', 'report_direzione_stato', 'report_direzione_dati', 'formazione_dati', 'geocache_leggi',
   'hr_anteprima', 'hr_anteprima_eliminazione', 'hr_calendario', 'hr_report', 'hr_richieste', 'hr_saldi',
   'piano_giorno', 'piano_modifiche_pendenti', 'prossimo_lavorativo', 'report_agenda', 'report_carburante', 'variazioni_da_riassegnare', 'variazioni_giornata',
 ]);

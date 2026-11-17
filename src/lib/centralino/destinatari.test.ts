@@ -24,6 +24,7 @@ const MATRICE: [string, string, string][] = [
   ['riepilogo_commerciale', 'commerciale', 'l.esposito@molajoni.it'], ['preventivo_tmq', 'cliente', CLIENTE],
   ['modifica_evasa', 'cliente', CLIENTE], ['conferma_anagrafica', 'cliente', CLIENTE], ['conferma_disdetta', 'cliente', CLIENTE],
   ['girata_referente', 'referente', 's.colagrossi@molajoni.it'], ['girata_ufficio', 'cliente', CLIENTE], ['girata_fornitore', 'cliente', CLIENTE],
+  ['risposta_informazione', 'cliente', CLIENTE],
 ];
 
 describe('destinatarioPerAzione: matrice', () => {

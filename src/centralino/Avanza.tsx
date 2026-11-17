@@ -11,6 +11,7 @@ import { NOME_RUOLO, controllaEmail, ruoloModello } from '../lib/centralino/dest
 import { useSalva } from '../lib/salva';
 import { apriEmail } from '../lib/centralino/mailto';
 import type { Eml } from '../lib/centralino/emailHtml';
+import AvanzaInformazione from './AvanzaInformazione';
 
 export interface Prossimo { key: string; nome: string; mancanti: string[] }
 export const prossimoDi = (id: number) => rpc<Prossimo | null>('centralino_prossimo', { p_id: id });
@@ -33,7 +34,15 @@ export function componi(t: Template, p: Pratica, firma: string, a: string, extra
  * «Invia email al coordinatore e avanti», «Conferma e informa il cliente», «Chiudi».
  * Scorciatoia: Invio = azione principale, Esc = chiudi.
  */
-export default function Avanza({ p, f, onClose, onFatto, onEmail }: { p: Pratica; f: Flusso; stadio?: unknown; onClose: () => void; onFatto: () => void; onEmail?: (template?: string, dopoPasso?: boolean) => void }) {
+type PropsAvanza = { p: Pratica; f: Flusso; stadio?: unknown; onClose: () => void; onFatto: () => void; onEmail?: (template?: string, dopoPasso?: boolean) => void };
+export default function Avanza(props: PropsAvanza) {
+  const s = prossimoStadio(props.f, props.p);
+  // «Informazione» (0083): passo con 3 esiti
+  if (s && (s.esito_info || (s.requisiti as string[] | undefined)?.includes('esito_info'))) return <AvanzaInformazione {...props} s={s} />;
+  return <AvanzaPasso {...props} />;
+}
+
+function AvanzaPasso({ p, f, onClose, onFatto, onEmail }: PropsAvanza) {
   const { config } = useConfig();
   const s = prossimoStadio(f, p);
   const req = s?.requisiti ?? [];

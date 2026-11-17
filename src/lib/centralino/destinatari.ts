@@ -26,6 +26,7 @@ export const RUOLO_MODELLO: Record<string, Ruolo> = {
   modifica_evasa: 'cliente', conferma_anagrafica: 'cliente', conferma_disdetta: 'cliente',
   // Informazione / amministrazione / fornitori (girata)
   girata_referente: 'referente', girata_ufficio: 'cliente', girata_fornitore: 'cliente',
+  risposta_informazione: 'cliente',
   // Trasferimenti e richiami
   trasf_referente: 'referente', riepilogo_trasferita: 'cliente', riepilogo_richiamo: 'cliente',
 };

@@ -12,6 +12,7 @@ import type { Dataset } from '../lib/centralino/registro';
 import { Tessera } from './Tessera';
 import KpiTrasferimenti from './KpiTrasferimenti';
 import { fineGiornoRoma, giornoRoma, inizioGiornoRoma, primoDelMeseRoma, semaforo, testoResiduo } from '../lib/centralino/sla';
+import { contaEsitiInfo } from '../lib/centralino/informazione';
 import { CAMPI_PRATICA, tutteLeRighe, useAdesso, useAggiornamento, useConfig } from './comune';
 import { nomeStadio } from './componenti';
 import { trasferimenti } from './Trasferimento';
@@ -87,6 +88,10 @@ export default function Direzione() {
           <table className="ct-tab"><tbody>{stadi.filter(s => k.tempiMedi[s] != null).map(s => <tr key={s}><td>{nomeSt(s)}</td><td className="num">{durata(k.tempiMedi[s])}</td></tr>)}</tbody></table>
           {!stadi.some(s => k.tempiMedi[s] != null) && <p className="ct-vuoto">Nessun dato nel periodo.</p>}</section>
       </div>
+
+      {(() => { const ei = contaEsitiInfo(data.eventi); return (
+        <section className="ct-blocco"><h2>Informazioni <span className="sub">a voce {ei.voce} · via email {ei.email} · girate {ei.girata}</span></h2>
+          <Barre v={Object.entries(ei.perReferente).map(([n, x]) => [`Girate a ${n}`, x] as [string, number])} /></section>); })()}
 
       <section className="ct-blocco"><h2>Offerte</h2>
         <div className="ct-funnel">

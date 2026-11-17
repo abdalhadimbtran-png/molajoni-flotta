@@ -11,6 +11,7 @@ const USO: Record<string, string[]> = {
   presa_offerta_piccola: ['offerta_piccola'], invio_offerta: ['offerta_piccola'], presa_offerta_grande: ['offerta_grande'], riepilogo_commerciale: ['offerta_grande'],
   preventivo_tmq: ['offerta_tablet'], modifica_evasa: ['modifica'], conferma_anagrafica: ['modifica'], conferma_disdetta: ['modifica'],
   girata_referente: ['amministrazione', 'fornitori', 'informazione'], girata_ufficio: ['amministrazione', 'informazione'], girata_fornitore: ['fornitori'],
+  risposta_informazione: ['informazione'],
 };
 // segnaposto aggiunti dal pannello dei trasferimenti (EmailTrasferimento / ModaleEmail)
 const TRASF = { sede: 'Via Roma 10, 00100 Roma', canale: 'Telefono', richiesta: 'Preventivo estintori', link: 'https://molajoni-flotta.vercel.app/centralino/pratica/42', autore: 'Jennifer Marchetti',
@@ -28,8 +29,8 @@ const pulito = (s: string) => s.replace(/https?:\/\/[^\s"]+/g, '');
 const controlla = (s: string) => VIETATI.filter(r => r.test(pulito(s))).map(String);
 
 describe('modelli attivi: segnaposto compilati in ogni flusso', () => {
-  it('20 modelli attivi, tutti coperti', () => {
-    expect(ATTIVI.length).toBe(20);
+  it('21 modelli attivi, tutti coperti', () => {
+    expect(ATTIVI.length).toBe(21);
     for (const t of ATTIVI) if (t.tipo_pratica !== 'trasferimento' && t.tipo_pratica !== 'trasferimento_referente') expect(USO[t.codice], t.codice).toBeTruthy();
   });
   for (const t of ATTIVI) {
@@ -50,12 +51,26 @@ describe('modelli attivi: segnaposto compilati in ogni flusso', () => {
 });
 
 describe('girata e firme', () => {
-  it('girata_referente: email interna al referente con chi chiama, link e sintesi', () => {
+  it('risposta_informazione: oggetto con numero pratica, segnaposto da completare, firma J. Marchetti', () => {
+    const t = ATTIVI.find(x => x.codice === 'risposta_informazione')!;
+    const e = emailDaModello(t, segnaposto(pratica('informazione'), ''));
+    expect(e.oggetto).toBe('RISPOSTA ALLA VOSTRA RICHIESTA DI INFORMAZIONI – Condominio Via Roma 10 – CT-2026-000042');
+    expect(e.testo).toContain('[scrivere qui la risposta]');
+    expect(e.testo).toContain('Grazie per la preferenza e distinti saluti.');
+    expect(e.testo).toContain('J. Marchetti');
+  });
+  it('girata_ufficio: «il nostro responsabile … Vi ricontatterà»', () => {
+    const t = ATTIVI.find(x => x.codice === 'girata_ufficio')!;
+    const e = emailDaModello(t, segnaposto(pratica('informazione'), ''));
+    expect(e.testo).toContain("il nostro responsabile Antonella D'Orazio Vi ricontatterà");
+  });
+  it('girata_referente: email interna al referente con link e sintesi, senza «chi chiama»', () => {
     const t = ATTIVI.find(x => x.codice === 'girata_referente')!;
     const e = emailDaModello(t, segnaposto(pratica('fornitori'), ''));
     expect(e.oggetto).toBe('[Centralino] Richiesta da gestire – CT-2026-000042 – Ferramenta Bianchi srl – Fornitori');
     expect(e.testo).toContain('Ciao Roberta Felci,');
-    expect(e.testo).toContain('Chi chiama: fornitore');
+    expect(e.testo).not.toMatch(/chi chiama|\(fornitore\)|\(cliente\)/i);
+    expect(e.testo).toContain('Cliente: Ferramenta Bianchi srl');
     expect(e.html).toContain('/centralino/pratica/42');
   });
   it('conferma della girata: variante neutra per i fornitori', () => {

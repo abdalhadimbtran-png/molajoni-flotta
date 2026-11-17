@@ -5,8 +5,8 @@ import { testoCella, type Col, type Report, type Riga } from '../admin/report/ca
 import { caricaTutto, piuMesi, type Tutto } from './comune';
 
 type Id = 'tecnico' | 'scadenze' | 'matrice' | 'mancanti' | 'ore';
-const ST: Record<string, string> = { valido: 'Valido', in_scadenza: 'In scadenza', scaduto: 'Scaduto', mancante: 'Mancante' };
-const SIM: Record<string, string> = { valido: '✓', in_scadenza: 'In scad.', scaduto: 'Scaduto', mancante: 'Manca' };
+const ST: Record<string, string> = { valido: 'Valido', in_scadenza: 'In scadenza', scaduto: 'Scaduto', mancante: 'Mancante', da_completare: 'Data da completare' };
+const SIM: Record<string, string> = { valido: '✓', in_scadenza: 'In scad.', scaduto: 'Scaduto', mancante: 'Manca', da_completare: 'Data?' };
 const c = (k: string, l: string, t: Col['t'], w: number, tot?: boolean): Col => ({ k, l, t, w, tot });
 const conta = (r: Riga[], k: string, v: string) => String(r.filter(x => x[k] === v).length);
 
@@ -53,7 +53,7 @@ const DEF: Def[] = [
   { id: 'ore', titolo: 'Ore di formazione per periodo', descrizione: 'Ore e corsi fatti da ogni persona nel periodo scelto.', periodo: true,
     costruisci: (t, f) => {
       const m = new Map<string, { dipendente: string; corsi: number; ore: number }>();
-      for (const r of t.registrazioni) if (r.data_conseguimento >= f.da && r.data_conseguimento <= f.a && (!f.tec || r.categoria === 'TEC')) {
+      for (const r of t.registrazioni) if (r.data_conseguimento && r.data_conseguimento >= f.da && r.data_conseguimento <= f.a && (!f.tec || r.categoria === 'TEC')) {
         const x = m.get(r.nome) ?? { dipendente: r.nome, corsi: 0, ore: 0 }; x.corsi++; x.ore += Number(r.ore ?? 0); m.set(r.nome, x);
       }
       const righe = [...m.values()].sort((a, b) => b.ore - a.ore);

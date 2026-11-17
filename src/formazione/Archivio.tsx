@@ -15,9 +15,9 @@ export default function Archivio() {
   const reg = useMemo(() => new Map((data?.registrazioni ?? []).map(r => [r.id, r])), [data]);
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data) return <Caricamento />;
-  const anni = [...new Set(data.registrazioni.map(r => r.data_conseguimento.slice(0, 4)))].sort().reverse();
-  const ok = (r: { nome: string; corso_id: number; data_conseguimento: string }) =>
-    (!cerca || r.nome.toLowerCase().includes(cerca.toLowerCase())) && (!corso || String(r.corso_id) === corso) && (!anno || r.data_conseguimento.startsWith(anno));
+  const anni = [...new Set(data.registrazioni.map(r => (r.data_conseguimento ?? '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const ok = (r: { nome: string; corso_id: number; data_conseguimento: string | null }) =>
+    (!cerca || r.nome.toLowerCase().includes(cerca.toLowerCase())) && (!corso || String(r.corso_id) === corso) && (!anno || (r.data_conseguimento ?? '').startsWith(anno));
   const con = data.attestati.map(a => ({ a, r: reg.get(a.corso_dipendente_id) })).filter(x => x.r && ok(x.r));
   const senza = data.registrazioni.filter(r => r.attuale && r.attivo && r.n_attestati === 0 && ok(r)).sort((a, b) => a.nome.localeCompare(b.nome));
   const apri = (p: string) => apriAttestato(p).catch(e => toast(e.message));

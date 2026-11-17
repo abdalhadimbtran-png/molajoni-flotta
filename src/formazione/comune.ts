@@ -1,14 +1,15 @@
 import { supabase } from '../lib/supabase';
 import type { Livello } from '../lib/format';
 
-export type StatoCorso = 'valido' | 'in_scadenza' | 'scaduto' | 'mancante';
+export type StatoCorso = 'valido' | 'in_scadenza' | 'scaduto' | 'mancante' | 'da_completare';
 export const STATO_CORSO: Record<StatoCorso, [Livello, string]> = {
   valido: ['ok', 'Valido'], in_scadenza: ['warn', 'In scadenza'], scaduto: ['ko', 'Scaduto'], mancante: ['ko', 'Mancante'],
+  da_completare: ['warn', 'Data da completare'],
 };
 
 export interface Corso { id: number; nome: string; descrizione: string | null; validita_mesi: number | null; obbligatorio_per_tec: boolean; attivo: boolean; ordine: number }
 export interface CorsoFatto {
-  id: number; dipendente_id: number; corso_id: number; data_conseguimento: string; data_scadenza: string | null;
+  id: number; dipendente_id: number; corso_id: number; data_conseguimento: string | null; data_scadenza: string | null;
   ente: string | null; ore: number | null; note: string | null; attestato_path: string | null; created_at: string;
 }
 export interface DipBase { id: number; codice: string; nome: string; cognome: string; categoria: string; reparto: string | null; attivo: boolean }
@@ -53,7 +54,7 @@ export async function apriAttestato(path: string) {
 
 export interface Registrazione {
   id: number; dipendente_id: number; nome: string; categoria: string; attivo: boolean; corso_id: number; corso: string;
-  data_conseguimento: string; data_scadenza: string | null; ente: string | null; ore: number | null; n_attestati: number; attuale: boolean;
+  data_conseguimento: string | null; data_scadenza: string | null; ente: string | null; ore: number | null; n_attestati: number; attuale: boolean;
 }
 export interface Attestato { id: number; corso_dipendente_id: number; path: string; nome_file: string | null; mime: string | null; created_at: string; caricato_da_dipendente: boolean }
 export interface Richiesta { id: number; corso_dipendente_id: number; stato: 'richiesto' | 'da_verificare' | 'approvato' | 'rifiutato'; path: string | null; nome_file: string | null; mime: string | null; motivo: string | null; richiesto_il: string; ultimo_promemoria: string | null; caricato_il: string | null }
@@ -92,7 +93,7 @@ export async function caricaFile(f: File): Promise<{ path: string; nome: string;
 }
 
 export const iniziali = (n: string, c: string) => `${(c[0] ?? '').toUpperCase()}${(n[0] ?? '').toUpperCase()}`;
-export const COLORE: Record<StatoCorso, string> = { valido: 'var(--ok)', in_scadenza: 'var(--warn)', scaduto: 'var(--ko)', mancante: 'var(--ko)' };
+export const COLORE: Record<StatoCorso, string> = { valido: 'var(--ok)', in_scadenza: 'var(--warn)', scaduto: 'var(--ko)', mancante: 'var(--ko)', da_completare: 'var(--warn)' };
 
 export const richiestaAperta = (t: Tutto, cd: number) => t.richieste.find(r => r.corso_dipendente_id === cd && r.stato !== 'approvato') ?? null;
 export async function chiediAttestato(ids: number[]) {

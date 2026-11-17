@@ -12,10 +12,13 @@ const Kpi = ({ n, l, s, cls }: { n: ReactNode; l: string; s?: string; cls?: stri
 export function kpi(t: Tutto) {
   const tec = t.dip.filter(d => d.categoria === 'TEC');
   const nonInRegola = new Set(t.righe.filter(r => r.obbligatorio && r.categoria === 'TEC' && (r.stato === 'scaduto' || r.stato === 'mancante')).map(r => r.dipendente_id));
-  const inRegola = tec.filter(d => !nonInRegola.has(d.id)).length;
+  // Data da completare: non conta come «in regola» (né come scaduto): conteggio a parte.
+  const daCompl = new Set(t.righe.filter(r => r.obbligatorio && r.categoria === 'TEC' && r.stato === 'da_completare').map(r => r.dipendente_id));
+  const inRegola = tec.filter(d => !nonInRegola.has(d.id) && !daCompl.has(d.id)).length;
   const entro = (g: number) => t.righe.filter(r => r.giorni != null && r.giorni >= 0 && r.giorni <= g).length;
   return { tec: tec.length, inRegola, s30: entro(30), s90: entro(90), s180: entro(180),
     scaduti: t.righe.filter(r => r.stato === 'scaduto').length, mancanti: t.righe.filter(r => r.stato === 'mancante').length,
+    daCompletare: t.righe.filter(r => r.stato === 'da_completare').length,
     senzaAtt: t.registrazioni.filter(r => r.attuale && r.attivo && r.n_attestati === 0).length };
 }
 
@@ -47,13 +50,13 @@ export default function Cruscotto() {
   // trend 12 mesi
   const o = new Date(data.oggi + 'T00:00:00Z');
   const mesi = Array.from({ length: 12 }, (_, i) => { const d = new Date(Date.UTC(o.getUTCFullYear(), o.getUTCMonth() - 11 + i, 1)); return d.toISOString().slice(0, 7); });
-  const trend = mesi.map(m => data.registrazioni.filter(r => r.data_conseguimento.startsWith(m)).length);
+  const trend = mesi.map(m => data.registrazioni.filter(r => (r.data_conseguimento ?? '').startsWith(m)).length);
   const maxT = Math.max(1, ...trend);
   // ore
-  const anni = [...new Set(data.registrazioni.map(r => r.data_conseguimento.slice(0, 4)))].sort().slice(-5);
-  const orePerAnno = anni.map(a => ({ a, h: data.registrazioni.filter(r => r.data_conseguimento.startsWith(a)).reduce((s, r) => s + Number(r.ore ?? 0), 0) }));
+  const anni = [...new Set(data.registrazioni.map(r => (r.data_conseguimento ?? '').slice(0, 4)).filter(Boolean))].sort().slice(-5);
+  const orePerAnno = anni.map(a => ({ a, h: data.registrazioni.filter(r => (r.data_conseguimento ?? '').startsWith(a)).reduce((s, r) => s + Number(r.ore ?? 0), 0) }));
   const annoCorr = data.oggi.slice(0, 4);
-  const orePerDip = Object.entries(data.registrazioni.filter(r => r.data_conseguimento.startsWith(annoCorr) && r.ore)
+  const orePerDip = Object.entries(data.registrazioni.filter(r => (r.data_conseguimento ?? '').startsWith(annoCorr) && r.ore)
     .reduce<Record<string, number>>((m, r) => { m[r.nome] = (m[r.nome] ?? 0) + Number(r.ore); return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10);
   const maxO = Math.max(1, ...orePerAnno.map(x => x.h), ...orePerDip.map(x => x[1]));
   const azioni = data.righe.filter(r => r.stato !== 'valido').sort((a, b) => (a.giorni ?? -9999) - (b.giorni ?? -9999));
@@ -92,6 +95,7 @@ export default function Cruscotto() {
         <Kpi n={`${perc}%`} l="Tecnici in regola" s={`${k.inRegola} su ${k.tec} hanno tutti gli obbligatori validi`} cls={perc === 100 ? 'ok' : 'warn'} />
         <Kpi n={k.scaduti} l="Corsi scaduti" cls={k.scaduti ? 'ko' : 'ok'} />
         <Kpi n={k.mancanti} l="Obbligatori mai fatti" cls={k.mancanti ? 'ko' : 'ok'} />
+        <Kpi n={k.daCompletare} l="Date da completare" s="corsi registrati senza data" cls={k.daCompletare ? 'warn' : 'ok'} />
         <Kpi n={k.senzaAtt} l="Senza attestato" s="corsi da completare con il documento" cls={k.senzaAtt ? 'warn' : 'ok'} />
       </div>
       <div className="kpis">
@@ -106,9 +110,9 @@ export default function Cruscotto() {
           <thead><tr><th>Chi</th><th>Cosa</th><th>Entro</th><th></th></tr></thead>
           <tbody>{azioni.slice(0, 40).map((r, i) => (
             <tr key={i}><td><b>{r.nome}</b></td>
-              <td>{r.stato === 'mancante' ? 'Fare' : 'Rinnovare'} «{r.corso}» <Pill s={STATO_CORSO[r.stato][0]}>{STATO_CORSO[r.stato][1]}</Pill></td>
-              <td>{r.stato === 'in_scadenza' ? fmtData(r.data_scadenza) : <b style={{ color: 'var(--ko)' }}>Subito</b>}</td>
-              <td><button className="btn btn-sm" onClick={() => nav(`/formazione/dipendenti?d=${r.dipendente_id}&c=${r.corso_id}`)}>{r.stato === 'mancante' ? 'Registra' : 'Rinnova'}</button></td></tr>))}</tbody>
+              <td>{r.stato === 'mancante' ? 'Fare' : r.stato === 'da_completare' ? 'Inserire la data di' : 'Rinnovare'} «{r.corso}» <Pill s={STATO_CORSO[r.stato][0]}>{STATO_CORSO[r.stato][1]}</Pill></td>
+              <td>{r.stato === 'da_completare' ? '—' : r.stato === 'in_scadenza' ? fmtData(r.data_scadenza) : <b style={{ color: 'var(--ko)' }}>Subito</b>}</td>
+              <td><button className="btn btn-sm" onClick={() => nav(`/formazione/dipendenti?d=${r.dipendente_id}&c=${r.corso_id}`)}>{r.stato === 'mancante' ? 'Registra' : r.stato === 'da_completare' ? 'Inserisci data' : 'Rinnova'}</button></td></tr>))}</tbody>
         </table></div>)}
 
       <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>

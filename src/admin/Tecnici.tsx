@@ -114,7 +114,7 @@ function FormTecnico({ x, onClose, onSalvato }: { x: Tecnico | null; onClose: ()
   const { t, tm } = useT();
   const [f, setF] = useState({
     codice: x?.codice ?? '', nome: x?.nome ?? '', cognome: x?.cognome ?? '', ruolo: x?.ruolo ?? '', telefono: x?.telefono ?? '', email: x?.email ?? '',
-    patente_categoria: x?.patente_categoria ?? 'B', patente_scadenza: x?.patente_scadenza ?? '', attivo: x?.attivo ?? true,
+    patente_categoria: x ? x.patente_categoria ?? '' : 'B', patente_scadenza: x?.patente_scadenza ?? '', attivo: x?.attivo ?? true,
   });
   const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string; checked?: boolean; type?: string } }) =>

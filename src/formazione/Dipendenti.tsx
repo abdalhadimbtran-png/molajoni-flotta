@@ -47,7 +47,7 @@ export default function Dipendenti() {
             </button>);
         })}
       </div>
-      <p className="sub" style={{ marginTop: 12 }}>Pallini: <span style={{ color: 'var(--ok)' }}>●</span> valido · <span style={{ color: 'var(--warn)' }}>●</span> in scadenza · <span style={{ color: 'var(--ko)' }}>●</span> scaduto · <span style={{ color: 'var(--ko)', opacity: .45 }}>●</span> mancante</p>
+      <p className="sub" style={{ marginTop: 12 }}>Pallini: <span style={{ color: 'var(--ok)' }}>●</span> valido · <span style={{ color: 'var(--warn)' }}>●</span> in scadenza o data da completare · <span style={{ color: 'var(--ko)' }}>●</span> scaduto · <span style={{ color: 'var(--ko)', opacity: .45 }}>●</span> mancante</p>
       {aperto && <Scheda d={aperto} t={data} corsoIniziale={Number(qs.get('c')) || undefined} onClose={() => setQs({})} onCambiato={reload} />}
     </>
   );
@@ -73,10 +73,10 @@ function Scheda({ d, t, corsoIniziale, onClose, onCambiato }: { d: DipBase; t: T
           return (
             <div key={r.corso_id} style={{ borderBottom: '1px solid var(--line)', paddingBottom: 10 }}>
               <div className="row-flex" style={{ justifyContent: 'space-between' }}><b style={{ fontSize: 16 }}>{r.corso}</b><Pill s={STATO_CORSO[s][0]}>{STATO_CORSO[s][1]}</Pill></div>
-              <div className="sub" style={{ margin: '4px 0 8px' }}>{r.reg ? (r.data_scadenza ? `Scade il ${fmtData(r.data_scadenza)}` : 'Non scade') + ` · fatto il ${fmtData(r.data_conseguimento)}` : 'Obbligatorio: da fare'}</div>
+              <div className="sub" style={{ margin: '4px 0 8px' }}>{r.stato === 'da_completare' ? 'Data del corso da completare: tocca «Inserisci data»' : r.reg ? (r.data_scadenza ? `Scade il ${fmtData(r.data_scadenza)}` : 'Non scade') + ` · fatto il ${fmtData(r.data_conseguimento)}` : 'Obbligatorio: da fare'}</div>
               <div className="row-flex">
                 {att.length > 0 && <button className="btn-ghost btn-sm" onClick={() => att.length === 1 ? apri(att[0].path) : setVedi(vedi === r.corso_id ? null : r.corso_id)}>Vedi attestato{att.length > 1 ? ` (${att.length})` : ''}</button>}
-                <button className="btn btn-sm" onClick={() => setAssegna(r.corso_id)}>{r.reg ? 'Rinnova' : 'Registra'}</button>
+                <button className="btn btn-sm" onClick={() => setAssegna(r.corso_id)}>{r.stato === 'da_completare' ? 'Inserisci data' : r.reg ? 'Rinnova' : 'Registra'}</button>
                 {r.reg && <button className="btn-ghost btn-sm" onClick={() => setAllega({ id: r.reg!.id, corso: r.corso })}>Aggiungi attestato</button>}
                 {r.reg && att.length === 0 && (() => {
                   const q = richiestaAperta(t, r.reg!.id);

@@ -9,7 +9,7 @@ import { dataLunga } from './periodo';
 
 export interface MioCorso { corso: string; data_conseguimento: string | null; data_scadenza: string | null; stato: string; attestati: { id: number; nome: string }[] }
 export interface RichiestaMia { id: number; corso: string; stato: 'richiesto' | 'da_verificare' | 'approvato' | 'rifiutato'; motivo: string | null }
-const PILL: Record<string, [string, string]> = { valido: ['ok', 'Valido'], in_scadenza: ['warn', 'In scadenza'], scaduto: ['ko', 'Scaduto'], mancante: ['ko', 'Da fare'] };
+const PILL: Record<string, [string, string]> = { valido: ['ok', 'Valido'], in_scadenza: ['warn', 'In scadenza'], scaduto: ['ko', 'Scaduto'], mancante: ['ko', 'Da fare'], da_completare: ['warn', 'Data da completare'] };
 
 const giorniA = (iso: string) => Math.round((Date.parse(iso + 'T00:00:00Z') - Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z')) / 86400000);
 const entro6Mesi = (iso: string | null) => { if (!iso) return false; const g = giorniA(iso); return g >= 0 && g <= 183; };
@@ -75,7 +75,7 @@ export default function Corsi() {
   if (!d) return <Attesa />;
   const aperte = d.richieste.filter(r => r.stato !== 'approvato');
   const scad = d.corsi.filter(c => entro6Mesi(c.data_scadenza)).sort((a, b) => a.data_scadenza!.localeCompare(b.data_scadenza!));
-  const fatti = d.corsi.filter(c => c.data_conseguimento);
+  const fatti = d.corsi.filter(c => c.data_conseguimento || c.stato === 'da_completare');
   return (
     <>
       <h1 className="tec-h1">I miei corsi</h1>
@@ -113,8 +113,8 @@ export default function Corsi() {
           return (
             <div key={i} style={{ paddingBottom: 10, borderBottom: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}><b style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{c.corso}</b><span className={`pill ${l}`}>{t}</span></div>
-              <span className="sub">Conseguito il {dataLunga(c.data_conseguimento!)}</span>
-              <span className="sub">{c.data_scadenza ? `${c.stato === 'scaduto' ? 'Scaduto il' : 'Scade il'} ${dataLunga(c.data_scadenza)}` : 'Nessuna scadenza'}</span>
+              <span className="sub">{c.data_conseguimento ? `Conseguito il ${dataLunga(c.data_conseguimento)}` : 'Data da completare (la inserisce l\'ufficio)'}</span>
+              <span className="sub">{!c.data_conseguimento ? '' : c.data_scadenza ? `${c.stato === 'scaduto' ? 'Scaduto il' : 'Scade il'} ${dataLunga(c.data_scadenza)}` : 'Nessuna scadenza'}</span>
               {c.attestati?.map((a, j) => <button key={a.id} className="btn-ghost" style={{ alignSelf: 'flex-start' }} onClick={() => apriMioAttestato(token, a.id)}>Vedi attestato{c.attestati.length > 1 ? ` ${j + 1}` : ''}</button>)}
             </div>);
         })}

@@ -117,7 +117,7 @@ function FormDipendente({ x, onClose, onSalvato }: { x: Dipendente | null; onClo
     nome: x?.nome ?? '', cognome: x?.cognome ?? '', telefono: x?.telefono ?? '', email: x?.email ?? '',
     codice: x?.codice ?? '', categoria: (x?.categoria ?? 'UFFICIO') as Categoria, reparto: x?.reparto ?? '', ruolo: x?.ruolo ?? '',
     data_assunzione: x?.data_assunzione ?? '', contratto: x?.contratto ?? 'full-time', ore_giornaliere: String(x?.ore_giornaliere ?? 8),
-    giorni_riposo: x?.giorni_riposo ?? '0000011', patente_categoria: x?.patente_categoria ?? 'B', patente_scadenza: x?.patente_scadenza ?? '',
+    giorni_riposo: x?.giorni_riposo ?? '0000011', patente_categoria: x ? x.patente_categoria ?? '' : 'B', patente_scadenza: x?.patente_scadenza ?? '',
     data_cessazione: x?.data_cessazione ?? '', attivo: x?.attivo ?? true, note: x?.note ?? '',
   });
   const [err, setErr] = useState<string | null>(null);

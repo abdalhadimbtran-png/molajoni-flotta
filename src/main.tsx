@@ -39,6 +39,7 @@ import AreaAdmin from './admin/amm/AreaAdmin';
 import Panoramica from './admin/amm/Panoramica';
 import Account from './admin/amm/Account';
 import Sicurezza from './admin/amm/Sicurezza';
+import DatiReali from './admin/amm/DatiReali';
 import ShellHR from './hr/ShellHR';
 import DaDecidere from './hr/DaDecidere';
 import CalendarioHR from './hr/Calendario';
@@ -91,6 +92,7 @@ function App() {
           <Route path="/admin/tecnici" element={<Tecnici />} />
           <Route path="/admin/installa-tecnici" element={<Volantino />} />
           <Route path="/admin/sicurezza" element={<Sicurezza />} />
+          <Route path="/admin/dati" element={<DatiReali />} />
           <Route path="/admin/registro" element={<Registro />} />
           <Route path="/admin/report" element={<Report />} />
         </Route>

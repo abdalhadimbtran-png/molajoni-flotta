@@ -80,12 +80,12 @@ describe('girata e firme', () => {
     const t = ATTIVI.find(x => x.codice === 'girata_fornitore')!;
     expect(emailDaModello(t, segnaposto(pratica('fornitori'), '')).testo).not.toContain('Grazie per la preferenza');
   });
-  it('email ai clienti: «Grazie per la preferenza e distinti saluti» + Molajoni Antincendi s.r.l. + J. Marchetti', () => {
+  it('email ai clienti: «Grazie per la preferenza e distinti saluti» + J. Marchetti + Molajoni Antincendi s.r.l.', () => {
     const clienti = ATTIVI.filter(t => !t.oggetto.startsWith('[Centralino]') && t.firma_tipo === 'front_office' && !['girata_fornitore', 'conferma_disdetta'].includes(t.codice));
     expect(clienti.length).toBeGreaterThan(10);
     for (const t of clienti) {
       const e = emailDaModello(t, { ...segnaposto(pratica(USO[t.codice]?.[0] ?? 'manutenzione'), ''), ...TRASF });
-      expect(e.testo, t.codice).toMatch(/Grazie per la preferenza e distinti saluti\.\n\n--\nMolajoni Antincendi s\.r\.l\.\nJ\. Marchetti\n/);
+      expect(e.testo, t.codice).toMatch(/Grazie per la preferenza e distinti saluti\.\n\n--\nJ\. Marchetti\nMolajoni Antincendi s\.r\.l\.\ntel\. 06 6941 4281/);
     }
   });
   it('preventivo_tmq: firma del TMQ con il tecnico scelto', () => {

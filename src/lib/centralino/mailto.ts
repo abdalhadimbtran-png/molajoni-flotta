@@ -5,11 +5,13 @@
  * - URL entro MAX_MAILTO caratteri: se il testo è troppo lungo il corpo viene accorciato (firma sempre presente),
  *   il testo completo va negli appunti e resta la «Versione formattata (.eml)».
  */
-import { AVVISO_EML, scaricaEml, suggerimentoEml, type Eml } from './emailHtml';
+import { AVVISO_EML, firmaFrontOffice, scaricaEml, type Eml } from './emailHtml';
+import { firmaOutlookAttiva, formatoEmail } from './preferenze';
 
 export const MAX_MAILTO = 1800;
 export const SALUTO_CLIENTE = 'Grazie per la preferenza e distinti saluti';
-export const FIRMA_MAILTO = ['Molajoni Antincendi s.r.l.', 'J. Marchetti'];
+/** Firma testo dell'operatore collegato; vuota se Outlook aggiunge la firma automatica. */
+export const firmaMailto = () => (firmaOutlookAttiva() ? [] : firmaFrontOffice());
 const TAGLIO = '[…] Testo completo negli appunti (Ctrl+V).';
 
 const indirizzi = (x: string | string[] | undefined) =>
@@ -27,7 +29,7 @@ export function testoMailto(testo: string): string {
   let corpo = r.join('\n').trim();
   const grazie = new RegExp(`${SALUTO_CLIENTE}[.,!]?\\s*$`, 'i').test(corpo) || corpo.includes(SALUTO_CLIENTE);
   corpo = corpo.replace(new RegExp(`\\n*${SALUTO_CLIENTE}[.,!]?\\s*$`, 'i'), '').replace(/\n*(Cordiali|Distinti) saluti[.,!]?\s*$/i, '').trim();
-  return [corpo, '', grazie ? SALUTO_CLIENTE : 'Distinti saluti', ...FIRMA_MAILTO].join('\n');
+  return [corpo, '', grazie ? SALUTO_CLIENTE : 'Distinti saluti', ...firmaMailto()].join('\n');
 }
 
 export interface Mailto { url: string; troncato: boolean; testo: string }
@@ -44,8 +46,9 @@ export function costruisciMailto(e: { a: string | string[]; cc?: string | string
   if (pieno.length <= max) return { url: pieno, troncato: false, testo };
   // accorcia il corpo (prima della chiusura) tenendo saluto e firma
   const righe = testo.split('\r\n');
-  const coda = righe.slice(-(FIRMA_MAILTO.length + 1)).join('\r\n');
-  const testa = righe.slice(0, -(FIRMA_MAILTO.length + 1)).join('\r\n');
+  const n = firmaMailto().length + 1;
+  const coda = righe.slice(-n).join('\r\n');
+  const testa = righe.slice(0, -n).join('\r\n');
   let lo = 0, hi = testa.length;
   while (lo < hi) { const m = Math.ceil((lo + hi) / 2); if (url(`${testa.slice(0, m)}\r\n${TAGLIO}\r\n\r\n${coda}`).length <= max) lo = m; else hi = m - 1; }
   const tagliato = testa.slice(0, lo).replace(/\s+\S*$/, '');
@@ -54,21 +57,29 @@ export function costruisciMailto(e: { a: string | string[]; cc?: string | string
   return { url: u, troncato: true, testo };
 }
 
-/** Apre Outlook (mailto) con il testo semplice; se accorciato copia il testo completo negli appunti. Ritorna l'avviso. */
-export function apriEmail(e: { a: string | string[]; cc?: string | string[]; oggetto: string; testo: string }): string {
+/** Solo testo semplice: apre Outlook (mailto); se accorciato copia il testo completo negli appunti. Ritorna l'avviso. */
+export function apriMailto(e: { a: string | string[]; cc?: string | string[]; oggetto: string; testo: string }): string {
   const m = costruisciMailto({ ...e, testo: testoMailto(e.testo) });
   if (m.troncato) { try { void navigator.clipboard?.writeText(m.testo.replace(/\r\n/g, '\n')); } catch { /* il browser può negarlo */ } }
   window.location.href = m.url;
   return avvisoOutlook(m.troncato);
 }
 
+/**
+ * Pulsante unico «Apri in Outlook»: con formato «Formattata (Outlook)» (predefinito) scarica la bozza .eml
+ * (HTML con logo, X-Unsent, senza From: parte dalla casella del PC), con «Testo semplice» usa mailto.
+ */
+export function apriEmail(e: { a: string | string[]; cc?: string | string[]; oggetto: string; testo: string; html?: string; numero?: string | null }): string {
+  if (formatoEmail() === 'html' && e.html) return apriBozza({ ...e, html: e.html });
+  return apriMailto(e);
+}
+
 export const avvisoOutlook = (troncato: boolean) => troncato
-  ? 'Outlook aperto con il testo accorciato: il testo completo è negli appunti (Ctrl+V), oppure usa «Versione formattata (.eml)». Premi Invia.'
+  ? 'Outlook aperto con il testo accorciato: il testo completo è negli appunti (Ctrl+V). Premi Invia.'
   : 'Outlook aperto: controlla e premi Invia.';
 
-/** «Versione formattata (.eml)»: scarica la bozza formattata (X-Unsent) e restituisce il testo dell'avviso. */
+/** Bozza formattata .eml (X-Unsent): scarica e restituisce il testo dell'avviso. */
 export function apriBozza(e: Eml & { numero?: string | null }): string {
   scaricaEml(e);
-  const s = suggerimentoEml();
-  return s ? `${AVVISO_EML}. ${s}` : AVVISO_EML;
+  return AVVISO_EML;
 }

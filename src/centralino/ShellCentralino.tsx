@@ -25,6 +25,8 @@ export function bip() {
 }
 import NuovoContatto from './NuovoContatto';
 import './centralino.css';
+import { impostaOperatore } from '../lib/centralino/preferenze';
+import { idEffettivo } from '../lib/vediCome';
 
 export interface ClientePreset { codice: string | null; nome: string; fonte?: 'taylor' | 'pratiche' }
 export interface CtxCentralino { scrive: boolean; admin?: boolean; base: string; nuovo: (cliente?: ClientePreset) => void; versione: number; aggiorna: () => void }
@@ -44,6 +46,12 @@ export default function ShellCentralino() {
   const direzione = loc.pathname.startsWith('/direzione');
   useEffect(() => { document.title = direzione ? 'Molajoni · Direzione' : 'Molajoni · Centralino'; return () => { document.title = 'Molajoni'; }; }, [direzione]);
   // controllo SLA all'apertura (c'è anche il controllo automatico ogni 5 minuti)
+  // operatore collegato: firma e Reply-To delle email (mai info@)
+  useEffect(() => {
+    const u = s.sessione?.user; if (!u) return;
+    supabase.from('responsabili').select('nome').eq('user_id', idEffettivo(u.id) ?? u.id).maybeSingle()
+      .then(({ data }) => impostaOperatore({ nome: data?.nome, email: u.email }), () => impostaOperatore({ email: u.email }));
+  }, [s.sessione?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (s.centralino || s.direzione) supabase.rpc('centralino_controlla_sla').then(() => undefined); }, [s.centralino, s.direzione]);
   const scrive = s.centralino && !direzione;
   const [suono, setSuono] = useState(suonoAttivo);

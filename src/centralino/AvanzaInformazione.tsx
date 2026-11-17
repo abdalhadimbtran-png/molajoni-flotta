@@ -69,7 +69,7 @@ export default function AvanzaInformazione({ p, f, s, onClose, onFatto, onEmail 
       // conferma al cliente (girata): in automatico parte subito, con Outlook si apre dopo nel compositore (una finestra per clic)
       const cli = esito === 'girata' && avvisaCli && emailOk(p.email) && !!tCli;
       if (cli && automatico) await rpc('centralino_invia_email', { p_id: p.id, p_template: tCli!.codice, p_a: p.email, p_cc: [], ...(() => { const c = componi(tCli!, p, firma, p.email!, extra); return { p_oggetto: c.oggetto, p_html: c.html, p_testo: c.testo }; })(), p_modo: 'resend', p_avanza: null });
-      if (apri && email) toast(apriEmail({ a: email.a, cc: email.cc, oggetto: email.oggetto, testo: email.testo }));
+      if (apri && email) toast(apriEmail({ a: email.a, cc: email.cc, oggetto: email.oggetto, testo: email.testo, html: email.html, numero: p.numero }));
       else toast(`${p.numero}: pratica chiusa`);
       onFatto();
       if (cli && !automatico) onEmail?.(tCli!.codice, true);

@@ -28,9 +28,9 @@ describe('costruisciMailto', () => {
 describe('testoMailto', () => {
   it('toglie titolo e firma «--», mette chiusura e firma di Jennifer', () => {
     const t = testoMailto(`CONFERMA APPUNTAMENTO\n\nPratica: 12\n\nGentile cliente,\nconfermiamo.\n\n${SALUTO_CLIENTE}\n\n--\nMolajoni Antincendi s.r.l.\nJ. Marchetti\ntel. 06`);
-    expect(t).toBe(`Pratica: 12\n\nGentile cliente,\nconfermiamo.\n\n${SALUTO_CLIENTE}\nMolajoni Antincendi s.r.l.\nJ. Marchetti`);
+    expect(t).toBe(`Pratica: 12\n\nGentile cliente,\nconfermiamo.\n\n${SALUTO_CLIENTE}\nJ. Marchetti\nMolajoni Antincendi s.r.l.\ntel. 06 6941 4281`);
   });
   it('senza «Grazie per la preferenza» chiude con Distinti saluti', () => {
-    expect(testoMailto('Ciao,\nti giro la richiesta.').endsWith('Distinti saluti\nMolajoni Antincendi s.r.l.\nJ. Marchetti')).toBe(true);
+    expect(testoMailto('Ciao,\nti giro la richiesta.').endsWith('Distinti saluti\nJ. Marchetti\nMolajoni Antincendi s.r.l.\ntel. 06 6941 4281')).toBe(true);
   });
 });

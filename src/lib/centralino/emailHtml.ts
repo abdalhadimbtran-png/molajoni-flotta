@@ -2,6 +2,8 @@
  * Email «premium» del Centralino (stile Apple Light, solo CSS inline, layout a tabelle sicuro per Outlook desktop)
  * e bozza .eml (X-Unsent: 1) che Outlook apre come messaggio pronto da inviare.
  */
+import { emailOperatore, firmaOutlookAttiva, nomeOperatore, TELEFONO_AZIENDA } from './preferenze';
+
 export const LOGO_URL = 'https://molajoni-flotta.vercel.app/logo-molajoni.png';
 export const ROSSO = '#E30613';
 
@@ -9,11 +11,13 @@ export type FirmaTipo = 'front_office' | 'tmq' | 'nessuna';
 export interface FirmaDati { nome?: string }
 
 /** Firma della procedura del front office: dopo «Grazie per la preferenza e distinti saluti» (nel corpo). */
-export const FIRMA_FRONT_OFFICE = ['Molajoni Antincendi s.r.l.', 'J. Marchetti', 'tel. 06 6941 4281 · info@molajoni.it'];
+/** Firma dell'operatore collegato (mai info@): nome, società, telefono aziendale. */
+export const firmaFrontOffice = () => [nomeOperatore(), 'Molajoni Antincendi s.r.l.', TELEFONO_AZIENDA];
+/** Con «Firma automatica Outlook attiva» la firma front office non si mette (la aggiunge Outlook). */
 export const firmaRighe = (tipo: FirmaTipo, f: FirmaDati = {}): string[] =>
   tipo === 'nessuna' ? []
-    : tipo === 'tmq' ? ['Il TMQ – Tecnico Manutentore Qualificato dal Corpo Nazionale dei Vigili del Fuoco', ...(f.nome ? [f.nome] : []), 'Molajoni Antincendi s.r.l.', 'tel. 06 6941 4281 · info@molajoni.it']
-    : FIRMA_FRONT_OFFICE;
+    : tipo === 'tmq' ? ['Il TMQ – Tecnico Manutentore Qualificato dal Corpo Nazionale dei Vigili del Fuoco', ...(f.nome ? [f.nome] : []), 'Molajoni Antincendi s.r.l.', TELEFONO_AZIENDA]
+    : firmaOutlookAttiva() ? [] : firmaFrontOffice();
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 /** Valori vuoti o segnaposto non compilati: la riga dei dati non si mostra. */
@@ -52,7 +56,7 @@ ${blocco}
 <tr><td style="padding:12px 32px 8px;font:15px/1.6 ${FONT};color:#1d1d1f">${e.corpoHtml}</td></tr>
 ${firma}
 </table>
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px"><tr><td style="padding:14px 32px;font:11px/1.5 ${FONT};color:#8e8e93;text-align:center">Molajoni Antincendi s.r.l. · Roma · tel. 06 6941 4281 · info@molajoni.it</td></tr></table>
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px"><tr><td style="padding:14px 32px;font:11px/1.5 ${FONT};color:#8e8e93;text-align:center">Molajoni Antincendi s.r.l. · Roma · ${TELEFONO_AZIENDA}</td></tr></table>
 </td></tr></table></body></html>`;
 }
 
@@ -90,14 +94,17 @@ export function codificaIntestazione(s: string): string {
 }
 const indirizzi = (x: string | string[] | undefined) => (Array.isArray(x) ? x : (x ?? '').split(/[,;\s]+/)).map(s => s.trim()).filter(Boolean);
 
-export interface Eml { a: string | string[]; cc?: string | string[]; oggetto: string; html: string; testo: string; data?: Date }
+export interface Eml { a: string | string[]; cc?: string | string[]; oggetto: string; html: string; testo: string; data?: Date; /** Reply-To (predefinito: email dell'operatore collegato) */ replyTo?: string | null }
 export function costruisciEml(e: Eml, confine = `----=_Molajoni_${Math.random().toString(36).slice(2)}`): string {
   const a = indirizzi(e.a), cc = indirizzi(e.cc);
   const testo = e.testo.replace(/\r?\n/g, '\r\n');
+  // Nessun «From:»: Outlook usa l'account predefinito del PC (la casella di Jennifer), mai info@
+  const rispondi = indirizzi(e.replyTo === undefined ? emailOperatore() ?? '' : e.replyTo ?? '').filter(x => !/^info@/i.test(x));
   const righe = [
     'X-Unsent: 1',
     ...(a.length ? [`To: ${a.join(', ')}`] : []),
     ...(cc.length ? [`Cc: ${cc.join(', ')}`] : []),
+    ...(rispondi.length ? [`Reply-To: ${rispondi[0]}`] : []),
     `Subject: ${codificaIntestazione(e.oggetto)}`,
     `Date: ${(e.data ?? new Date()).toUTCString().replace('GMT', '+0000')}`,
     'MIME-Version: 1.0',
@@ -140,9 +147,3 @@ export function scaricaEml(e: Eml & { numero?: string | null }): string {
 }
 
 export const AVVISO_EML = 'Bozza pronta: aprila (si apre in Outlook) e premi Invia';
-const CHIAVE_SUGG = 'ct-eml-suggerimento-visto';
-/** Suggerimento una tantum: in Chrome/Edge «Apri sempre i file di questo tipo». */
-export function suggerimentoEml(): string | null {
-  try { if (localStorage.getItem(CHIAVE_SUGG)) return null; localStorage.setItem(CHIAVE_SUGG, '1'); } catch { return null; }
-  return 'Suggerimento: in Chrome/Edge, dopo il primo download clicca la freccia accanto al file → «Apri sempre i file di questo tipo». Le prossime bozze si apriranno da sole in Outlook.';
-}

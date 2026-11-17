@@ -153,7 +153,7 @@ function AvanzaPasso({ p, f, onClose, onFatto, onEmail }: PropsAvanza) {
     return rpc('centralino_invia_email', { p_id: p.id, p_template: codice, p_a: e.a.trim(), p_cc: e.cc, p_oggetto: e.oggetto, p_html: e.html, p_testo: e.testo, p_modo: automatico ? 'resend' : 'outlook', p_avanza: null });
   };
   const allegato = richiedeAllegato(tEmail);
-  const apriSeServe = () => { const m = daAprire as Eml | null; if (m) toast(`${apriEmail({ a: m.a, cc: m.cc, oggetto: m.oggetto, testo: m.testo })}${allegato ? ` ${AVVISO_ALLEGATO}.` : ''}`); return !!m; };
+  const apriSeServe = () => { const m = daAprire as Eml | null; if (m) toast(`${apriEmail({ a: m.a, cc: m.cc, oggetto: m.oggetto, testo: m.testo, html: m.html, numero: p.numero })}${allegato ? ` ${AVVISO_ALLEGATO}.` : ''}`); return !!m; };
   const avanza = (key: string, dati: Record<string, unknown>) => rpc('centralino_avanza', { p_id: p.id, p_stadio: key, p_dati: dati, p_testo: nota || null });
 
   const emailInterne = [...destinatari, ...elencoComm, ...coord, ...altri, ...tecCoord, ...(config?.impostazioni.cc_offerte_grandi ?? [])].map(x => x.email ?? null).concat(p.commerciale_email);

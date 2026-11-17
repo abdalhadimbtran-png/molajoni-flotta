@@ -1,6 +1,7 @@
 import { FASCE, NOME_TIPO, nomeTipoContatto, type Template, type TipoPratica } from './tipi';
 import { costruisciEmailHtml, costruisciEmailTesto, htmlInTesto, type FirmaTipo } from './emailHtml';
 import { scadenzaSla, partiRoma } from './sla';
+import { firmaOutlookAttiva, pulisciFirma } from './preferenze';
 
 export const SEGNAPOSTO = ['cliente', 'contatto', 'numero_pratica', 'data_appuntamento', 'fascia', 'commerciale', 'tecnico', 'firma', 'argomento', 'referente', 'entro',
   'urgenza', 'obiettivo', 'dettaglio', 'descrizione', 'indirizzo', 'telefono', 'email_cliente', 'quando', 'importo', 'stato_cliente', 'scadenza_richiamo',
@@ -31,7 +32,7 @@ export function segnaposto(p: Dati, firma: string, ora = new Date()): Valori {
     scadenza: '', tmq: p.tecnico_nome || p.assegnato_nome || '',
     cliente: p.cliente_nome, contatto: p.contatto_nome || 'Cliente', numero_pratica: p.numero,
     data_appuntamento: dataLunga(p.appuntamento_data) || 'data da concordare', fascia: p.appuntamento_fascia ? FASCE[p.appuntamento_fascia] : 'da concordare',
-    commerciale: p.commerciale_nome || 'il nostro Tecnico Commerciale', tecnico: p.tecnico_nome || p.assegnato_nome || 'il nostro tecnico', firma,
+    commerciale: p.commerciale_nome || 'il nostro Tecnico Commerciale', tecnico: p.tecnico_nome || p.assegnato_nome || 'il nostro tecnico', firma: firmaOutlookAttiva() ? '' : pulisciFirma(firma),
     argomento: p.sottotipo || (p.tipo ? NOME_TIPO[p.tipo as TipoPratica] : '') || 'la Vostra richiesta',
     chi_chiama: nomeTipoContatto(p.tipo_contatto).toLowerCase(),
     link: `${typeof window !== 'undefined' && window.location ? window.location.origin : 'https://molajoni-flotta.vercel.app'}/centralino/${p.id ? `pratica/${p.id}` : 'pratiche'}`,

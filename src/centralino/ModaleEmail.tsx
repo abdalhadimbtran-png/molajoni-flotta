@@ -8,7 +8,7 @@ import type { TecnicoDisp } from '../lib/centralino/tipi';
 import { useConfig } from './comune';
 import { useSalva } from '../lib/salva';
 import { apriEmail } from '../lib/centralino/mailto';
-import { formatoEmail, guidaEmlVista, impostaFormatoEmail, segnaGuidaEmlVista, type FormatoEmail } from '../lib/centralino/preferenze';
+import { formatoEmail, guidaEmlVista, segnaGuidaEmlVista, type FormatoEmail } from '../lib/centralino/preferenze';
 import { useTastoTelefono } from './tastiera';
 import { AVVISO_ALLEGATO, avanzaConModello, richiedeAllegato, templatePasso } from '../lib/centralino/passi';
 import { NOME_RUOLO, controllaEmail, destinatarioPerAzione, ruoloModello, type ContestoDest, type PersonaEmail } from '../lib/centralino/destinatari';
@@ -39,9 +39,8 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
   const { salva: esegui } = useSalva({ riprova: false });
   const [senza, setSenza] = useState(false);
   const [motivo, setMotivo] = useState('');
-  const [formato, setFormato] = useState<FormatoEmail>(formatoEmail);
+  const [formato] = useState<FormatoEmail>(formatoEmail);
   const [guida, setGuida] = useState(() => !guidaEmlVista());
-  const cambiaFormato = () => { const f: FormatoEmail = formato === 'html' ? 'testo' : 'html'; impostaFormatoEmail(f); setFormato(f); };
   const chiudiGuida = () => { segnaGuidaEmlVista(); setGuida(false); };
   const [telTec, setTelTec] = useState<string | null>(null);
   useEffect(() => { if (pratica?.tecnico_dipendente_id) rpc<TecnicoDisp[]>('centralino_tecnici', {}).then(l => setTelTec((l ?? []).find(t => t.id === pratica.tecnico_dipendente_id)?.telefono ?? null), () => undefined); }, [pratica?.tecnico_dipendente_id]);
@@ -181,7 +180,6 @@ export default function ModaleEmail({ pratica, trasf, codice, onClose, onFatto }
           <button type="button" className="btn-ghost" onClick={onClose}>Più tardi</button>
         </div>
         {guida && formato === 'html' && <p className="hint ct-guida-eml">Prima volta: Chrome/Edge, dopo il download clicca la freccia del file → «Apri sempre i file di questo tipo».<br />Windows: Impostazioni → App predefinite → .eml → Outlook. <button type="button" className="ct-link" onClick={chiudiGuida}>OK</button></p>}
-        <p className="hint">Formato: {formato === 'html' ? 'Formattata (Outlook)' : 'Testo semplice'} · <button type="button" className="ct-link" onClick={cambiaFormato}>{formato === 'html' ? 'usa testo semplice' : 'usa formattata'}</button></p>
         {trasf && (
           <details open={senza} onToggle={e => setSenza((e.target as HTMLDetailsElement).open)}>
             <summary>Email non disponibile</summary>

@@ -8,8 +8,7 @@ import type { Template } from '../lib/centralino/tipi';
 import { partiRoma } from '../lib/centralino/sla';
 import { useConfig } from './comune';
 import { useSalva } from '../lib/salva';
-import { apriBozza, apriEmail, apriMailto } from '../lib/centralino/mailto';
-import { formatoEmail } from '../lib/centralino/preferenze';
+import { apriEmail } from '../lib/centralino/mailto';
 import { useTastoTelefono } from './tastiera';
 import { controllaEmail } from '../lib/centralino/destinatari';
 
@@ -129,17 +128,6 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
     });
     if (!esito.ok && !esito.duplicato) setErr(esito.messaggio);
   }
-  /** Secondario: l'altro formato (testo semplice se il predefinito è la bozza formattata, e viceversa). */
-  async function eml(chi: 'ref' | 'cli') {
-    const b = chi === 'ref' ? ref : cli; if (!b) return;
-    const x = verifica(chi, b); if (x) { setErr(x); return; }
-    const esito = await esegui(async () => {
-      await (chi === 'ref' ? inviaRef('outlook') : inviaCli('outlook'));
-      const f = fin(b); toast(formatoEmail() === 'html' ? apriMailto({ a: b.a, oggetto: b.oggetto, testo: f.testo }) : apriBozza({ a: b.a, oggetto: b.oggetto, html: f.html, testo: f.testo, numero: p?.numero }));
-      if (chi === 'ref' ? inviataCli : inviataRef) onFatto();
-    });
-    if (!esito.ok && !esito.duplicato) setErr(esito.messaggio);
-  }
   /** Alternativa all'email: avvisato per telefono (conta come l'email inviata). */
   async function telefono(chi: 'ref' | 'cli') {
     if (invio) return;
@@ -168,7 +156,7 @@ export default function EmailTrasferimento({ trasf, pratica, onClose, onFatto }:
         <div className="field"><label>Oggetto</label><input value={b.oggetto} disabled={fatta} onChange={e => set({ ...b, oggetto: e.target.value })} /></div>
         <div className="ct-anteprima" contentEditable={!fatta} suppressContentEditableWarning onBlur={e => set({ ...b, corpo: (e.target as HTMLDivElement).innerHTML })} dangerouslySetInnerHTML={{ __html: b.corpo }} />
         {b.t && valori && <details className="ct-anteprima-box"><summary>Anteprima formattata</summary><iframe title="Anteprima email" sandbox="" className="ct-iframe ct-iframe-email" srcDoc={fin(b).html} /></details>}
-        {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => telefono(chi)} disabled={invio}>Avvisato per telefono</button><button type="button" className="ct-link" onClick={() => eml(chi)}>{formatoEmail() === 'html' ? 'Testo semplice' : 'Versione formattata'}</button></div>}
+        {!fatta && <div className="row-flex"><button type="button" className="btn btn-sm" onClick={() => outlook(chi)}>{chi === 'ref' ? 'Outlook → referente' : 'Outlook → cliente'}</button><button type="button" className="btn-ghost btn-sm" onClick={() => telefono(chi)} disabled={invio}>Avvisato per telefono</button></div>}
       </>}
     </section>
   );

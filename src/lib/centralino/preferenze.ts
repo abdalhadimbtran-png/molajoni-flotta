@@ -14,7 +14,8 @@ const mem = new Map<string, string | null>();
 const leggi = (k: string): string | null => { if (mem.has(k)) return mem.get(k)!; try { return localStorage.getItem(k); } catch { return null; } };
 const scrivi = (k: string, v: string | null) => { mem.set(k, v); try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* storage non disponibile */ } };
 
-export const formatoEmail = (): FormatoEmail => (leggi(K_FORMATO) === 'testo' ? 'testo' : 'html');
+// Sempre testo semplice (mailto): la versione formattata .eml è stata ritirata su richiesta.
+export const formatoEmail = (): FormatoEmail => 'testo';
 export const impostaFormatoEmail = (f: FormatoEmail) => scrivi(K_FORMATO, f);
 export const firmaOutlookAttiva = () => leggi(K_FIRMA) === '1';
 export const impostaFirmaOutlook = (on: boolean) => scrivi(K_FIRMA, on ? '1' : null);

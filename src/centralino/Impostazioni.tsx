@@ -8,20 +8,15 @@ import { useCtx } from './ShellCentralino';
 import ImportaClienti from './ImportaClienti';
 import AzzeraDati from './AzzeraDati';
 import { useSalva } from '../lib/salva';
-import { firmaOutlookAttiva, formatoEmail, impostaFirmaOutlook, impostaFormatoEmail, type FormatoEmail } from '../lib/centralino/preferenze';
+import { firmaOutlookAttiva, impostaFirmaOutlook } from '../lib/centralino/preferenze';
 
 /** Preferenze di questo PC (localStorage): formato email e firma automatica di Outlook. */
 function EmailQuestoPc() {
-  const [f, setF] = useState<FormatoEmail>(formatoEmail);
-  const [firma, setFirma] = useState(firmaOutlookAttiva);
+    const [firma, setFirma] = useState(firmaOutlookAttiva);
   return (
     <>
       <h2 className="section-title">Email su questo PC</h2>
       <div className="ct-riga">
-        <label htmlFor="imp-formato">Formato email</label>
-        <select id="imp-formato" value={f} onChange={e => { const v = e.target.value as FormatoEmail; impostaFormatoEmail(v); setF(v); }}>
-          <option value="html">Formattata (Outlook)</option><option value="testo">Testo semplice</option>
-        </select>
         <label className="check"><input type="checkbox" checked={firma} onChange={e => { impostaFirmaOutlook(e.target.checked); setFirma(e.target.checked); }} /> Firma automatica Outlook attiva</label>
       </div>
     </>

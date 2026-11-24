@@ -10,7 +10,7 @@ import { NOME_TIPO, type Pratica } from '../lib/centralino/tipi';
 import { cerca } from './comune';
 import { ChiBadge, Ic } from './componenti';
 import { Modal, toast } from '../ui';
-import { SCORCIATOIE, sequenzaVai, staScrivendo } from './tastiera';
+import { SCORCIATOIE, modaleAperta, sequenzaVai, staScrivendo } from './tastiera';
 
 const SUONO = 'ct_suono_avvisi';
 export const suonoAttivo = () => { try { return localStorage.getItem(SUONO) === '1'; } catch { return false; } };
@@ -72,7 +72,7 @@ export default function ShellCentralino() {
       .subscribe();
     return () => { window.clearTimeout(k); supabase.removeChannel(ch); };
   }, [s.sessione, s.centralino, s.direzione]);
-  // tastiera globale: N, ?, G poi O/P/T/C, Esc (fuori dai campi di testo; Esc anche nei campi)
+  // tastiera globale: N, ?, G poi O/P/C, Esc (fuori dai campi di testo; Esc anche nei campi)
   const [aiuto, setAiuto] = useState(false);
   const prec = useRef<{ k: string; t: number } | null>(null);
   const baseK = loc.pathname.startsWith('/direzione') ? '/direzione/centralino' : '/centralino';
@@ -195,7 +195,7 @@ function Ricerca({ base }: { base: string }) {
   const box = useRef<HTMLDivElement>(null);
   const inp = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { const t = e.target as HTMLElement; if (e.key === '/' && !t.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); inp.current?.focus(); } };
+    const k = (e: KeyboardEvent) => { const t = e.target as HTMLElement; if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !staScrivendo(t) && !modaleAperta()) { e.preventDefault(); inp.current?.focus(); } };
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
   }, []);
   useEffect(() => {
@@ -235,7 +235,7 @@ function Ricerca({ base }: { base: string }) {
 
 /** Riquadro «?»: scorciatoie da tastiera. */
 function AiutoTastiera({ onClose }: { onClose: () => void }) {
-  const gruppi = ['Ovunque', 'Elenchi', 'Moduli'] as const;
+  const gruppi = ['Ovunque', 'Nuovo contatto', 'Elenchi', 'Finestre'] as const;
   return (
     <Modal titolo="Scorciatoie da tastiera" onClose={onClose}>
       <div className="k-aiuto">
@@ -244,7 +244,7 @@ function AiutoTastiera({ onClose }: { onClose: () => void }) {
             <dl>{SCORCIATOIE.filter(x => x.gruppo === g).map(x => (
               <div key={x.testo}><dt>{x.tasti.map((t, i) => <span key={i}>{i > 0 && <span className="k-poi">{x.tasti[0] === 'G' ? 'poi' : x.tasti[0] === 'Ctrl' ? '+' : '/'}</span>}<kbd>{t}</kbd></span>)}</dt><dd>{x.testo}</dd></div>))}
             </dl></section>))}
-        <p className="k-hint">Le lettere non funzionano mentre scrivi in un campo (tranne <kbd>Esc</kbd> e <kbd>Ctrl</kbd>+<kbd>Invio</kbd>).</p>
+        <p className="k-hint">Lettere e cifre non partono mentre scrivi in un campo: premi <kbd>Esc</kbd> per uscire dal campo. <kbd>Ctrl</kbd>+<kbd>Invio</kbd> funziona sempre.</p>
       </div>
     </Modal>
   );

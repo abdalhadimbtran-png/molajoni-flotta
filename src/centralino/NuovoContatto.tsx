@@ -7,7 +7,7 @@ import { scadenzaSla, testoResiduo, type RegolaSla } from '../lib/centralino/sla
 import { salvaAppunti, useConfig } from './comune';
 import Appunti from './Appunti';
 import { Ic, iconaCanale } from './componenti';
-import { focusGruppo, indiceSuccessivo, tabRoving, tastiRadio } from './tastiera';
+import { focusDopo, focusGruppo, indiceSuccessivo, staScrivendo, tabRoving, tastiRadio, tastoNuovo, tastoSalva, type GruppoNuovo } from './tastiera';
 
 interface Cliente { codice: string | null; nome: string; stato_cliente?: StatoCliente | null; sedi?: number; fonte: 'taylor' | 'pratiche' | 'fornitore'; contatto?: string | null; telefono?: string | null; email?: string | null; indirizzo?: string | null; cap?: string | null; comune?: string | null }
 interface Contatto { id: number; contatto_nome: string | null; ruolo: string | null; telefono: string | null; cellulare: string | null; email: string | null; preferito: boolean; sede: string | null }
@@ -60,6 +60,9 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [passata, setPassata] = useState('');
   const qRef = useRef<HTMLInputElement>(null);
   const chiRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  // Canale «fatto»: scelto, oppure il focus è passato oltre il gruppo Canale (Telefono resta quello proposto)
+  const [canaleFatto, setCanaleFatto] = useState(false);
   const [nuovoForn, setNuovoForn] = useState(false);
   const [suggSel, setSuggSel] = useState(-1);
   const cliente_ = chi === 'cliente';
@@ -75,7 +78,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     const b = cliente ? null : leggiBozza(uid);
     if (b) {
       if (b.canale) setCanale(b.canale as Canale);
-      if (b.richiesta) setRichiesta(b.richiesta as TipoPratica | 'offerta');
+      if (b.richiesta) { setRichiesta(b.richiesta as TipoPratica | 'offerta'); setCanaleFatto(true); }
       if (typeof b.sottotipo === 'string') setSottotipo(b.sottotipo);
       if (b.gestione) setGestione(b.gestione as 'centralino' | 'commerciale');
       if (typeof b.importo === 'string') setImporto(b.importo);
@@ -108,7 +111,8 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   function svuota() {
     if (uid) scriviBozza(uid, null);
     setCanale('telefono'); setRichiesta(null); setSottotipo(''); setGestione(null); setImporto(''); setQ(''); setCli(null); setSede(''); setSedi([]); setContatti([]); setContattoId(null);
-    setF({ contatto_nome: '', telefono: '', email: '', indirizzo: '', cap: '', comune: '', descrizione: '', commerciale: '' }); setTacit(false); setPassata(''); setRipristinata(false);
+    setF({ contatto_nome: '', telefono: '', email: '', indirizzo: '', cap: '', comune: '', descrizione: '', commerciale: '' }); setTacit(false); setPassata(''); setRipristinata(false); setCanaleFatto(false);
+    window.setTimeout(() => focusGruppo(chiRef.current), 0);
   }
   function annulla() {
     if (piena && !confAnnulla) { setConfAnnulla(true); return; }
@@ -239,23 +243,53 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
 
+  // Tastiera della finestra (sul document: funziona anche col focus «da nessuna parte», p. es. dopo un clic sullo sfondo).
+  // Ctrl+Invio / Ctrl+Maiusc+Invio salvano ovunque; Esc esce solo dal campo (la finestra non si chiude: dati al sicuro);
+  // fuori da campi di testo e gruppi: cifre → Canale/Richiesta/Gestione/Dettaglio (tastoNuovo), U/O → urgenza.
+  const tastiRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  tastiRef.current = (e: KeyboardEvent) => {
+    const form = formRef.current; if (!form) return;
+    const card = form.closest('.modal');
+    // solo se questa è la finestra in primo piano e il tasto non viene da fuori (barra in alto ecc.)
+    const modali = document.querySelectorAll('.modal'); if (modali[modali.length - 1] !== card) return;
+    const t = e.target as HTMLElement | null;
+    if (t && t !== document.body && !card?.contains(t)) return;
+    const salvaK = tastoSalva(e);
+    if (salvaK) { e.preventDefault(); if (!invio) { if (salvaK === 'seguire' && (!tipo || offerta)) salva(undefined, true); else salva(undefined, salvaK === 'chiudi'); } return; }
+    if (e.key === 'Escape') {
+      if (t && t !== document.body && (staScrivendo(t) || form.contains(t))) { e.preventDefault(); t.blur(); form.focus({ preventScroll: true }); }
+      return;
+    }
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || staScrivendo(t)) return;
+    if (/^[1-9]$/.test(e.key) && t?.closest('[role=radiogroup]')) return; // ci pensa il gruppo (tastiRadio)
+    const m = tastoNuovo(e.key, { canaleFatto, tipoScelto: !!richiesta, gestione: richiesta === 'offerta' && canale !== 'tablet_tmq', nCanali: CANALI_SCELTA.length, nTipi: RICHIESTE.length, nSottotipi: Math.min(9, flusso?.sottotipi.length ?? 0), urgenza: conUrgenza });
+    if (!m) return;
+    const g = form.querySelector<HTMLElement>(`[data-k-gruppo="${m.gruppo}"]`);
+    const v = g ? [...g.querySelectorAll<HTMLElement>('[role=radio]:not([disabled])')] : [];
+    if (!g || !v[m.indice]) return;
+    e.preventDefault(); v[m.indice].click();
+    if (m.gruppo === 'urgenza') v[m.indice].focus(); else focusDopo(g);
+  };
+  useEffect(() => { const h = (e: KeyboardEvent) => tastiRef.current(e); document.addEventListener('keydown', h); return () => document.removeEventListener('keydown', h); }, []);
+  const segnaGruppo = (g: GruppoNuovo) => ({ 'data-k-gruppo': g });
+
   return (
     <Modal titolo="Nuovo contatto" onClose={onClose} bloccaFuori>
-      <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(undefined, !e.shiftKey); } }}>
+      <form className="ct-nuovo" onSubmit={salva} ref={formRef} tabIndex={-1} onFocus={e => { if (!canaleFatto && e.target !== e.currentTarget && !chiRef.current?.contains(e.target)) setCanaleFatto(true); }}>
         {ripristinata && <p className="ct-bozza">Bozza ripristinata · <button type="button" className="ct-link" onClick={svuota}>Svuota</button></p>}
         {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
 
 
         <div className="ct-sez"><span className="ct-sez-n">1</span><b>Canale</b></div>
-        <div className="ct-canali" role="radiogroup" aria-label="Canale" ref={chiRef} onKeyDown={tastiRadio}>
+        <div className="ct-canali" role="radiogroup" aria-label="Canale" ref={chiRef} onKeyDown={tastiRadio} {...segnaGruppo('canale')}>
           {CANALI_SCELTA.map((c, i) => (
-            <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} tabIndex={tabRoving(canale === c.v, i, true)} className={canale === c.v ? 'on' : ''} onClick={() => setCanale(c.v)} title={c.l}>
+            <button type="button" key={c.v} role="radio" aria-checked={canale === c.v} tabIndex={tabRoving(canale === c.v, i, true)} className={canale === c.v ? 'on' : ''} onClick={() => { setCanale(c.v); setCanaleFatto(true); }} title={c.l}>
               <Ic n={iconaCanale(c.v)} size={18} /><span className="ct-canale-l">{c.l.split(' / ')[0]}</span>
               <span className="k-n" aria-hidden>{i + 1}</span></button>))}
         </div>
 
         <div className="ct-sez"><span className="ct-sez-n">2</span><b>Richiesta</b></div>
-        <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta" onKeyDown={tastiRadio}>
+        <div className="ct-big ct-big-tipi" role="radiogroup" aria-label="Tipo di richiesta" onKeyDown={tastiRadio} {...segnaGruppo('tipo')}>
           {RICHIESTE.map((r, i) => (
             <button type="button" key={r.v} role="radio" aria-checked={richiesta === r.v} tabIndex={tabRoving(richiesta === r.v, i, !!richiesta)} className={richiesta === r.v ? 'on' : ''}
               onClick={() => { if (richiesta !== r.v) setRichiestaChi(r.v); }}>
@@ -264,7 +298,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         </div>
         {flusso && flusso.sottotipi.length > 0 && (
           <div className="field"><label id="ct-sotto-l">Dettaglio</label>
-            <div className="segmented ct-chips" role="radiogroup" aria-labelledby="ct-sotto-l" onKeyDown={tastiRadio}>
+            <div className="segmented ct-chips" role="radiogroup" aria-labelledby="ct-sotto-l" onKeyDown={tastiRadio} {...segnaGruppo('sottotipo')}>
               {flusso.sottotipi.map((st, i) => <button type="button" key={st} role="radio" aria-checked={sottotipo === st} tabIndex={tabRoving(sottotipo === st, i, !!sottotipo)} className={sottotipo === st ? 'on' : ''}
                 onClick={() => setSottotipo(st)} title={flusso.sottotipi_urgenti.includes(st) ? 'Urgente: in giornata' : undefined}>
                 {i < 9 && <span className="k-n" aria-hidden>{i + 1}</span>}{st}{flusso.sottotipi_urgenti.includes(st) ? ' ·!' : ''}</button>)}
@@ -276,15 +310,15 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
           </div>)}
         {conUrgenza && (<>
           <div className="field"><label id="ct-urg-l">Urgenza</label>
-            <div className="segmented" role="radiogroup" aria-labelledby="ct-urg-l" onKeyDown={tastiRadio}>
+            <div className="segmented" role="radiogroup" aria-labelledby="ct-urg-l" onKeyDown={tastiRadio} {...segnaGruppo('urgenza')}>
               {([['urgente', 'Urgente'], ['ordinario', 'Ordinario']] as const).map(([v, l], i) => (
                 <button type="button" key={v} role="radio" aria-checked={urgenza === v} tabIndex={tabRoving(urgenza === v, i, !!urgenza)} className={urgenza === v ? 'on' : ''} onClick={() => setUrgenza(v)}>
-                  <span className="k-n" aria-hidden>{i + 1}</span>{l}</button>))}
+                  <span className="k-n" aria-hidden>{i ? 'O' : 'U'}</span>{l}</button>))}
             </div></div>
         </>)}
         {richiesta === 'offerta' && canale !== 'tablet_tmq' && (
           <div className="ct-sub-panel">
-            <div className="ct-big ct-big-gestione" role="radiogroup" aria-label="Chi gestisce l'offerta" onKeyDown={tastiRadio}>
+            <div className="ct-big ct-big-gestione" role="radiogroup" aria-label="Chi gestisce l'offerta" onKeyDown={tastiRadio} {...segnaGruppo('gestione')}>
               {([['centralino', 'Gestita da Jennifer', 'Gestita da Jennifer'], ['commerciale', 'Passa al Commerciale', 'Passa al Tecnico Commerciale']] as const).map(([v, l, d], i) => (
                 <button type="button" key={v} role="radio" aria-checked={gestione === v} tabIndex={tabRoving(gestione === v, i, !!gestione)} className={gestione === v ? 'on' : ''} onClick={() => setGestione(v)}>
                   <span className="ct-ico"><Ic n={v === 'centralino' ? 'offerta' : 'collega'} size={20} /></span><span className="ct-big-t" title={d}><b>{l}</b></span>

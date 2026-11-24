@@ -3,36 +3,60 @@ import { useEffect, type KeyboardEvent as RKE, type RefObject } from 'react';
 /**
  * Tastiera del Centralino: funzioni pure (testate) + piccoli aiuti DOM.
  * Gruppi a scelta (role="radiogroup"): frecce = sposta, Invio/Spazio = scegli e passa al gruppo dopo, 1–9 = n-esima voce.
+ * Nuovo contatto: con il focus fuori da campi e gruppi, le cifre seguono `tastoNuovo`.
  */
 
 /** Scorciatoie mostrate nel riquadro «?» e in docs/CENTRALINO.md. */
-export const SCORCIATOIE: { tasti: string[]; testo: string; gruppo: 'Ovunque' | 'Elenchi' | 'Moduli' }[] = [
+export const SCORCIATOIE: { tasti: string[]; testo: string; gruppo: 'Ovunque' | 'Elenchi' | 'Nuovo contatto' | 'Finestre' }[] = [
   { tasti: ['N'], testo: 'Nuovo contatto', gruppo: 'Ovunque' },
   { tasti: ['/'], testo: 'Cerca pratica', gruppo: 'Ovunque' },
   { tasti: ['G', 'O'], testo: 'Vai a Oggi', gruppo: 'Ovunque' },
   { tasti: ['G', 'P'], testo: 'Vai a Pratiche', gruppo: 'Ovunque' },
-  { tasti: ['G', 'T'], testo: 'Vai a Trasferimenti', gruppo: 'Ovunque' },
   { tasti: ['G', 'C'], testo: 'Vai a Clienti', gruppo: 'Ovunque' },
   { tasti: ['?'], testo: 'Mostra queste scorciatoie', gruppo: 'Ovunque' },
-  { tasti: ['Esc'], testo: 'Chiudi finestra / indietro', gruppo: 'Ovunque' },
+  { tasti: ['Esc'], testo: 'Esci dal campo · chiudi la finestra · scheda pratica: indietro', gruppo: 'Ovunque' },
   { tasti: ['J', 'K'], testo: 'Riga successiva / precedente (anche ↓ ↑)', gruppo: 'Elenchi' },
   { tasti: ['Invio'], testo: 'Apri la riga evidenziata', gruppo: 'Elenchi' },
   { tasti: ['A'], testo: 'Offerta: prossima email · altre pratiche: Chiudi', gruppo: 'Elenchi' },
-  { tasti: ['↑', '↓'], testo: 'Sposta nella scelta (anche ← →)', gruppo: 'Moduli' },
-  { tasti: ['Invio'], testo: 'Scegli e passa al gruppo dopo · nel passo: Avanti', gruppo: 'Moduli' },
-  { tasti: ['1–9'], testo: 'Scegli la n-esima voce', gruppo: 'Moduli' },
-  { tasti: ['Tab'], testo: 'Gruppo / campo successivo (Maiusc+Tab indietro)', gruppo: 'Moduli' },
-  { tasti: ['Ctrl', 'Invio'], testo: 'Nuovo contatto: Salva e chiudi (offerta: salva e apri email)', gruppo: 'Moduli' },
-  { tasti: ['Ctrl', 'Maiusc', 'Invio'], testo: 'Nuovo contatto: Salva da seguire', gruppo: 'Moduli' },
-  { tasti: ['T'], testo: '«Avvisato per telefono»: solo presa in carico offerta ed email al commerciale', gruppo: 'Moduli' },
+  { tasti: ['1–5'], testo: 'Canale (se non ancora scelto), poi Richiesta', gruppo: 'Nuovo contatto' },
+  { tasti: ['1', '2'], testo: 'Offerta: Gestita da Jennifer / Passa al Commerciale', gruppo: 'Nuovo contatto' },
+  { tasti: ['U', 'O'], testo: 'Intervento: Urgente / Ordinario', gruppo: 'Nuovo contatto' },
+  { tasti: ['←', '→'], testo: 'Sposta nella scelta (anche ↑ ↓) · Invio o Spazio sceglie', gruppo: 'Nuovo contatto' },
+  { tasti: ['Tab'], testo: 'Gruppo / campo successivo (Maiusc+Tab indietro)', gruppo: 'Nuovo contatto' },
+  { tasti: ['Invio'], testo: 'Nel campo Cliente: sceglie il cliente evidenziato', gruppo: 'Nuovo contatto' },
+  { tasti: ['Ctrl', 'Invio'], testo: 'Salva e chiudi (offerta: Salva e apri email)', gruppo: 'Nuovo contatto' },
+  { tasti: ['Ctrl', 'Maiusc', 'Invio'], testo: 'Salva da seguire', gruppo: 'Nuovo contatto' },
+  { tasti: ['Esc'], testo: 'Esce dal campo (la finestra resta aperta: nessun dato perso)', gruppo: 'Nuovo contatto' },
+  { tasti: ['Invio'], testo: 'Passo dell\'offerta: Avanti', gruppo: 'Finestre' },
+  { tasti: ['T'], testo: '«Avvisato per telefono» (presa in carico offerta, email al commerciale)', gruppo: 'Finestre' },
 ];
+
+/** Nuovo contatto, fuori dai campi di testo e dai gruppi: quale gruppo sceglie un tasto. */
+export type GruppoNuovo = 'canale' | 'tipo' | 'gestione' | 'sottotipo' | 'urgenza';
+export interface StatoNuovo { canaleFatto: boolean; tipoScelto: boolean; gestione: boolean; nCanali: number; nTipi: number; nSottotipi: number; urgenza: boolean }
+export function tastoNuovo(key: string, s: StatoNuovo): { gruppo: GruppoNuovo; indice: number } | null {
+  const k = key.toLowerCase();
+  if (s.urgenza && (k === 'u' || k === 'o')) return { gruppo: 'urgenza', indice: k === 'u' ? 0 : 1 };
+  if (!/^[1-9]$/.test(key)) return null;
+  const i = Number(key) - 1;
+  const g: [GruppoNuovo, number] = !s.canaleFatto && !s.tipoScelto ? ['canale', s.nCanali] : !s.tipoScelto ? ['tipo', s.nTipi]
+    : s.gestione ? ['gestione', 2] : s.nSottotipi > 0 ? ['sottotipo', s.nSottotipi] : ['tipo', s.nTipi];
+  return i < g[1] ? { gruppo: g[0], indice: i } : null;
+}
+/** Ctrl/⌘+Invio = Salva e chiudi; con Maiusc = Salva da seguire. */
+export function tastoSalva(e: { key: string; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean }): 'chiudi' | 'seguire' | null {
+  if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.altKey) return null;
+  return e.shiftKey ? 'seguire' : 'chiudi';
+}
+/** true se c'è una finestra (modale) aperta: le scorciatoie di pagina non devono partire. */
+export const modaleAperta = () => typeof document !== 'undefined' && !!document.querySelector('.modal');
 
 /** Tasto T (senza modificatori, non mentre si scrive): «Avvisato per telefono». */
 export const tastoTelefono = (e: { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; target?: ElLike | null }) =>
   (e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey && !staScrivendo(e.target);
 
 /** Destinazioni della sequenza «G poi …». */
-export const VAI: Record<string, string> = { o: '', p: '/pratiche', t: '/trasferimenti', c: '/clienti' };
+export const VAI: Record<string, string> = { o: '', p: '/pratiche', c: '/clienti' };
 
 interface ElLike { tagName?: string; type?: string; isContentEditable?: boolean; closest?: (s: string) => unknown }
 /** true se l'utente sta scrivendo (le scorciatoie a lettera non devono partire). */
@@ -128,7 +152,7 @@ export function tastiRadio(e: RKE<HTMLElement>) {
 export function useListaTastiera(ref: RefObject<HTMLElement>, sel: string) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || !ref.current) return;
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || !ref.current || modaleAperta()) return;
       const t = e.target as HTMLElement;
       if (staScrivendo(t) || t.closest?.('.modal, [role=radiogroup], [role=listbox], .ct-split-r')) return;
       const righe = [...ref.current.querySelectorAll<HTMLElement>(sel)];

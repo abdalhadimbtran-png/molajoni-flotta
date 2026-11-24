@@ -13,6 +13,7 @@ import ModaleEmail from './ModaleEmail';
 import EmailTrasferimento from './EmailTrasferimento';
 import { ModaleTrasferimento, RigaTrasf, segnaRichiamato, trasferimenti } from './Trasferimento';
 import { useCtx } from './ShellCentralino';
+import { modaleAperta, staScrivendo } from './tastiera';
 
 /** Scheda pratica: intestazione, avanzamento, storia completa, azioni (sola lettura per la direzione). */
 export default function Pratica() {
@@ -56,7 +57,7 @@ export default function Pratica() {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (e.key.toLowerCase() !== 'a' || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable) return;
+      if (e.key.toLowerCase() !== 'a' || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || staScrivendo(t) || modaleAperta()) return; // mai con una finestra aperta (es. Nuovo contatto)
       if (ctx.scrive && !modale && data?.pratica.esito === 'aperta') { e.preventDefault(); const pp = data.pratica; const ff = config?.flussi.find(x => x.tipo === pp.tipo); if (!pp.tipo.startsWith('offerta') || !ff?.stadi.some(x => x.key === pp.stato_corrente)) void rpc('centralino_chiudi_semplice', { p_id: pp.id, p_testo: null }).then(() => { toast(`${pp.numero}: chiusa`); reload(); ctx.aggiorna(); }, x => toast(testoErrore(x))); else setModale('avanza'); }
     };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);

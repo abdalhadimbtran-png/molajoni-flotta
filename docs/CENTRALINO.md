@@ -189,16 +189,17 @@ Il promemoria del risponditore non è più mostrato nel Nuovo contatto (rimosso 
 ## Tastiera
 Il Centralino si usa tutto senza mouse. Helper in `src/centralino/tastiera.ts` (test: `tastiera.test.ts`); l'elenco `SCORCIATOIE` alimenta il riquadro <kbd>?</kbd>.
 
-**Ovunque** (non partono mentre si scrive in un campo, tranne <kbd>Esc</kbd> e <kbd>Ctrl</kbd>+<kbd>Invio</kbd>):
+**Ovunque** (non partono mentre si scrive in un campo né con una finestra aperta; <kbd>Esc</kbd> esce dal campo):
 - <kbd>N</kbd> nuovo contatto · <kbd>/</kbd> cerca · <kbd>?</kbd> riquadro scorciatoie (anche pulsante «?» nella barra)
-- <kbd>G</kbd> poi <kbd>O</kbd>/<kbd>P</kbd>/<kbd>T</kbd>/<kbd>C</kbd> → Oggi / Pratiche / Trasferimenti / Clienti (entro 1,2 s)
-- <kbd>Esc</kbd> chiude la finestra; in un campo toglie il focus; sulla scheda pratica torna indietro
+- <kbd>G</kbd> poi <kbd>O</kbd>/<kbd>P</kbd>/<kbd>C</kbd> → Oggi / Pratiche / Clienti (entro 1,2 s)
+- <kbd>Esc</kbd> chiude la finestra (non Nuovo contatto); in un campo toglie il focus; sulla scheda pratica torna indietro
+- Nota: la pagina Clienti apre con il focus nella ricerca: premi <kbd>Esc</kbd> prima di <kbd>N</kbd>.
 
-**Nuovo contatto**: all'apertura il focus è sul Canale. Canale, Cosa chiede, Dettaglio (sottotipo), Urgenza e Gestita da Jennifer / Passa al Tecnico Commerciale sono gruppi a scelta (`role="radiogroup"`, roving tabindex): <kbd>←</kbd><kbd>→</kbd>/<kbd>↑</kbd><kbd>↓</kbd> spostano, <kbd>Invio</kbd>/<kbd>Spazio</kbd> scelgono e portano al gruppo successivo, <kbd>1</kbd>–<kbd>9</kbd> scelgono la n-esima voce (il numero compare sulla voce quando il gruppo ha il focus). <kbd>Tab</kbd>/<kbd>Maiusc</kbd>+<kbd>Tab</kbd> tra gruppi e campi. Cliente: <kbd>↑</kbd><kbd>↓</kbd> nei suggerimenti, <kbd>Invio</kbd> sceglie, <kbd>Esc</kbd> chiude l'elenco. <kbd>Ctrl</kbd>+<kbd>Invio</kbd> salva da qualunque punto.
+**Nuovo contatto** (gestore `keydown` sul document nella finestra, funziona anche col focus «da nessuna parte»): all'apertura il focus è sul Canale. Gruppi a scelta (`role="radiogroup"`, roving tabindex, `data-k-gruppo`): <kbd>←</kbd><kbd>→</kbd>/<kbd>↑</kbd><kbd>↓</kbd> spostano, <kbd>Invio</kbd>/<kbd>Spazio</kbd> scelgono e portano al gruppo successivo, <kbd>1</kbd>–<kbd>9</kbd> scelgono nel gruppo che ha il focus. Con il focus fuori da campi e gruppi (`tastoNuovo`): le cifre scelgono il Canale se non ancora fatto, poi la Richiesta; con Offerta <kbd>1</kbd>/<kbd>2</kbd> = Gestita da Jennifer / Passa al Commerciale; con Intervento le cifre vanno al Dettaglio e <kbd>U</kbd>/<kbd>O</kbd> = Urgente/Ordinario (anche dentro i gruppi). Cliente: <kbd>↑</kbd><kbd>↓</kbd> nei suggerimenti, <kbd>Invio</kbd> sceglie, <kbd>Esc</kbd> chiude l'elenco. <kbd>Ctrl</kbd>+<kbd>Invio</kbd> = Salva e chiudi (offerta: Salva e apri email), <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>Invio</kbd> = Salva da seguire, da qualunque punto. <kbd>Esc</kbd> esce solo dal campo: la finestra non si chiude (dati al sicuro).
 
-**Passo (Avanza)**: focus sul primo campo; tendine con le frecce; caselle e «Telefonato» con <kbd>Spazio</kbd>; «Quando» è un gruppo a scelta; <kbd>Invio</kbd> = Avanti; <kbd>Esc</kbd> = chiudi.
+**Passo (Avanza, solo offerte)**: focus sul primo campo; <kbd>T</kbd> = «Avvisato per telefono» (presa in carico offerta, email al commerciale); tendine con le frecce; caselle e «Telefonato» con <kbd>Spazio</kbd>; «Quando» è un gruppo a scelta; <kbd>Invio</kbd> = Avanti; <kbd>Esc</kbd> = chiudi.
 
-**Elenchi** (Oggi «Adesso», Pratiche, Trasferimenti): <kbd>J</kbd>/<kbd>K</kbd> o <kbd>↓</kbd>/<kbd>↑</kbd> spostano la riga evidenziata (focus reale sul link della riga), <kbd>Invio</kbd> apre, <kbd>A</kbd> fa il prossimo passo (pulsante `[data-k-avanza]` della card in Oggi; nella scheda pratica aperta, come prima).
+**Elenchi** (Oggi «Adesso», Pratiche; disattivati con una finestra aperta): <kbd>J</kbd>/<kbd>K</kbd> o <kbd>↓</kbd>/<kbd>↑</kbd> spostano la riga evidenziata (focus reale sul link della riga), <kbd>Invio</kbd> apre, <kbd>A</kbd> fa il prossimo passo (pulsante `[data-k-avanza]` della card in Oggi; nella scheda pratica aperta, come prima).
 
 Anello di focus: `--info` 2px + alone `--info-bg` (token Apple Light). Suggerimenti tasti `.k-hint` discreti, nascosti su dispositivi touch.
 

@@ -120,7 +120,6 @@ export default function ShellCentralino() {
       { to: '/centralino', label: 'Oggi', icona: 'cruscotto', end: true },
       { to: '/centralino/nuovo', label: 'Nuovo contatto', icona: 'attivita' },
       { to: '/centralino/pratiche', label: 'Pratiche', icona: 'pratiche' },
-      { to: '/centralino/trasferimenti', label: 'Trasferimenti e richiami', icona: 'telefono' },
       { to: '/centralino/clienti', label: 'Clienti', icona: 'tecnici' }] },
     { titolo: 'Dati', voci: [
       { to: '/centralino/monitoraggio', label: 'Analisi', icona: 'panoramica' },
@@ -149,7 +148,7 @@ export default function ShellCentralino() {
         <Protezione chiave={loc.pathname}><Outlet context={ctx} /></Protezione>
       </Layout>
       {aiuto && <AiutoTastiera onClose={() => setAiuto(false)} />}
-      {aperto && <NuovoContatto cliente={preset} onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}
+      {aperto && <NuovoContatto cliente={preset} onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); if (dopo === 'chiusa') nav('/centralino'); else nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}
     </div>
   );
 }

@@ -7,21 +7,18 @@ import { useCtx } from '../centralino/ShellCentralino';
 import { datiPeriodo } from '../centralino/Direzione';
 import { tutteLeRighe, useAdesso, useAggiornamento, useConfig } from '../centralino/comune';
 import { Scheletro } from '../centralino/Scheletro';
-import { nomeStadio } from '../centralino/componenti';
-import KpiTrasferimenti from '../centralino/KpiTrasferimenti';
-import { calcolaKpi, durata } from '../lib/centralino/kpi';
+import { calcolaKpi } from '../lib/centralino/kpi';
 import { kpi, linkAnalisi, valuta, type RecPratica } from '../lib/centralino/registro';
 import { CANALI, NOME_TIPO, STATI_CLIENTE, nomeCanale, type StatoCliente } from '../lib/centralino/tipi';
-import { inizioGiornoRoma, testoResiduo } from '../lib/centralino/sla';
-import { giorniTra, heatmap, intervallo, perCommerciale, piuGiorni, precedente, primaRisposta, slaPerPasso, trend, valore, type Periodo } from '../lib/direzione/analisi';
-import { BASE, Barre, Cella, Delta, Info, Kpi, Sezione, oggiRoma } from './comuni';
+import { inizioGiornoRoma } from '../lib/centralino/sla';
+import { giorniTra, heatmap, intervallo, piuGiorni, precedente, trend, valore, type Periodo } from '../lib/direzione/analisi';
+import { BASE, Barre, Cella, Info, Kpi, Sezione, oggiRoma } from './comuni';
 import { Feed } from './Feed';
 import ReportDirezione from './ReportDirezione';
 import Digest from './Digest';
 
 const GIORNI = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-const PASSI = [['coordinatore', 'Inviato al coordinatore'], ['tecnico', 'Tecnico individuato'], ['cliente', 'Cliente informato'], ['avviso', 'Tecnico avvisato']] as const;
-const SEZ = [['volumi', 'Volumi'], ['servizio', 'Servizio'], ['offerte', 'Offerte'], ['trasferimenti', 'Trasferimenti'], ['qualita', 'Qualità'], ['registro', 'Registro di Jennifer'], ['movimenti', 'Movimenti']] as const;
+const SEZ = [['volumi', 'Volumi'], ['offerte', 'Offerte'], ['qualita', 'Qualità'], ['registro', 'Registro di Jennifer'], ['movimenti', 'Movimenti']] as const;
 
 async function carica90(da: string) {
   // a blocchi: l'API restituisce al massimo 1000 righe per richiesta; fatture/fornitori non sono pratiche
@@ -32,7 +29,7 @@ async function carica90(da: string) {
 /** /direzione/centralino: tutto quello che succede al centralino, con periodo e confronto. Sola lettura. */
 export default function CentralinoDirezione() {
   const ctx = useCtx();
-  const ora = useAdesso();
+  useAdesso(); // aggiorna la pagina ogni minuto
   const { config } = useConfig();
   const [per, setPer] = useState<Periodo>('settimana');
   const [cust, setCust] = useState({ da: piuGiorni(oggiRoma(), -6), a: oggiRoma() });
@@ -56,11 +53,6 @@ export default function CentralinoDirezione() {
   const hm = heatmap(d.pratiche);
   const tr = trend(data.t, piuGiorni(oggi, -(giorniTrend - 1)), oggi);
   const trMax = Math.max(1, ...tr.map(x => x.n));
-  const pr = primaRisposta(d.pratiche, d.eventi), prp = primaRisposta(p.pratiche, p.eventi);
-  const spp = slaPerPasso(d.eventi), sppP = slaPerPasso(p.eventi);
-  const comm = perCommerciale(d.trasf, ora);
-  const fl = (t: string) => config.flussi.find(f => f.tipo === t);
-  const scadute = (valuta(kpi('in_ritardo')!, d, {}, ora).righe as RecPratica[]).sort((x, y) => (x.sla_scadenza ?? '').localeCompare(y.sla_scadenza ?? ''));
   const piccole = d.pratiche.filter(x => x.tipo === 'offerta_piccola'), grandi = d.pratiche.filter(x => x.tipo === 'offerta_grande');
   const giorni = [...Array(Math.min(62, giorniTra(da, a))).keys()].map(i => piuGiorni(a, -i));
   const tipi = Object.keys(NOME_TIPO);
@@ -81,12 +73,11 @@ export default function CentralinoDirezione() {
       <div className="kpis dz-kpis">
         <Kpi id="pratiche" titolo="Contatti" d={d} prev={p} da={da} a={a} />
         <Kpi id="aperte" d={d} da={da} a={a} />
-        <Kpi id="in_ritardo" titolo="Scadute adesso" d={d} da={da} a={a} rossoSe />
-        <Kpi id="sla" d={d} prev={p} da={da} a={a} soglia={80} />
-        <Kpi id="cliente1h" d={d} prev={p} da={da} a={a} soglia={80} />
-        <Kpi id="offerte60" d={d} prev={p} da={da} a={a} soglia={80} />
-        <Kpi id="trasf_in_tempo" d={d} prev={p} da={da} a={a} soglia={80} />
-        <Kpi id="comm_scaduti" d={d} da={da} a={a} rossoSe />
+        <Kpi id="off_piccole" titolo="Offerte Jennifer" d={d} prev={p} da={da} a={a} />
+        <Kpi id="offerte60" titolo="Offerte entro 60 min" d={d} prev={p} da={da} a={a} soglia={80} />
+        <Kpi id="off_grandi" titolo="Offerte al Commerciale" d={d} prev={p} da={da} a={a} />
+        <Kpi id="da_seguire" d={d} da={da} a={a} />
+        <Kpi id="in_ritardo" titolo="Offerte in ritardo" d={d} da={da} a={a} rossoSe />
       </div>
 
       <Sezione id="volumi" titolo="Volumi" sub="Quanti contatti, da dove e per cosa">
@@ -114,35 +105,6 @@ export default function CentralinoDirezione() {
         </div>
       </Sezione>
 
-      <Sezione id="servizio" titolo="Servizio" sub="Promesse al cliente mantenute e tempi di lavoro">
-        <div className="kpis dz-kpis">
-          <Kpi id="sla" d={d} prev={p} da={da} a={a} soglia={80} />
-          <Kpi id="urgenti_giornata" d={d} prev={p} da={da} a={a} soglia={90} />
-          <Kpi id="sla_mancati" d={d} prev={p} da={da} a={a} buono="giu" />
-          <div className="kpi dz-kpi"><div className="dz-kpi-top"><span className="lbl">Prima risposta (media)</span>
-            <Info def={{ id: 'pr', titolo: 'Prima risposta', spiegazione: 'Media dei minuti tra la chiamata e il primo passo fatto, sulle pratiche del periodo che hanno almeno un passo.', fonte: 'pratiche', num: () => true }} /></div>
-            <div className="num">{durata(pr.media)}</div><div className="sub">su {pr.n} pratiche · <Delta att={pr.media} prec={prp.media} buono="giu" /></div></div>
-        </div>
-        <div className="dz-g2">
-          <div className="dz-card"><h3>SLA rispettati per tipo</h3>
-            <table className="ct-tab dz-tab"><thead><tr><th>Tipo</th><th className="num">Pratiche</th><th className="num">SLA ok</th><th className="num">vs prec.</th></tr></thead><tbody>
-              {tipi.filter(t => k.perTipo[t]).map(t => { const x = valuta(kpi('sla')!, d, { tipo: t }), y = valuta(kpi('sla')!, p, { tipo: t }); return (
-                <tr key={t}><td>{NOME_TIPO[t as 'manutenzione']}</td><td className="num"><Cella id="pratiche" d={d} da={da} a={a} f={{ tipo: t }} /></td><td className="num"><Cella id="sla" d={d} da={da} a={a} f={{ tipo: t }} pct /></td><td className="num"><Delta att={x.pct} prec={y.pct} punti /></td></tr>); })}
-            </tbody></table>{!k.totale && <p className="ct-vuoto">Nessun dato nel periodo.</p>}</div>
-          <div className="dz-card"><h3>Per passo <span className="sub">interventi e sopralluoghi</span></h3>
-            <table className="ct-tab dz-tab"><thead><tr><th>Passo</th><th className="num">Fatti</th><th className="num">Entro SLA</th><th className="num">Tempo medio</th><th className="num">vs prec.</th></tr></thead><tbody>
-              {PASSI.map(([s, l]) => <tr key={s}><td>{l}</td><td className="num">{spp[s]?.n ?? 0}</td><td className="num">{spp[s] ? <Cella id="sla_passo" d={d} da={da} a={a} f={{ passo: s }} pct /> : '—'}</td>
-                <td className="num">{durata(k.tempiMedi[s])}</td><td className="num"><Delta att={spp[s]?.pct ?? null} prec={sppP[s]?.pct ?? null} punti /></td></tr>)}
-            </tbody></table><p className="sub">Tempo medio: dal passo precedente all'ingresso nel passo.</p></div>
-        </div>
-        <div className="dz-card"><h3>Pratiche scadute aperte <span className={`ct-n ${scadute.length ? 'ko' : ''}`}>{scadute.length}</span></h3>
-          {scadute.length ? <table className="ct-tab dz-tab"><thead><tr><th>Cliente</th><th>Tipo</th><th>Passo atteso</th><th>Chi</th><th className="num">Ritardo</th></tr></thead><tbody>
-            {scadute.slice(0, 15).map(x => <tr key={x.id}><td><Link to={`${BASE}/pratica/${x.id}`}><b>{x.cliente_nome || '—'}</b></Link><div className="sub">{x.numero}</div></td><td>{NOME_TIPO[x.tipo as 'manutenzione']}</td>
-              <td>{nomeStadio(fl(x.tipo), (x as RecPratica & { sla_stadio?: string }).sla_stadio ?? x.stato_corrente)}</td><td>{x.assegnato_nome ?? '—'}</td><td className="num ko-t">{testoResiduo(x.sla_scadenza, ora)}</td></tr>)}
-          </tbody></table> : <p className="ct-vuoto">Nessuna pratica in ritardo.</p>}
-          {scadute.length > 15 && <Link className="sub" to={L('in_ritardo')}>Tutte le {scadute.length} →</Link>}</div>
-      </Sezione>
-
       <Sezione id="offerte" titolo="Offerte" sub="Jennifer le gestisce o le passa a un Tecnico Commerciale">
         <div className="dz-g2">
           <div className="dz-card"><h3>Gestite da Jennifer</h3>
@@ -155,18 +117,9 @@ export default function CentralinoDirezione() {
             <div className="kpis dz-kpis dz-k2">
               <Kpi id="off_grandi" titolo="Richieste" d={d} prev={p} da={da} a={a} sub={<>valore {fmtEuro(valore(grandi))}</>} />
               <Kpi id="off_grandi_passate" d={d} prev={p} da={da} a={a} soglia={90} />
-              <Kpi id="comm_in_tempo" d={d} prev={p} da={da} a={a} soglia={80} />
-              <Kpi id="comm_scaduti" d={d} da={da} a={a} rossoSe />
             </div>
-            <table className="ct-tab dz-tab"><thead><tr><th>Commerciale</th><th className="num">Richiami</th><th className="num">Entro 2 ore</th><th className="num">Scaduti</th></tr></thead><tbody>
-              {Object.entries(comm).sort((x, y) => y[1].tot - x[1].tot).map(([n, x]) => <tr key={n}><td>{n}</td><td className="num">{x.tot}</td>
-                <td className="num"><Cella id="comm_in_tempo" d={d} da={da} a={a} f={{ dest: n }} pct /></td><td className={`num ${x.scaduti ? 'ko-t' : ''}`}><Cella id="comm_scaduti" d={d} da={da} a={a} f={{ dest: n }} /></td></tr>)}
-            </tbody></table>{!Object.keys(comm).length && <p className="ct-vuoto">Nessun richiamo dei commerciali nel periodo.</p>}</div>
+</div>
         </div>
-      </Sezione>
-
-      <Sezione id="trasferimenti" titolo="Trasferimenti" sub="Chiamate per un responsabile: richiami ed email di riepilogo">
-        <KpiTrasferimenti d={d} da={da} a={a} base={BASE} />
       </Sezione>
 
       <Sezione id="qualita" titolo="Qualità dei dati" sub="Tracciabilità e completezza delle pratiche">
@@ -175,7 +128,6 @@ export default function CentralinoDirezione() {
           <Kpi id="annullate_motivo" d={d} prev={p} da={da} a={a} soglia={100} sub={<>{cnt(d.pratiche, x => x.esito === 'annullata')} annullate</>} />
           <Kpi id="senza_contatti" d={d} prev={p} da={da} a={a} buono="giu" />
           <Kpi id="reg_anagrafica" titolo="Anagrafiche aggiornate" d={d} prev={p} da={da} a={a} buono="neutro" />
-          <Kpi id="trasf_email_cli" d={d} prev={p} da={da} a={a} soglia={90} />
         </div>
       </Sezione>
 

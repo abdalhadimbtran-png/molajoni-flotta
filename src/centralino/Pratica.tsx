@@ -57,10 +57,10 @@ export default function Pratica() {
     const h = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (e.key.toLowerCase() !== 'a' || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable) return;
-      if (ctx.scrive && !modale && data?.pratica.esito === 'aperta') { e.preventDefault(); setModale('avanza'); }
+      if (ctx.scrive && !modale && data?.pratica.esito === 'aperta') { e.preventDefault(); const pp = data.pratica; const ff = config?.flussi.find(x => x.tipo === pp.tipo); if (!pp.tipo.startsWith('offerta') || !ff?.stadi.some(x => x.key === pp.stato_corrente)) void rpc('centralino_chiudi_semplice', { p_id: pp.id, p_testo: null }).then(() => { toast(`${pp.numero}: chiusa`); reload(); ctx.aggiorna(); }, x => toast(testoErrore(x))); else setModale('avanza'); }
     };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
-  }, [ctx.scrive, modale, data]);
+  }, [ctx.scrive, modale, data, config]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data || !config) return <Caricamento />;
@@ -68,10 +68,16 @@ export default function Pratica() {
   const f = config.flussi.find(x => x.tipo === p.tipo);
   const prossimo = prossimoStadio(f, p);
   const aperta = p.esito === 'aperta';
+  // 0095: solo le offerte hanno passi (email); gli altri tipi (e le pratiche rimaste su passi tolti) si chiudono con un clic
+  const semplice = !p.tipo.startsWith('offerta') || !f?.stadi.some(x => x.key === p.stato_corrente);
   const scrive = ctx.scrive && aperta;
   const fatto = () => { setModale(''); reload(); ctx.aggiorna(); };
 
+  async function chiudiSemplice() {
+    try { await rpc('centralino_chiudi_semplice', { p_id: p.id, p_testo: null }); toast(`${p.numero}: chiusa`); qs.delete('nuova'); setQs(qs, { replace: true }); fatto(); } catch (e) { toast(testoErrore(e)); }
+  }
   async function avanzaUno() {
+    if (semplice) { await chiudiSemplice(); return; }
     if (!prossimo) return;
     if (!avanzaDiretto(prossimo) || (data?.pr?.mancanti.length ?? 0) > 0) { setModale('avanza'); return; }
     try { await rpc('centralino_avanza', { p_id: p.id, p_stadio: prossimo.key, p_dati: {}, p_testo: null }); toast(prossimo.nome); setContinua(p.stato_corrente); fatto(); } catch (e) { toast(testoErrore(e)); }
@@ -92,12 +98,11 @@ export default function Pratica() {
       <Link to={`${ctx.base}/pratiche`} className="ct-indietro ct-solo-stretto">← Elenco</Link>
       {nuova && aperta && ctx.scrive && (
         <div className="ct-dopo">
-          <div><b>Pratica {p.numero} aperta.</b> {prossimo ? <>Prossimo passo: <b>{prossimo.nome}</b>.</> : null}</div>
+          <div><b>Pratica {p.numero} {semplice ? 'da seguire' : 'aperta'}.</b> {!semplice && prossimo ? <>Prossimo: <b>{prossimo.nome}</b>.</> : null}</div>
           <div className="row-flex">
-            {prossimo && <button className="btn btn-sm" onClick={avanzaUno}>Prossimo passo: {prossimo.nome} <kbd>A</kbd></button>}
-            <button className="btn-ghost btn-sm" onClick={() => { setCodiceEmail(undefined); setModale('email'); }}>Invia email al cliente</button>
-            <button className="btn-ghost btn-sm" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
-            <button className="btn-ghost btn-sm" onClick={() => { qs.delete('nuova'); setQs(qs); }}>Chiudi</button>
+            {semplice ? <button className="btn btn-sm" onClick={chiudiSemplice}>Chiudi pratica <kbd>A</kbd></button>
+              : prossimo && <button className="btn btn-sm" onClick={avanzaUno}>{prossimo.nome} <kbd>A</kbd></button>}
+            <button className="btn-ghost btn-sm" onClick={() => { qs.delete('nuova'); setQs(qs); }}>Nascondi</button>
           </div>
         </div>)}
       {senzaEmail.length > 0 && <div className="ct-flag-bar">Email di riepilogo non inviata per {senzaEmail.length === 1 ? 'la chiamata trasferita' : `${senzaEmail.length} chiamate trasferite`}.
@@ -121,17 +126,16 @@ export default function Pratica() {
         </div>
       </header>
 
-      <Stepper f={f} p={p} eventi={data.eventi} />
-      {aperta && data.pr && <div className={`ct-prossimo ${data.pr.mancanti.length ? 'manca' : 'ok'}`}><b>Prossimo passo: {data.pr.nome}</b>{data.pr.mancanti.length ? <span> · manca: {data.pr.mancanti.join(', ')}</span> : <span> · tutto pronto</span>}</div>}
+      {!semplice && <Stepper f={f} p={p} eventi={data.eventi} />}
+      {aperta && !semplice && data.pr && <div className={`ct-prossimo ${data.pr.mancanti.length ? 'manca' : 'ok'}`}><b>Prossimo passo: {data.pr.nome}</b>{data.pr.mancanti.length ? <span> · manca: {data.pr.mancanti.join(', ')}</span> : <span> · tutto pronto</span>}</div>}
 
       {ctx.scrive && (
         <div className="ct-azioni">
-          {aperta && prossimo && <button className="btn" onClick={avanzaUno}>Avanza: {prossimo.nome}</button>}
-          <button className="btn-ghost" onClick={() => { setCodiceEmail(prossimo?.template); setModale('email'); }}><Ic n="email" size={16} /> Invia email</button>
-          {aperta && p.appuntamento_data && <button className="btn-ghost" onClick={() => setModale('sposta')}>Sposta appuntamento</button>}
+          {aperta && semplice && <button className="btn" onClick={chiudiSemplice}>Chiudi</button>}
+          {aperta && !semplice && prossimo && <button className="btn" onClick={avanzaUno}>{prossimo.nome}</button>}
+          {!semplice && <button className="btn-ghost" onClick={() => { setCodiceEmail(prossimo?.template); setModale('email'); }}><Ic n="email" size={16} /> Invia email</button>}
           <button className="btn-ghost" onClick={() => setModale('chiamata')}><Ic n="telefono" size={16} /> Registra chiamata</button>
           {aperta && p.tipo === 'offerta_piccola' && <button className="btn-ghost" onClick={() => setModale('commerciale')}>Passa al Tecnico Commerciale</button>}
-          <button className="btn-ghost" onClick={() => setModale('trasf')}>Chiamata per un responsabile</button>
           <button className="btn-ghost" onClick={() => setModale('nota')}>Aggiungi nota</button>
           <button className="btn-ghost" onClick={() => setModale('dati')}>Dati e assegnazione</button>
           <button className="btn-ghost" onClick={() => file.current?.click()}>Allegati</button>
@@ -180,7 +184,7 @@ export default function Pratica() {
         </aside>
       </div>
 
-      {modale === 'avanza' && f && <Avanza p={p} f={f} onClose={() => setModale('')} onFatto={() => { setContinua(p.stato_corrente); fatto(); }} onEmail={(t, dopoPasso) => { if (dopoPasso) { setContinua(null); setEmailDopo({ codice: t, da: p.stato_corrente }); } else { setCodiceEmail(t); setModale('email'); } }} />}
+      {modale === 'avanza' && f && !semplice && <Avanza p={p} f={f} onClose={() => setModale('')} onFatto={() => { setContinua(p.stato_corrente); fatto(); }} onEmail={(t, dopoPasso) => { if (dopoPasso) { setContinua(null); setEmailDopo({ codice: t, da: p.stato_corrente }); } else { setCodiceEmail(t); setModale('email'); } }} />}
       {modale === 'sposta' && <ModaleSposta p={p} onClose={() => setModale('')} onFatto={fatto} />}
       {(modale === 'nota' || modale === 'chiamata') && <ModaleNota p={p} tipo={modale} onClose={() => setModale('')} onFatto={fatto} />}
       {modale === 'email' && <ModaleEmail pratica={p} codice={codiceEmail} onClose={() => setModale('')} onFatto={fatto} />}

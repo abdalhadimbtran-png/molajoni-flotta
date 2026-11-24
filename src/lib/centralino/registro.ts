@@ -72,7 +72,7 @@ export const KPI: Def[] = [
   { id: 'off_piccole', titolo: 'Offerte gestite dal centralino', spiegazione: 'Richieste di offerta gestite dal centralino nel periodo.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_piccola' },
   { id: 'off_piccole_inviate', titolo: 'Offerte del centralino inviate', spiegazione: 'Offerte gestite dal centralino con il passo «Offerta inviata» fatto o chiuse.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_piccola' && inviata(P(r)) },
   { id: 'off_grandi', titolo: 'Offerte del Tecnico Commerciale', spiegazione: 'Richieste di offerta passate al Tecnico Commerciale nel periodo.', fonte: 'pratiche', num: r => P(r).tipo === 'offerta_grande' },
-  { id: 'off_grandi_passate', titolo: 'Passate ai commerciali', spiegazione: 'Numeratore: offerte passate al Tecnico Commerciale con l\'email al cliente fatta (passate al commerciale). Denominatore: offerte passate al Tecnico Commerciale non annullate.', fonte: 'pratiche',
+  { id: 'off_grandi_passate', titolo: 'Commerciale avvisato', spiegazione: 'Numeratore: offerte passate al Tecnico Commerciale con l\'email (o la telefonata) al commerciale fatta. Denominatore: offerte passate al Tecnico Commerciale non annullate.', fonte: 'pratiche',
     num: r => P(r).tipo === 'offerta_grande' && inviata(P(r)), den: r => P(r).tipo === 'offerta_grande' && !annullata(P(r)) },
   { id: 'qual_email', titolo: 'Pratiche con email al cliente', spiegazione: 'Numeratore: pratiche con almeno un\'email inviata dal centralino. Denominatore: pratiche del periodo, annullate escluse.', fonte: 'pratiche',
     num: (r, c) => !annullata(P(r)) && c.email.has(P(r).id), den: r => !annullata(P(r)) },
@@ -84,6 +84,7 @@ export const KPI: Def[] = [
   // situazione attuale
   { id: 'in_ritardo', titolo: 'In ritardo adesso', spiegazione: 'Pratiche aperte (di qualunque giorno) con la scadenza del prossimo passo già superata.', fonte: 'aperte', num: (r, c) => !!P(r).sla_scadenza && new Date(P(r).sla_scadenza!) < c.ora },
   { id: 'in_scadenza', titolo: 'In scadenza (60 min)', spiegazione: 'Pratiche aperte con la scadenza del prossimo passo entro i prossimi 60 minuti.', fonte: 'aperte', num: (r, c) => !!P(r).sla_scadenza && new Date(P(r).sla_scadenza!) >= c.ora && new Date(P(r).sla_scadenza!).getTime() - c.ora.getTime() <= 3600e3 },
+  { id: 'da_seguire', titolo: 'Da seguire aperte', spiegazione: 'Pratiche aperte senza email (intervento, sopralluogo, modifiche, informazione) salvate «da seguire»: si chiudono con «Chiudi».', fonte: 'aperte', num: r => !P(r).tipo.startsWith('offerta') },
   { id: 'aperte', titolo: 'Pratiche aperte', spiegazione: 'Tutte le pratiche aperte in questo momento.', fonte: 'aperte', num: tutto },
   // registro del giorno (Jennifer pannel)
   { id: 'reg_telefonate', titolo: 'Telefonate ricevute', spiegazione: 'Pratiche con canale Telefono + chiamate solo informative.', fonte: 'contatti', conInfo: true, num: r => ('tipo' in r ? P(r).canale : (r as RecInfo).canale) === 'telefono' },

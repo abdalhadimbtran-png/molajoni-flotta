@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emailDaModello, segnaposto, SEGNAPOSTO, templatePasso, richiedeAllegato } from './modelli';
+import { emailDaModello, segnaposto, SEGNAPOSTO, richiedeAllegato } from './modelli';
 import MODELLI from './modelli_email.json';
 
 /** Copia dei modelli attivi (public.email_template, attivo = true) e dei flussi in cui sono usati (public.pratiche_flussi). */
@@ -29,8 +29,8 @@ const pulito = (s: string) => s.replace(/https?:\/\/[^\s"]+/g, '');
 const controlla = (s: string) => VIETATI.filter(r => r.test(pulito(s))).map(String);
 
 describe('modelli attivi: segnaposto compilati in ogni flusso', () => {
-  it('21 modelli attivi, tutti coperti', () => {
-    expect(ATTIVI.length).toBe(21);
+  it('4 modelli attivi (0095: solo offerte), tutti coperti', () => {
+    expect(ATTIVI.length).toBe(4);
     for (const t of ATTIVI) if (t.tipo_pratica !== 'trasferimento' && t.tipo_pratica !== 'trasferimento_referente') expect(USO[t.codice], t.codice).toBeTruthy();
   });
   for (const t of ATTIVI) {
@@ -51,38 +51,16 @@ describe('modelli attivi: segnaposto compilati in ogni flusso', () => {
 });
 
 describe('girata e firme', () => {
-  it('risposta_informazione: oggetto con numero pratica, segnaposto da completare, firma J. Marchetti', () => {
-    const t = ATTIVI.find(x => x.codice === 'risposta_informazione')!;
-    const e = emailDaModello(t, segnaposto(pratica('informazione'), ''));
-    expect(e.oggetto).toBe('RISPOSTA ALLA VOSTRA RICHIESTA DI INFORMAZIONI – Condominio Via Roma 10 – CT-2026-000042');
-    expect(e.testo).toContain('[scrivere qui la risposta]');
-    expect(e.testo).toContain('Grazie per la preferenza e distinti saluti.');
-    expect(e.testo).toContain('J. Marchetti');
-  });
-  it('girata_ufficio: «il nostro responsabile … Vi ricontatterà»', () => {
-    const t = ATTIVI.find(x => x.codice === 'girata_ufficio')!;
-    const e = emailDaModello(t, segnaposto(pratica('informazione'), ''));
-    expect(e.testo).toContain("il nostro responsabile Antonella D'Orazio Vi ricontatterà");
-  });
-  it('girata_referente: email interna al referente con link e sintesi, senza «chi chiama»', () => {
-    const t = ATTIVI.find(x => x.codice === 'girata_referente')!;
-    const e = emailDaModello(t, segnaposto(pratica('fornitori'), ''));
-    expect(e.oggetto).toBe('[Centralino] Richiesta da gestire – CT-2026-000042 – Ferramenta Bianchi srl – Fornitori');
-    expect(e.testo).toContain('Ciao Roberta Felci,');
-    expect(e.testo).not.toMatch(/chi chiama|\(fornitore\)|\(cliente\)/i);
-    expect(e.testo).toContain('Cliente: Ferramenta Bianchi srl');
-    expect(e.html).toContain('/centralino/pratica/42');
-  });
-  it('conferma della girata: variante neutra per i fornitori', () => {
-    expect(templatePasso({ tipo: 'fornitori', tipo_contatto: 'fornitore' }, 'girata_ufficio')).toBe('girata_fornitore');
-    expect(templatePasso({ tipo: 'amministrazione', tipo_contatto: 'fornitore' }, 'girata_ufficio')).toBe('girata_fornitore');
-    expect(templatePasso({ tipo: 'amministrazione', tipo_contatto: 'cliente' }, 'girata_ufficio')).toBe('girata_ufficio');
-    const t = ATTIVI.find(x => x.codice === 'girata_fornitore')!;
-    expect(emailDaModello(t, segnaposto(pratica('fornitori'), '')).testo).not.toContain('Grazie per la preferenza');
+  it('riepilogo_commerciale (0095): tutti i dati del cliente + cosa chiede, nessun richiamo', () => {
+    const t = ATTIVI.find(x => x.codice === 'riepilogo_commerciale')!;
+    const e = emailDaModello(t, segnaposto({ ...pratica('offerta_grande'), cliente_codice: 'C0123', sede: 'IMP-7' }, ''));
+    expect(e.oggetto).toBe('[Centralino] Preventivo da gestire – CT-2026-000042 – Condominio Via Roma 10');
+    for (const x of ['Condominio Via Roma 10', 'C0123', 'Sig. Rossi', '+39 333 1234567', 'rossi@example.it', 'Via Roma 10, 00100 Roma', 'IMP-7', 'Centrale antincendio in avaria']) expect(e.testo).toContain(x);
+    expect(e.testo).not.toMatch(/richiamare entro|2 ore/i);
   });
   it('email ai clienti: «Grazie per la preferenza e distinti saluti» + J. Marchetti + Molajoni Antincendi s.r.l.', () => {
     const clienti = ATTIVI.filter(t => !t.oggetto.startsWith('[Centralino]') && t.firma_tipo === 'front_office' && !['girata_fornitore', 'conferma_disdetta'].includes(t.codice));
-    expect(clienti.length).toBeGreaterThan(10);
+    expect(clienti.map(t => t.codice).sort()).toEqual(['invio_offerta', 'presa_offerta_piccola']);
     for (const t of clienti) {
       const e = emailDaModello(t, { ...segnaposto(pratica(USO[t.codice]?.[0] ?? 'manutenzione'), ''), ...TRASF });
       expect(e.testo, t.codice).toMatch(/Grazie per la preferenza e distinti saluti\.\n\n--\nJ\. Marchetti\nMolajoni Antincendi s\.r\.l\.\ntel\. 06 6941 4281/);

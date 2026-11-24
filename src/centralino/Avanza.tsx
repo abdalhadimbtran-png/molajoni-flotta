@@ -123,7 +123,7 @@ function AvanzaPasso({ p, f, onClose, onFatto, onEmail }: PropsAvanza) {
   const destPersona = destinatari.find(d => d.nome === destEff);
 
   // email del passo (precompilata, anteprima chiusa)
-  const tEmail = has('email') || has('informato') || (girata && !!destEff) ? modello(s?.template) : undefined;
+  const tEmail = has('email') || has('email_inviata') || has('informato') || (girata && !!destEff) ? modello(s?.template) : undefined;
   const aEmail = !tEmail ? '' : girata ? (destPersona?.email ?? '') : tEmail.codice.endsWith('_coordinatore') ? (coordSel?.email ?? '') : tEmail.codice === 'riepilogo_commerciale' ? (p.commerciale_email || elencoComm.find(c => c.nome === p.commerciale_nome)?.email || '') : (p.email ?? '');
   const ccOff = (config?.impostazioni.cc_offerte_grandi ?? []).map(x => x.email).filter(Boolean) as string[];
   const telTec = tecnici.find(t => t.id === p.tecnico_dipendente_id)?.telefono ?? null;
@@ -140,7 +140,10 @@ function AvanzaPasso({ p, f, onClose, onFatto, onEmail }: PropsAvanza) {
   // passo «cliente» successivo al tecnico: si invia insieme
   const tCliente = !tablet && has('tecnico') && (dopo?.requisiti?.includes('email') || (dopo?.requisiti as string[] | undefined)?.includes('informato')) ? modello(dopo!.template) : undefined;
 
-  const telPossibile = !!(tEmail || tCliente);
+  // 0095: «Avvisato per telefono» solo per la presa in carico dell'offerta e per il Tecnico Commerciale
+  const telPossibile = !!tEmail && (tEmail.codice === 'presa_offerta_piccola' || tEmail.codice === 'riepilogo_commerciale');
+  const soloEmail = (req as string[]).includes('email_inviata');
+  const mancaEmailCliente = soloEmail && !emailOk(p.email);
   const telRef = useRef<(() => void) | null>(null);
   useTastoTelefono(() => telRef.current?.(), telPossibile);
   if (!s) return null;
@@ -161,6 +164,7 @@ function AvanzaPasso({ p, f, onClose, onFatto, onEmail }: PropsAvanza) {
     controllaEmail({ codice, oggetto: e.oggetto, testo: e.testo, a: e.a, cc: e.cc, numero: p.numero, clienteEmail: p.email, emailInterne, dati: { ...p, ...extraDati, ...dati }, nomeDest: nome });
   async function salva(e?: FormEvent, tel = false) {
     e?.preventDefault(); if (!s) return; setErr(null);
+    if (mancaEmailCliente) return setErr('Manca l\'email del cliente: l\'offerta si invia solo per email. Aggiungila in «Dati e assegnazione».');
     const dati: Record<string, unknown> = {};
     const telefonato = telefonatoS || (tel && has('coordinatore'));
     const voce = voceS || tel;
@@ -300,8 +304,9 @@ function AvanzaPasso({ p, f, onClose, onFatto, onEmail }: PropsAvanza) {
         {has('informato') && <label className="check"><input type="checkbox" checked={voce} onChange={e => setVoce(e.target.checked)} /> Informato a voce</label>}
         {email && !voce && !emailOk(destEmail) && <p className="hint">{has('coordinatore') ? `Manca l'email di ${coordNome || 'questa persona'}: aggiungila in ${tecDiretto ? 'Dipendenti' : 'Referenti'} oppure basta «Telefonato».` : 'Apri l\'anteprima e scrivi l\'indirizzo.'}</p>}
         <details><summary>Nota (facoltativa)</summary><input aria-label="Nota" value={nota} onChange={e => setNota(e.target.value)} /></details>
+        {mancaEmailCliente && <Banner s="ko">Manca l'email del cliente: l'offerta si invia solo per email. Aggiungila in «Dati e assegnazione».</Banner>}
         {err && <Banner s="ko">{err}</Banner>}
-        <div className="row-flex"><button className="btn" disabled={invio}>{etichetta}</button>{telPossibile && <button type="button" className="btn-ghost" disabled={invio} onClick={() => salva(undefined, true)} title="Tasto T">Avvisato per telefono <kbd>T</kbd></button>}<span className="k-hint"><kbd>Invio</kbd> avanti · <kbd>Spazio</kbd> spunta · <kbd>↑</kbd><kbd>↓</kbd> nelle tendine · <kbd>Esc</kbd> chiudi</span></div>
+        <div className="row-flex"><button className="btn" disabled={invio || mancaEmailCliente}>{etichetta}</button>{telPossibile && <button type="button" className="btn-ghost" disabled={invio} onClick={() => salva(undefined, true)} title="Tasto T">Avvisato per telefono <kbd>T</kbd></button>}<span className="k-hint"><kbd>Invio</kbd> avanti · <kbd>Spazio</kbd> spunta · <kbd>↑</kbd><kbd>↓</kbd> nelle tendine · <kbd>Esc</kbd> chiudi</span></div>
       </form>
     </Modal>
   );

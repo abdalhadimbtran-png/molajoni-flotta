@@ -5,7 +5,7 @@ import { firmaOutlookAttiva, pulisciFirma } from './preferenze';
 
 export const SEGNAPOSTO = ['cliente', 'contatto', 'numero_pratica', 'data_appuntamento', 'fascia', 'commerciale', 'tecnico', 'firma', 'argomento', 'referente', 'entro',
   'urgenza', 'obiettivo', 'dettaglio', 'descrizione', 'indirizzo', 'telefono', 'email_cliente', 'quando', 'importo', 'stato_cliente', 'scadenza_richiamo',
-  'saluto', 'tel_tecnico', 'rif_pratica', 'scadenza', 'tmq', 'chi_chiama', 'link'] as const;
+  'saluto', 'tel_tecnico', 'rif_pratica', 'scadenza', 'tmq', 'chi_chiama', 'link', 'codice_cliente', 'sede'] as const;
 export type Valori = Record<(typeof SEGNAPOSTO)[number], string>;
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -19,7 +19,7 @@ export function dataLunga(iso: string | null | undefined): string {
 interface Dati { numero: string; cliente_nome: string; contatto_nome: string | null; appuntamento_data: string | null; appuntamento_fascia: 'mattina' | 'pomeriggio' | null; commerciale_nome: string | null; tecnico_nome: string | null;
   urgenza?: string | null; sottotipo?: string | null; descrizione?: string | null; indirizzo?: string | null; cap?: string | null; comune?: string | null; telefono?: string | null; email?: string | null;
   tecnico_quando?: string | null; importo_stimato?: number | null; stato_cliente?: string | null; assegnato_nome?: string | null;
-  created_at?: string | null; tecnico_telefono?: string | null; id?: number | null; tipo?: string | null; tipo_contatto?: string | null }
+  cliente_codice?: string | null; sede?: string | null; created_at?: string | null; tecnico_telefono?: string | null; id?: number | null; tipo?: string | null; tipo_contatto?: string | null }
 const STATO_C: Record<string, string> = { nuovo: 'nuovo cliente', ex_cliente: 'ex cliente', attivo: 'cliente attivo' };
 /** Valori dei segnaposto per una pratica (testo semplice, non ancora in HTML). */
 /** «Buongiorno» fino alle 13:59, poi «Buonasera» (ora di Roma). */
@@ -43,6 +43,7 @@ export function segnaposto(p: Dati, firma: string, ora = new Date()): Valori {
     indirizzo: [p.indirizzo, [p.cap, p.comune].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—',
     telefono: p.telefono || '—', email_cliente: p.email || '—', quando: p.tecnico_quando || 'al più presto',
     importo: p.importo_stimato != null ? `${p.importo_stimato.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '—',
+    codice_cliente: p.cliente_codice || '—', sede: p.sede || '—',
     stato_cliente: STATO_C[p.stato_cliente ?? ''] ?? 'nuovo cliente', scadenza_richiamo: hhmm(richiamo),
   };
 }

@@ -28,6 +28,12 @@ const MATRICE: [string, string, string][] = [
 ];
 
 describe('destinatarioPerAzione: matrice', () => {
+  it('0095: attivi solo i modelli delle offerte (cliente ×2, commerciale ×1, TMQ)', () => {
+    const attivi = (MODELLI as { codice: string }[]).map(t => t.codice).sort();
+    expect(attivi).toEqual(['invio_offerta', 'presa_offerta_piccola', 'preventivo_tmq', 'riepilogo_commerciale']);
+    for (const c of attivi) expect(MATRICE.some(([k]) => k === c), c).toBe(true);
+    expect(destinatarioPerAzione('riepilogo_commerciale', ctx()).email).not.toBe(CLIENTE);
+  });
   it('ogni modello attivo ha un ruolo esplicito', () => {
     for (const t of MODELLI as { codice: string }[]) expect(RUOLO_MODELLO[t.codice], t.codice).toBeTruthy();
   });

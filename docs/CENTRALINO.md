@@ -1,5 +1,19 @@
 # Centralino (front office) e monitoraggio Direzione
 
+## Centralino semplificato (0095–0097, 24/11/2026) — VALE QUESTO
+Decisione di Hadi dopo una settimana d'uso: pochissimi clic, email solo per le offerte. Le sezioni sotto su coordinatore/tecnico/sopralluogo, Informazione a 3 esiti, trasferimenti e email di riepilogo sono **storiche** (dati e colonne restano).
+| Tipo | Cosa fa Jennifer | Clic dopo il modulo |
+|---|---|---|
+| Offerta · Gestita da Jennifer | «Salva e apri email» → Apri in Outlook (presa in carico «riceverete il preventivo entro 60 minuti», `presa_offerta_piccola`; senza email cliente: «Avvisato per telefono») → più tardi Apri in Outlook offerta (`invio_offerta`) → chiusa. L'offerta richiede l'email del cliente (requisito `email_inviata`). | 2 |
+| Offerta · Passa al Tecnico Commerciale | Commerciale dai Referenti → «Apri in Outlook e chiudi» (`riepilogo_commerciale`: nome, codice, contatto, telefono, email, indirizzo, sede, cosa chiede) o «Avvisato per telefono» → chiusa. **Nessun richiamo 2 ore**, nessuna email al cliente. | 1 |
+| Intervento · Sopralluogo · Modifiche/Disdetta · Informazione | Una schermata: tipo, cliente, nota, «Passata a» (facoltativo, Referenti), urgenza solo per Intervento (default Ordinario). **Salva e chiudi** (Ctrl+Invio) o **Salva da seguire** (Ctrl+Maiusc+Invio) → poi un solo «Chiudi» (`centralino_chiudi_semplice`, tasto A). Nessuna email, nessun SLA; promemoria leggero «da più di 24 ore». | 0 / 1 |
+- Flussi (`pratiche_flussi`): non-offerte = `ricevuta → chiusa` senza SLA; `offerta_piccola` = ricevuta → conferma (10 min) → offerta (60 min); `offerta_grande` = ricevuta → riepilogo (15 min). Pratiche vecchie rimaste su passi tolti: pulsante «Chiudi».
+- `centralino_crea`: `chiudi` (solo non-offerte), `assegnato_nome` = «Passata a», urgenza solo manutenzione; `centralino_passa_commerciale` senza richiamo; cron SLA solo offerte.
+- Modelli attivi: `presa_offerta_piccola`, `invio_offerta`, `riepilogo_commerciale` (+ `preventivo_tmq` del canale Tablet TMQ); gli altri `attivo=false`.
+- Tolti dall'interfaccia: passi Avanza per non-offerte, esiti Informazione, finestre email per non-offerte, «Per un responsabile», menu Trasferimenti (la pagina resta per lo storico), sezioni Servizio/Trasferimenti della Direzione.
+- Direzione e Report Direzione (`privato.report_sez_centralino`, 0097): contatti per tipo/canale, offerte Jennifer vs Commerciale, % offerte inviate entro 60 min, da seguire aperte (KPI `da_seguire`).
+- Prove: `supabase/prove/semplice_prove.sql` (atteso `PROVE SEMPLICE OK`).
+
 Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0053` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte al Tecnico Commerciale).
 
 ## Struttura (rifacimento)

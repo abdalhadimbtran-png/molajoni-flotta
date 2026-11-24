@@ -4,17 +4,15 @@ import { toast } from '../ui';
 import { testoCella, type Col, type Report, type Riga } from '../admin/report/catalogo';
 import { datiPeriodo } from '../centralino/Direzione';
 import { kpi, valuta, type Dataset } from '../lib/centralino/registro';
-import { intervallo, perCommerciale, precedente, primaRisposta, valore, variazione } from '../lib/direzione/analisi';
-import { durata } from '../lib/centralino/kpi';
+import { intervallo, precedente, valore, variazione } from '../lib/direzione/analisi';
 import { fmtEuro } from '../lib/format';
 import { FONTE } from './comuni';
 
 const VOCI: [string, string[]][] = [
-  ['Volumi', ['pratiche', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'urgenti', 'reg_info']],
-  ['Servizio', ['sla', 'cliente1h', 'interventi1h', 'sopralluoghi1h', 'urgenti_giornata', 'sla_mancati', 'in_ritardo']],
-  ['Offerte', ['off_piccole', 'offerte60', 'off_piccole_inviate', 'off_grandi', 'off_grandi_passate', 'comm_in_tempo', 'comm_scaduti']],
-  ['Trasferimenti', ['trasferite', 'trasf_in_tempo', 'trasf_da_richiamare', 'trasf_scadute', 'trasf_email_ref', 'trasf_email_cli']],
-  ['Qualità', ['qual_email', 'annullate', 'annullate_motivo', 'senza_contatti', 'reg_anagrafica']],
+  ['Volumi', ['pratiche', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_info']],
+  ['Offerte', ['off_piccole', 'offerte60', 'off_piccole_inviate', 'off_grandi', 'off_grandi_passate', 'in_ritardo']],
+  ['Da seguire', ['da_seguire']],
+  ['Qualità', ['annullate', 'annullate_motivo', 'senza_contatti', 'reg_anagrafica']],
 ];
 const COL: Col[] = [
   { k: 'sezione', l: 'Sezione', t: 'testo', w: 14 }, { k: 'voce', l: 'Indicatore', t: 'testo', w: 30 }, { k: 'valore', l: 'Valore', t: 'testo', w: 12 },
@@ -34,13 +32,9 @@ export function righeReport(d: Dataset, p: Dataset, ora = new Date()): Riga[] {
       prec: def.fonte === 'aperte' ? 'situazione attuale' : pr == null ? '—' : pc ? `${pr}%` : String(pr), var: x ? `${x.su ? '▲' : '▼'} ${Math.abs(x.v)}${pc ? ' pt' : '%'}` : '—',
       def: `${def.spiegazione} Fonte: ${FONTE[def.fonte]}.` });
   }
-  const pr = primaRisposta(d.pratiche, d.eventi), prp = primaRisposta(p.pratiche, p.eventi);
-  out.push({ sezione: 'Servizio', voce: 'Prima risposta (media)', valore: durata(pr.media), dettaglio: `${pr.n} pratiche`, prec: durata(prp.media), var: '—', def: 'Minuti medi tra la chiamata e il primo passo fatto.' });
   const vp = (l: Dataset['pratiche'], t: string) => fmtEuro(valore(l.filter(x => x.tipo === t)));
   out.push({ sezione: 'Offerte', voce: 'Valore offerte gestite dal centralino', valore: vp(d.pratiche, 'offerta_piccola'), dettaglio: '', prec: vp(p.pratiche, 'offerta_piccola'), var: '—', def: 'Somma degli importi stimati.' });
   out.push({ sezione: 'Offerte', voce: 'Valore offerte del Tecnico Commerciale', valore: vp(d.pratiche, 'offerta_grande'), dettaglio: '', prec: vp(p.pratiche, 'offerta_grande'), var: '—', def: 'Somma degli importi stimati.' });
-  for (const [n, x] of Object.entries(perCommerciale(d.trasf, ora)))
-    out.push({ sezione: 'Offerte', voce: `Richiami entro 2 ore – ${n}`, valore: x.pct == null ? '—' : `${x.pct}%`, dettaglio: `${x.inTempo} / ${x.val}`, prec: '', var: '—', def: `${x.scaduti} scaduti non richiamati.` });
   return out;
 }
 

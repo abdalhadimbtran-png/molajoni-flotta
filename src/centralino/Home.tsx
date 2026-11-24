@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtOra } from '../lib/format';
 import { Banner, Errore, toast, useLoad } from '../ui';
-import { REGOLA_SQUILLI, SCRIPT_TELEFONO, prossimoStadio, senzaRiepilogo, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
+import { REGOLA_SQUILLI, SCRIPT_TELEFONO, daSeguireVecchia, praticaSemplice, prossimoStadio, senzaRiepilogo, type Pratica, type Trasferimento } from '../lib/centralino/tipi';
 import { giornoRoma, semaforo } from '../lib/centralino/sla';
 import { praticheAperte, useAdesso, useAggiornamento, useConfig } from './comune';
 import { CardPratica, Vuoto, nomeStadio } from './componenti';
@@ -63,9 +63,14 @@ export default function Home() {
   const fl = (t: string) => config.flussi.find(f => f.tipo === t);
   const richiami = daRichiamare(data.tr);
   const senzaEmail = data.tr.filter(t => senzaRiepilogo(t) && !richiami.includes(t));
+  const vecchie = data.aperte.filter(p => daSeguireVecchia(fl(p.tipo), p, ora)).length;
   const feed = [...data.oggiD.eventi].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 14);
 
   async function avanzaUno(p: Pratica) {
+    if (praticaSemplice(fl(p.tipo), p)) {
+      try { await rpc('centralino_chiudi_semplice', { p_id: p.id, p_testo: null }); toast(`${p.numero}: chiusa`); reload(); } catch (e) { toast(testoErrore(e)); }
+      return;
+    }
     const st = prossimoStadio(fl(p.tipo), p);
     if (!st) return;
     if (!avanzaDiretto(st)) { setAvanza(p); return; }
@@ -96,12 +101,12 @@ export default function Home() {
       </header>
 
       <section className="ct-contatori" aria-label="Il mio registro di oggi">
-        {['reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_tablet', 'reg_wa_offerte', 'reg_cliente', 'reg_anagrafica', 'trasferite', 'reg_chiuse'].map(id => <Tessera key={id} id={id} d={data.oggiD} da={data.g} a={data.g} />)}
+        {['reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_tablet', 'reg_wa_offerte', 'reg_cliente', 'reg_anagrafica', 'reg_chiuse'].map(id => <Tessera key={id} id={id} d={data.oggiD} da={data.g} a={data.g} />)}
       </section>
 
       <div className="ct-plancia">
         <section className="ct-blocco ct-coda" aria-label="Adesso" ref={lista}>
-          <div className="ct-blocco-h"><h2>Adesso <span className="ct-n">{coda.length}</span><span className="k-hint"><kbd>J</kbd><kbd>K</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>A</kbd> avanza</span></h2>
+          <div className="ct-blocco-h"><h2>Adesso <span className="ct-n">{coda.length}</span><span className="k-hint"><kbd>J</kbd><kbd>K</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>A</kbd> email / chiudi</span></h2>
             <div className="segmented" role="group" aria-label="Filtro">
               {([['tutte', 'Tutte'], ['rosse', 'In ritardo'], ['oggi', 'Scadono oggi']] as const).map(([v, l]) => <button key={v} className={filtro === v ? 'on' : ''} onClick={() => setFiltro(v)}>{l}</button>)}
             </div></div>
@@ -111,11 +116,12 @@ export default function Home() {
         </section>
 
         <aside className="ct-lato">
-          <section className="ct-blocco">
+          {vecchie > 0 && <Banner s="warn">{vecchie === 1 ? '1 pratica da seguire' : `${vecchie} pratiche da seguire`} da più di 24 ore.</Banner>}
+          {richiami.length > 0 && <section className="ct-blocco">
             <div className="ct-blocco-h"><h2>Richiami dovuti <span className={`ct-n ${richiami.length ? 'ko' : ''}`}>{richiami.length}</span></h2><Link to="/centralino/trasferimenti" className="ct-link">tutti</Link></div>
             {richiami.length ? richiami.slice(0, 6).map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRichiamato={ctx.scrive ? richiamato : undefined} onRiepilogo={ctx.scrive ? setRiep : undefined} />)
-              : <Vuoto>Nessun cliente da richiamare.</Vuoto>}
-          </section>
+              : null}
+          </section>}
           {senzaEmail.length > 0 && <section className="ct-blocco">
             <h2>Email da inviare <span className="ct-n ko">{senzaEmail.length}</span></h2>
             {senzaEmail.slice(0, 5).map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} onRiepilogo={ctx.scrive ? setRiep : undefined} />)}

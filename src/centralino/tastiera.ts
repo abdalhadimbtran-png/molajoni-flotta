@@ -17,13 +17,14 @@ export const SCORCIATOIE: { tasti: string[]; testo: string; gruppo: 'Ovunque' | 
   { tasti: ['Esc'], testo: 'Chiudi finestra / indietro', gruppo: 'Ovunque' },
   { tasti: ['J', 'K'], testo: 'Riga successiva / precedente (anche ↓ ↑)', gruppo: 'Elenchi' },
   { tasti: ['Invio'], testo: 'Apri la riga evidenziata', gruppo: 'Elenchi' },
-  { tasti: ['A'], testo: 'Prossimo passo della pratica', gruppo: 'Elenchi' },
+  { tasti: ['A'], testo: 'Offerta: prossima email · altre pratiche: Chiudi', gruppo: 'Elenchi' },
   { tasti: ['↑', '↓'], testo: 'Sposta nella scelta (anche ← →)', gruppo: 'Moduli' },
   { tasti: ['Invio'], testo: 'Scegli e passa al gruppo dopo · nel passo: Avanti', gruppo: 'Moduli' },
   { tasti: ['1–9'], testo: 'Scegli la n-esima voce', gruppo: 'Moduli' },
   { tasti: ['Tab'], testo: 'Gruppo / campo successivo (Maiusc+Tab indietro)', gruppo: 'Moduli' },
-  { tasti: ['Ctrl', 'Invio'], testo: 'Salva il nuovo contatto', gruppo: 'Moduli' },
-  { tasti: ['T'], testo: 'Nelle email: «Avvisato per telefono» (passo fatto senza email)', gruppo: 'Moduli' },
+  { tasti: ['Ctrl', 'Invio'], testo: 'Nuovo contatto: Salva e chiudi (offerta: salva e apri email)', gruppo: 'Moduli' },
+  { tasti: ['Ctrl', 'Maiusc', 'Invio'], testo: 'Nuovo contatto: Salva da seguire', gruppo: 'Moduli' },
+  { tasti: ['T'], testo: '«Avvisato per telefono»: solo presa in carico offerta ed email al commerciale', gruppo: 'Moduli' },
 ];
 
 /** Tasto T (senza modificatori, non mentre si scrive): «Avvisato per telefono». */

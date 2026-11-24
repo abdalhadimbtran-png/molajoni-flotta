@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { fmtOra } from '../lib/format';
 import { conto, orologio, semaforo, testoRegola } from '../lib/centralino/sla';
 import { useAdesso, useConfig } from './comune';
-import { ESITI, FASCE, NOME_TIPO, STATI_CLIENTE, nomeCanale, prossimoStadio, stadioDi, type Evento, type Flusso, type Pratica } from '../lib/centralino/tipi';
+import { ESITI, FASCE, NOME_TIPO, STATI_CLIENTE, nomeCanale, prossimoStadio, stadioDi, type Evento, type Flusso, type Pratica, praticaSemplice, daSeguireVecchia } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 
 /** Icone del centralino (canali e tipi di richiesta), tratto 1.75. */
@@ -74,6 +74,8 @@ export const nomeStadio = (f: Flusso | undefined, k: string | null) => stadioDi(
 
 export function CardPratica({ p, f, ora, base, onAvanza, soglia }: { p: Pratica; f?: Flusso; ora: Date; base: string; onAvanza?: (p: Pratica) => void; soglia?: number }) {
   const prossimo = prossimoStadio(f, p);
+  const semplice = praticaSemplice(f, p);
+  const vecchia = daSeguireVecchia(f, p, ora);
   const urg = p.priorita === 'urgente';
   return (
     <div className={`ct-card ${urg ? 'urgente' : ''} sla-${p.esito === 'aperta' ? semaforo(p.created_at, p.sla_scadenza, ora, soglia) : 'chiusa'}`}>
@@ -85,13 +87,15 @@ export function CardPratica({ p, f, ora, base, onAvanza, soglia }: { p: Pratica;
             <span className="ct-num">{p.numero}</span> · {NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''}<ChiBadge t={p.tipo_contatto} soloNonClienti />{(p.tipo_contatto ?? 'cliente') === 'cliente' && p.stato_cliente ? <span className={`ct-mini ${p.stato_cliente}`}>{STATI_CLIENTE[p.stato_cliente][1]}</span> : null}
           </span>
           <span className="ct-card-meta">
-            <span className="ct-stadio">{nomeStadio(f, p.stato_corrente)}</span>
+            <span className="ct-stadio">{semplice && p.esito === 'aperta' ? `Da seguire${p.assegnato_nome ? ` · ${p.assegnato_nome}` : ''}` : nomeStadio(f, p.stato_corrente)}</span>{vecchia && <span className="pill warn">da più di 24 ore</span>}
             {p.appuntamento_data && <span>{dataLunga(p.appuntamento_data).replace(/\/\d{4}$/, '')} · {p.appuntamento_fascia}</span>}
             {p.esito !== 'aperta' && <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}
           </span>
         </span>
       </Link>
-      {onAvanza && p.esito === 'aperta' && prossimo && (
+      {onAvanza && p.esito === 'aperta' && semplice && (
+        <button className="ct-card-next" data-k-avanza onClick={() => onAvanza(p)} title="Chiudi (tasto A)"><span>Chiudi</span></button>)}
+      {onAvanza && p.esito === 'aperta' && !semplice && prossimo && (
         <button className="ct-card-next" data-k-avanza onClick={() => onAvanza(p)} title={`Avanza a «${prossimo.nome}» (tasto A)`}>
           <span className="sub">Prossimo</span><span>{prossimo.nome} →</span>
         </button>)}

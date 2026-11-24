@@ -3,7 +3,7 @@ import type { RegolaSla } from './sla';
 export type Canale = 'telefono' | 'whatsapp' | 'email' | 'collega' | 'tablet_tmq' | 'altro';
 export type Esito = 'aperta' | 'chiusa_ok' | 'chiusa_ko' | 'annullata';
 export type TipoPratica = 'manutenzione' | 'sopralluogo' | 'offerta_piccola' | 'offerta_grande' | 'modifica' | 'amministrazione' | 'fornitori' | 'informazione' | 'trasferta' | 'abbigliamento' | 'offerta_tablet';
-export type Requisito = 'appuntamento' | 'email' | 'taylor' | 'commerciale' | 'destinatario' | 'urgenza' | 'coordinatore' | 'tecnico' | 'buono' | 'avviso' | 'informato' | 'esito_info';
+export type Requisito = 'appuntamento' | 'email' | 'taylor' | 'commerciale' | 'destinatario' | 'urgenza' | 'coordinatore' | 'tecnico' | 'buono' | 'avviso' | 'informato' | 'esito_info' | 'email_inviata';
 
 export interface Stadio { key: string; nome: string; sla?: RegolaSla; azione?: 'appuntamento' | 'taylor' | 'esito'; template?: string; requisiti?: Requisito[];
   /** email facoltativa aggiuntiva (es. conferma al chiamante) */ template_extra?: string; extra_etichetta?: string; /** «informazione»: si può non girare (risposta data dal centralino) */ girata_facoltativa?: boolean; /** «informazione» (0083): passo con 3 esiti */ esito_info?: boolean }
@@ -109,6 +109,11 @@ export const REGOLA_SQUILLI = 'Rispondi entro 3 squilli.';
 
 export const stadioDi = (f: Flusso | undefined, key: string | null) => f?.stadi.find(s => s.key === key);
 export const indiceStadio = (f: Flusso | undefined, key: string | null) => f ? f.stadi.findIndex(s => s.key === key) : -1;
+/** 0095: pratica senza passi (non offerta, o rimasta su un passo tolto) → si chiude con «Chiudi». */
+export const praticaSemplice = (f: Flusso | undefined, p: Pick<Pratica, 'tipo' | 'stato_corrente'>) => !p.tipo.startsWith('offerta') || !f?.stadi.some(s => s.key === p.stato_corrente);
+/** «Da seguire» da più di 24 ore (promemoria leggero). */
+export const daSeguireVecchia = (f: Flusso | undefined, p: Pick<Pratica, 'tipo' | 'stato_corrente' | 'esito' | 'created_at'>, ora = new Date()) =>
+  p.esito === 'aperta' && praticaSemplice(f, p) && ora.getTime() - new Date(p.created_at).getTime() > 24 * 3600e3;
 /** Prossimo stadio dopo quello attuale (null se ultimo). */
 export const prossimoStadio = (f: Flusso | undefined, p: Pratica) => {
   const i = indiceStadio(f, p.stato_corrente);

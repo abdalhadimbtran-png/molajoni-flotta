@@ -57,7 +57,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const [stato, setStato] = useState<StatoCliente | null>(null);
   const [statoMan, setStatoMan] = useState(false);
   const statoChiave = useRef<string | null>(null);
-  const [trasf, setTrasf] = useState(false);
+  const [passata, setPassata] = useState('');
   const qRef = useRef<HTMLInputElement>(null);
   const chiRef = useRef<HTMLDivElement>(null);
   const [nuovoForn, setNuovoForn] = useState(false);
@@ -94,7 +94,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
       if (typeof b.sede === 'string') setSede(b.sede);
       if (b.f) setF(x => ({ ...x, ...(b.f as typeof x) }));
       if (typeof b.tacit === 'boolean') setTacit(b.tacit);
-      if (typeof b.trasf === 'boolean') setTrasf(b.trasf);
+      if (typeof b.passata === 'string') setPassata(b.passata);
       setRipristinata(true);
       window.setTimeout(() => { if (typeof b.urgenza === 'string') setUrgenza(b.urgenza as '' | 'urgente' | 'ordinario'); }, 0);
     }
@@ -103,12 +103,12 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const piena = !!(richiesta || q.trim() || importo || Object.values(f).some(v => v.trim()));
   useEffect(() => {
     if (!uid || !pronta) return;
-    scriviBozza(uid, piena ? { canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza, stato, statoMan, contattoId } : null);
-  }, [uid, pronta, piena, canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, trasf, urgenza, stato, statoMan, contattoId]);
+    scriviBozza(uid, piena ? { canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, passata, urgenza, stato, statoMan, contattoId } : null);
+  }, [uid, pronta, piena, canale, richiesta, sottotipo, gestione, importo, q, cli, sede, f, tacit, passata, urgenza, stato, statoMan, contattoId]);
   function svuota() {
     if (uid) scriviBozza(uid, null);
     setCanale('telefono'); setRichiesta(null); setSottotipo(''); setGestione(null); setImporto(''); setQ(''); setCli(null); setSede(''); setSedi([]); setContatti([]); setContattoId(null);
-    setF({ contatto_nome: '', telefono: '', email: '', indirizzo: '', cap: '', comune: '', descrizione: '', commerciale: '' }); setTacit(false); setTrasf(false); setRipristinata(false);
+    setF({ contatto_nome: '', telefono: '', email: '', indirizzo: '', cap: '', comune: '', descrizione: '', commerciale: '' }); setTacit(false); setPassata(''); setRipristinata(false);
   }
   function annulla() {
     if (piena && !confAnnulla) { setConfAnnulla(true); return; }
@@ -131,7 +131,9 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const disponibili = comms.filter(c => c.disponibile);
   const nessunoEff = nessuno || (comms.length > 0 && !disponibili.length);
 
-  const conUrgenza = tipo === 'manutenzione' || tipo === 'sopralluogo';
+  const conUrgenza = tipo === 'manutenzione';
+  const offerta = !!tipo && tipo.startsWith('offerta');
+  const referenti = config?.impostazioni.destinatari_trasferimento ?? [];
   const urgente = urgenza === 'urgente';
   // urgenza proposta dal sottotipo (allarme sonoro → urgente)
   useEffect(() => { if (!conUrgenza) { setUrgenza(''); return; } if (allarme || (sottotipo && flusso?.sottotipi_urgenti.includes(sottotipo))) setUrgenza('urgente'); else setUrgenza('ordinario'); }, [sottotipo, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -213,7 +215,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
     return l;
   }, [tipo, gestione, richiesta, canale, q, f.telefono, urgenza, conUrgenza, f.commerciale]);
 
-  async function salva(e?: FormEvent) {
+  async function salva(e?: FormEvent, chiudi = true) {
     e?.preventDefault(); setErr(null);
     if (manca.length) { setErr(`Manca: ${manca.join(', ')}.`); return; }
     setInvio(true);
@@ -222,7 +224,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         canale, tipo, gestione: tipo === 'offerta_grande' ? 'commerciale' : tipo === 'offerta_piccola' ? 'centralino' : null, sottotipo: sottotipo || null, priorita: urgente ? 'urgente' : 'normale', urgenza: conUrgenza ? urgenza : null,
         cliente_codice: cli?.codice ?? null, cliente_nome: q.trim(), sede: sede || null,
         contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, indirizzo: f.indirizzo, cap: f.cap, comune: f.comune, descrizione: f.descrizione,
-        importo_stimato: richiesta === 'offerta' && importo ? Number(importo) : null,
+        importo_stimato: null, chiudi: !offerta && chiudi, assegnato_nome: !offerta && passata ? passata : null,
         appuntamento_data: null, appuntamento_fascia: null, tacitazione_tentata: tacit,
         commerciale_nome: tipo === 'offerta_grande' ? f.commerciale || null : null, nessuno_disponibile: tipo === 'offerta_grande' && nessunoEff,
         stato_cliente: cliente_ && (statoMan || cli) ? stato : null,
@@ -231,14 +233,15 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
       if (cliente_ && cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
       if (uid) scriviBozza(uid, null);
       if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
-      // passata al Tecnico Commerciale: subito il passo «email al cliente» (richiamo 2 ore per il commerciale già creato)
-      onCreata(r.id, tipo === 'offerta_grande' ? 'avanza=1' : conUrgenza ? 'avanza=1' : trasf ? 'trasferisci=1' : '');
+      // offerte: si apre subito l'email (presa in carico / riepilogo al commerciale); altri tipi: salvata e chiusa o da seguire
+      if (!offerta) toast(chiudi ? 'Salvata e chiusa' : 'Salvata: da seguire');
+      onCreata(r.id, offerta ? 'avanza=1' : chiudi ? 'chiusa' : '');
     } catch (x) { setErr(testoErrore(x)); setInvio(false); }
   }
 
   return (
     <Modal titolo="Nuovo contatto" onClose={onClose} bloccaFuori>
-      <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(); } }}>
+      <form className="ct-nuovo" onSubmit={salva} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!invio) salva(undefined, !e.shiftKey); } }}>
         {ripristinata && <p className="ct-bozza">Bozza ripristinata · <button type="button" className="ct-link" onClick={svuota}>Svuota</button></p>}
         {(canale === 'telefono' || canale === 'whatsapp') && <p className="ct-script">{canale === 'telefono' ? `${REGOLA_SQUILLI} ` : ''}«{SCRIPT_TELEFONO}»</p>}
 
@@ -287,8 +290,6 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
                   <span className="ct-ico"><Ic n={v === 'centralino' ? 'offerta' : 'collega'} size={20} /></span><span className="ct-big-t" title={d}><b>{l}</b></span>
                   <span className="k-n" aria-hidden>{i + 1}</span><span className="ct-check" aria-hidden /></button>))}
             </div>
-            <div className="field ct-importo"><label htmlFor="ct-imp">Importo</label>
-              <input id="ct-imp" inputMode="decimal" value={importo} onChange={e => setImporto(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="€" /></div>
           </div>)}
         {tipo === 'offerta_grande' && (
           <div className="ct-allarme ct-grande">
@@ -341,7 +342,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
             <div className="field"><label htmlFor="ct-em">Email</label><input id="ct-em" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
           </div>
           {cliente_ && cambiato && <label className="check ct-agg-rub"><input type="checkbox" checked={aggiornaRubrica} onChange={e => setAggiornaRubrica(e.target.checked)} /> Aggiorna in anagrafica</label>}
-          {!sede && (tipo === 'manutenzione' || tipo === 'sopralluogo') && (
+          {!sede && tipo !== 'informazione' && tipo !== 'modifica' && (
             <div className="ct-griglia">
               <div className="field"><label htmlFor="ct-ind">Indirizzo</label><input id="ct-ind" value={f.indirizzo} onChange={e => setF({ ...f, indirizzo: e.target.value })} /></div>
               <div className="field"><label htmlFor="ct-cap">CAP</label><input id="ct-cap" inputMode="numeric" maxLength={5} value={f.cap} onChange={e => setF({ ...f, cap: e.target.value.replace(/\D/g, '') })} /></div>
@@ -359,15 +360,23 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
         <div className="ct-sez"><span className="ct-sez-n">4</span><b>Nota</b></div>
         <textarea rows={3} value={f.descrizione} onChange={e => setF({ ...f, descrizione: e.target.value })} placeholder="In breve" aria-label="Nota" />
 
+        {tipo && !offerta && (
+          <div className="field"><label htmlFor="ct-pass">Passata a</label>
+            <select id="ct-pass" value={passata} onChange={e => setPassata(e.target.value)}>
+              <option value="">— nessuno —</option>
+              {referenti.map(d => <option key={d.nome} value={d.nome}>{d.nome}{d.ruolo ? ` · ${d.ruolo}` : ''}</option>)}
+            </select></div>)}
+        {tipo === 'offerta_piccola' && !f.email.trim() && <p className="hint">Senza email: presa in carico per telefono; l'offerta si invia solo per email.</p>}
         <Appunti chiave="bozza" righe={4} onTesto={setAppunti} />
-        {tipo !== 'offerta_grande' && <label className="check ct-trasf-form"><input type="checkbox" checked={trasf} onChange={e => setTrasf(e.target.checked)} /> Per un responsabile</label>}
         {err && <Banner s="ko">{err}</Banner>}
         <div className="ct-salva">
           <div className="sub">
             {scad && <>Scadenza <b>{testoResiduo(scad)}</b> </>}
             {urgente && <span className="ct-sla rosso">urgente</span>}
           </div>
-          <div className="row-flex">{confAnnulla && <span className="ct-conf">Scartare i dati? <button type="button" className="ct-link" onClick={annulla}>Scarta</button> · <button type="button" className="ct-link" onClick={() => setConfAnnulla(false)}>No</button></span>}<button type="button" className="btn-ghost" onClick={annulla}>Annulla</button><button className="btn" disabled={invio}>{invio ? 'Salvo…' : 'Salva'}</button></div>
+          <div className="row-flex">{confAnnulla && <span className="ct-conf">Scartare i dati? <button type="button" className="ct-link" onClick={annulla}>Scarta</button> · <button type="button" className="ct-link" onClick={() => setConfAnnulla(false)}>No</button></span>}<button type="button" className="btn-ghost" onClick={annulla}>Annulla</button>
+            {tipo && !offerta && <button type="button" className="btn-ghost" disabled={invio} onClick={() => salva(undefined, false)} title="Ctrl+Maiusc+Invio">Salva da seguire</button>}
+            <button className="btn" disabled={invio} title="Ctrl+Invio">{invio ? 'Salvo…' : offerta ? 'Salva e apri email' : tipo ? 'Salva e chiudi' : 'Salva'}</button></div>
         </div>
       </form>
     </Modal>

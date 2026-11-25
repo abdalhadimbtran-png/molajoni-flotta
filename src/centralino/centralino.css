@@ -482,3 +482,9 @@ p.k-hint { margin:4px 0 0; }
 @container ctbar (max-width:1160px) { .ct-live-c span { display:none; } .ct-live-c { padding:5px 9px; } }
 @container ctbar (max-width:900px) { .ct-live { display:none; } }
 @container ctbar (max-width:760px) { .ct-nuovo-btn span, .ct-nuovo-btn kbd { display:none; } .ct-cerca { min-width:120px; } }
+
+/* «Registra chiamata» in Oggi: pulsante pieno blu, ben visibile */
+.btn.ct-reg-oggi { display:inline-flex; align-items:center; gap:8px; background:var(--info); color:#fff; border:none; padding:10px 16px; border-radius:var(--r-pill); font-weight:600; box-shadow:0 2px 8px rgba(var(--info-rgb) / .28); white-space:nowrap; }
+.btn.ct-reg-oggi:hover { filter:brightness(1.08); }
+.btn.ct-reg-oggi:focus-visible { outline:3px solid rgba(var(--info-rgb) / .35); outline-offset:2px; }
+.btn.ct-reg-oggi kbd { background:rgba(255,255,255,.2); border-color:rgba(255,255,255,.35); color:#fff; }

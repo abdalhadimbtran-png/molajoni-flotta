@@ -87,7 +87,7 @@
 .dz-digest { display: inline-flex; gap: 8px; align-items: center; font-size: var(--t-s); color: var(--ink-2); cursor: pointer; }
 .dz-digest.off { color: var(--ink-3); cursor: default; font-size: var(--t-xs); }
 
-/* Legenda tipi di richiesta (Direzione › Offerte e centralino) */
+/* Legenda tipi di richiesta (Direzione › Centralino e offerte) */
 .dz2-legenda { margin: 0 0 16px; }
 .dz2-legenda summary { cursor: pointer; }
 .dz2-legenda dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 20px; margin: 8px 0 0; }

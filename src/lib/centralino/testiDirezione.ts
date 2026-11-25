@@ -35,7 +35,7 @@ export const MOTIVI_AR: Record<Motivo, string> = {
 
 /** Pagina Direzione. */
 export const DIR = {
-  titolo: { it: 'Offerte e centralino', ar: 'العروض والسنترال' },
+  titolo: { it: 'Centralino e offerte', ar: 'العروض والسنترال' },
   sottotitolo: { it: 'Sola lettura. Dati aggiornati in tempo reale.', ar: 'للقراءة فقط. البيانات محدثة مباشرة' },
   periodo: { it: 'Periodo', ar: 'الفترة' },
   sez_offerte: { it: 'Offerte', def: 'Dalla richiesta del cliente all\'invio dell\'offerta, poi la risposta del cliente.', ar: 'العروض: من طلب الزبون حتى إرسال العرض ثم رد الزبون' },

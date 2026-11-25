@@ -78,7 +78,7 @@ begin
   if n_rit > 0 then att := att || jsonb_build_array(jsonb_build_object('testo', n_rit || ' offerte inviate in ritardo', 'livello', 'medio')); end if;
   if n_non > 0 then att := att || jsonb_build_array(jsonb_build_object('testo', n_non || ' offerte non accettate: vedi elenco con il motivo', 'livello', 'medio')); end if;
 
-  return jsonb_build_object('codice', 'centralino', 'titolo', 'Offerte e centralino',
+  return jsonb_build_object('codice', 'centralino', 'titolo', 'Centralino e offerte',
     'kpi', jsonb_build_array(
       jsonb_build_object('label', 'Offerte arrivate', 'valore', n_arr),
       jsonb_build_object('label', 'Inviate in tempo', 'valore', case when n_arr = 0 then null else round(100.0 * n_tempo / n_arr) end, 'unita', '%'),

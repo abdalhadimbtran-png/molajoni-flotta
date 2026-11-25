@@ -1,3 +1,4 @@
+import { perInput } from './OfferteComuni';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { rpc, supabase, testoErrore } from '../lib/supabase';
 import { Banner, Modal, toast } from '../ui';
@@ -35,6 +36,8 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
   const chi = 'cliente' as TipoContatto; // il centralino gestisce solo clienti
   const [canale, setCanale] = useState<Canale>('telefono');
   const [richiesta, setRichiesta] = useState<TipoPratica | 'offerta' | null>(null);
+  // «Arrivata il» dell'offerta (es. email ricevuta ieri): vuoto = adesso
+  const [arrivata, setArrivata] = useState('');
   const [sottotipo, setSottotipo] = useState('');
   const [gestione, setGestione] = useState<'centralino' | 'commerciale' | null>(null);
   const [importo, setImporto] = useState('');
@@ -235,6 +238,7 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
       } });
       if (!cliente_) await rpc('centralino_tipo_contatto', { p_pratica_id: r.id, p_trasf_id: null, p_tipo: chi });
       if (cliente_ && cambiato && aggiornaRubrica && scelto) await rpc('centralino_salva_contatto', { p: { id: scelto.id, contatto_nome: f.contatto_nome, telefono: f.telefono, email: f.email, motivo: 'Aggiornato durante la chiamata', pratica_id: r.id } }).catch(e => toast(testoErrore(e)));
+      if (offerta && arrivata) await rpc('offerta_aggiorna', { p_id: r.id, p: { arrivata_il: new Date(arrivata).toISOString() } }).catch(e => toast(testoErrore(e)));
       if (uid) scriviBozza(uid, null);
       if (appunti.trim()) { await salvaAppunti(`p:${r.id}`, appunti); await salvaAppunti('bozza', ''); }
       // offerte: si apre subito l'email (presa in carico / riepilogo al commerciale); altri tipi: salvata e chiusa o da seguire
@@ -335,6 +339,9 @@ export default function NuovoContatto({ cliente, onClose, onCreata }: { cliente?
               </select></div>
             <label className="check"><input type="checkbox" checked={nessunoEff} disabled={comms.length > 0 && !disponibili.length} onChange={e => setNessuno(e.target.checked)} /> Nessuno disponibile</label>
           </div>)}
+
+        {offerta && <div className="field of-arrivata"><label htmlFor="ct-arr">Arrivata il <span className="sub">vuoto = adesso</span></label>
+          <input id="ct-arr" type="datetime-local" value={arrivata} max={perInput(new Date())} onChange={e => setArrivata(e.target.value)} /></div>}
 
         <div className="ct-sez"><span className="ct-sez-n">3</span><b>{cliente_ ? 'Cliente' : infoChi.l}</b></div>
         <div className="ct-cliente">

@@ -121,6 +121,7 @@ export default function ShellCentralino() {
   ] : [
     { titolo: 'Lavoro', voci: [
       { to: '/centralino', label: 'Oggi', icona: 'cruscotto', end: true },
+      { to: '/centralino/offerte', label: 'Offerte', icona: 'report' },
       { to: '/centralino/nuovo', label: 'Nuovo contatto', icona: 'attivita' },
       { to: '/centralino/pratiche', label: 'Pratiche', icona: 'pratiche' },
       { to: '/centralino/clienti', label: 'Clienti', icona: 'tecnici' }] },

@@ -15,6 +15,9 @@ import { bip, suonoAttivo, useCtx } from './ShellCentralino';
 import { datiPeriodo } from './Direzione';
 import { Cifra, Tessera } from './Tessera';
 import { Scheletro } from './Scheletro';
+import { caricaOfferte } from './OfferteComuni';
+import { aggiornamentoObbligatorio, daAggiornareOggi } from '../lib/centralino/offerte';
+import { JEN } from '../lib/centralino/testiDirezione';
 
 const PESO: Record<string, number> = { rosso: 0, arancio: 1, verde: 2, nessuno: 3 };
 const ETICHETTA_EV: Record<string, string> = { creata: 'ha aperto', stato: 'è passata a', email_inviata: 'email', chiamata: 'chiamata', nota: 'nota', assegnata: 'assegnata', appuntamento: 'appuntamento', allegato: 'allegato', sla_scaduto: 'SLA scaduto', chiusa: 'chiusa', modifica: 'dati modificati' };
@@ -27,11 +30,12 @@ export default function Home() {
   const { config } = useConfig();
   const { data, errore, reload } = useLoad(async () => {
     const g = giornoRoma(new Date());
-    const [aperte, oggiD, cop, tr] = await Promise.all([
+    const [aperte, oggiD, cop, tr, off] = await Promise.all([
       praticheAperte(), datiPeriodo(g, g),
       rpc<{ assenti: string[]; sostituto: string }>('centralino_copertura', {}).catch(() => null), trasferimenti(new Date(Date.now() - 30 * 864e5).toISOString()),
+      caricaOfferte({ aperte: true }).catch(() => null),
     ]);
-    return { aperte, oggiD, cop, tr, g };
+    return { aperte, oggiD, cop, tr, g, off };
   }, [ctx.versione]);
   const ricarica = useCallback(() => { reload(); }, [reload]);
   useAggiornamento(ricarica);
@@ -64,6 +68,8 @@ export default function Home() {
   const richiami = daRichiamare(data.tr);
   const senzaEmail = data.tr.filter(t => senzaRiepilogo(t) && !richiami.includes(t));
   const vecchie = data.aperte.filter(p => daSeguireVecchia(fl(p.tipo), p, ora)).length;
+  // offerte da aggiornare oggi: solo se l'impostazione «offerte_aggiornamento_obbligatorio» è accesa (spenta per default)
+  const offAgg = aggiornamentoObbligatorio(config.impostazioni as unknown as Record<string, unknown>) ? (data.off ?? []).filter(o => daAggiornareOggi(o, ora)).length : 0;
   const feed = [...data.oggiD.eventi].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 14);
 
   async function avanzaUno(p: Pratica) {
@@ -100,6 +106,8 @@ export default function Home() {
             <span className="ct-info-n">oggi <Cifra id="reg_info" d={data.oggiD} da={data.g} a={data.g} /></span></div>
         </div>}
       </header>
+
+      {offAgg > 0 && <Link to="/centralino/offerte" className="of-allarme of-link"><b>{offAgg}</b> {JEN.banner_oggi.it} →</Link>}
 
       <section className="ct-contatori" aria-label="Il mio registro di oggi">
         {['reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_tablet', 'reg_wa_offerte', 'reg_cliente', 'reg_anagrafica', 'reg_chiuse'].map(id => <Tessera key={id} id={id} d={data.oggiD} da={data.g} a={data.g} />)}

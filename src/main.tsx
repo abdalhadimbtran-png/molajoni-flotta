@@ -58,6 +58,7 @@ import ArchivioFormazione from './formazione/Archivio';
 import ShellCentralino from './centralino/ShellCentralino';
 import HomeCentralino from './centralino/Home';
 import PraticheCentralino from './centralino/Pratiche';
+import OfferteCentralino from './centralino/Offerte';
 import ModelliCentralino from './centralino/Modelli';
 import ImpostazioniCentralino from './centralino/Impostazioni';
 import ReportCentralino from './centralino/Report';
@@ -120,6 +121,7 @@ function App() {
         </Route>
         <Route element={<ShellCentralino />}>
           <Route path="/centralino" element={<HomeCentralino />} />
+          <Route path="/centralino/offerte" element={<OfferteCentralino />} />
           <Route path="/centralino/pratiche" element={<PraticheCentralino />} />
           <Route path="/centralino/pratica/:id" element={<PraticheCentralino />} />
           <Route path="/centralino/trasferimenti" element={<Trasferimenti />} />

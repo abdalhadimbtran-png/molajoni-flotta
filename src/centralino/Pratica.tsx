@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
+import { SchedaOfferta } from './OfferteComuni';
 import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui';
 import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, RUOLI_DISMESSI, STATI_CLIENTE, campiCambiati, conTecnicoScelto, eCliente, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento, type Commerciale } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
@@ -150,6 +151,7 @@ export default function Pratica() {
           <Timeline eventi={data.eventi} f={f} onApri={apri} />
         </section>
         <aside>
+          {p.tipo.startsWith('offerta') && <SchedaOfferta praticaId={p.id} scrive={ctx.scrive} versione={ctx.versione} />}
           {ctx.scrive && <section className="ct-blocco"><Appunti chiave={`p:${p.id}`} /></section>}
           <section className="ct-blocco ct-dati">
             <h2>Cliente</h2>

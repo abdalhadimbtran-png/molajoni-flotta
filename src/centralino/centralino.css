@@ -488,3 +488,79 @@ p.k-hint { margin:4px 0 0; }
 .btn.ct-reg-oggi:hover { filter:brightness(1.08); }
 .btn.ct-reg-oggi:focus-visible { outline:3px solid rgba(var(--info-rgb) / .35); outline-offset:2px; }
 .btn.ct-reg-oggi kbd { background:rgba(255,255,255,.2); border-color:rgba(255,255,255,.35); color:#fff; }
+
+/* ── Offerte (0099): pagina di Jennifer, scheda pratica, Direzione ───────────────────────── */
+.of-pill { display:inline-block; padding:3px 10px; border-radius:var(--r-pill); font-size:var(--t-xs); font-weight:600; line-height:1.4; white-space:nowrap; margin-right:4px; }
+.of-grigio { background:var(--surface-3); color:var(--ink-2); }
+.of-rosso { background:rgba(var(--ko-rgb, 200 40 40) / .14); color:var(--ko); }
+.of-ambra { background:rgba(var(--warn-rgb, 200 130 0) / .16); color:var(--warn, #9a6200); }
+.of-blu { background:rgba(var(--info-rgb) / .14); color:var(--info); }
+.of-verde { background:rgba(var(--ok-rgb, 30 140 70) / .14); color:var(--ok, #1e8c46); }
+.of-arancio { background:rgba(220 110 20 / .15); color:#b45309; }
+.of-scuro { background:var(--ink-2); color:var(--surface); }
+.of-giallo { background:#fff3c4; color:#7a5a00; }
+.of-pag { display:flex; flex-direction:column; gap:var(--sp-3); }
+.of-h { display:flex; justify-content:space-between; align-items:flex-end; gap:var(--sp-3); flex-wrap:wrap; }
+.of-h h1 { margin:0; }
+.of-n { margin-left:6px; background:var(--ko); color:#fff; border-radius:var(--r-pill); padding:0 7px; font-size:var(--t-xs); }
+.of-allarme { display:block; padding:12px 16px; border-radius:var(--r-md); background:#fff3c4; color:#5a4300; font-size:var(--t-s); text-decoration:none; }
+.of-allarme b { font-size:1.2em; }
+.of-chk { font-size:var(--t-s); color:var(--ink-2); display:flex; gap:6px; align-items:center; }
+.of-tab-w { overflow-x:auto; }
+.of-tab, .dz2-tab { width:100%; border-collapse:collapse; font-size:var(--t-s); }
+.of-tab th, .dz2-tab th { text-align:left; font-weight:600; color:var(--ink-2); padding:8px 10px; border-bottom:1px solid var(--line-strong); white-space:nowrap; }
+.of-tab td, .dz2-tab td { padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+.of-riga { cursor:pointer; }
+.of-riga:hover, .of-riga:focus { background:var(--surface-2); outline:none; }
+.of-riga:focus { box-shadow:inset 3px 0 0 var(--info); }
+.of-agg { background:#fffbea; }
+.of-num { display:block; }
+.of-desc, .dz2-desc { max-width:280px; }
+.of-nowrap { white-space:nowrap; }
+.of-az { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+.of-b-ok { background:var(--ok, #1e8c46); }
+.of-form { display:flex; flex-direction:column; gap:12px; min-width:min(460px, 86vw); }
+.of-form label { display:flex; flex-direction:column; gap:4px; font-weight:600; font-size:var(--t-s); }
+.of-form input, .of-form textarea, .of-form select { font-weight:400; }
+.of-motivi { border:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:6px; }
+.of-motivi legend { font-weight:600; font-size:var(--t-s); margin-bottom:6px; }
+.of-scelta { flex-direction:row !important; align-items:center; gap:6px !important; padding:6px 12px; border:1px solid var(--line-strong); border-radius:var(--r-pill); font-weight:500 !important; cursor:pointer; }
+.of-scelta.on { border-color:var(--info); background:rgba(var(--info-rgb) / .1); }
+.of-scelta input { margin:0; }
+.of-rit { background:#fff3c4; padding:8px 10px; border-radius:var(--r-md); }
+.of-form-a { display:flex; justify-content:flex-end; gap:8px; }
+.of-scheda h2 { display:flex; gap:8px; align-items:center; }
+.of-scheda-a { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.of-arrivata { max-width:280px; }
+
+/* Direzione riscritta (25/11): numeri grandi, definizione sempre visibile */
+.dz2 .dz2-sez { margin-top:var(--sp-5); display:flex; flex-direction:column; gap:var(--sp-3); }
+.dz2-sez > header { display:flex; justify-content:space-between; align-items:flex-end; gap:var(--sp-3); flex-wrap:wrap; }
+.dz2-sez h2 { font-size:1.6rem; margin:0; }
+.dz2-lbl { font-weight:600; }
+.dz2-def { margin:4px 0 0; font-size:0.95rem; line-height:1.4; color:var(--ink-2); white-space:normal; overflow:visible; }
+.dz2-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:var(--sp-3); }
+.dz2-num { background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px; border-top:4px solid var(--line-strong); }
+.dz2-num.ok { border-top-color:var(--ok, #1e8c46); }
+.dz2-num.ko { border-top-color:var(--ko); }
+.dz2-num.warn { border-top-color:var(--warn, #c98a00); }
+.dz2-num-l { font-size:1.1rem; font-weight:700; color:var(--ink); }
+.dz2-num-v { font-size:2.6rem; font-weight:700; line-height:1.1; margin-top:4px; font-variant-numeric:tabular-nums; }
+.dz2-num-p { font-size:1.3rem; color:var(--ink-2); margin-left:10px; font-weight:600; }
+.dz2-num-x { font-size:0.95rem; color:var(--ink-2); margin-top:2px; }
+.dz2-g { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:var(--sp-3); }
+.dz2-larga { grid-column:1 / -1; }
+.dz2-card h3 { font-size:1.15rem; margin:0; }
+.dz2-tab { font-size:1rem; margin-top:8px; }
+.dz2-tab .num { text-align:right; white-space:nowrap; }
+.dz2-tab-h { display:flex; justify-content:space-between; gap:var(--sp-3); flex-wrap:wrap; align-items:flex-end; }
+.dz2-filtri { display:flex; gap:8px; flex-wrap:wrap; }
+.dz2-scroll { overflow-x:auto; }
+.dz2-tutte tbody tr:hover, .dz2-tutte tbody tr:focus { background:var(--surface-2); outline:none; }
+.dz2-barre { list-style:none; padding:0; margin:10px 0 0; display:flex; flex-direction:column; gap:8px; }
+.dz2-barre li { display:grid; grid-template-columns:minmax(110px, 40%) 1fr auto; gap:10px; align-items:center; font-size:1rem; }
+.dz2-bl { overflow-wrap:anywhere; }
+.dz2-bt { height:10px; background:var(--surface-3); border-radius:var(--r-pill); overflow:hidden; }
+.dz2-bt i { display:block; height:100%; background:var(--chart-1, var(--info)); }
+.dz2-k2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) { .dz2-num-v { font-size:2.1rem; } .dz2-k2 { grid-template-columns:1fr; } }

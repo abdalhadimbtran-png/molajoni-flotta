@@ -8,7 +8,11 @@ import { useAggiornamento, useConfig } from '../centralino/comune';
 import { Scheletro } from '../centralino/Scheletro';
 import { piuGiorni } from '../lib/direzione/analisi';
 import { giornoRoma } from '../lib/centralino/sla';
-import { BASE, Kpi, Sezione, oggiRoma } from './comuni';
+import { BASE, Sezione, oggiRoma } from './comuni';
+import { Numero } from './Centralino';
+import { caricaOfferte } from '../centralino/OfferteComuni';
+import { kpiOfferte } from '../lib/centralino/offerte';
+import { DIR, KPI_OFFERTE } from '../lib/centralino/testiDirezione';
 import { Feed } from './Feed';
 
 /** /direzione: la giornata a colpo d'occhio. Dati degli ultimi 30 giorni (per i richiami ancora aperti), numeri del giorno con filtro «giorno». */
@@ -16,26 +20,27 @@ export default function Panoramica() {
   const ctx = useCtx();
   const { config } = useConfig();
   const oggi = oggiRoma(), da = piuGiorni(oggi, -29);
-  const { data, errore, reload } = useLoad(() => datiPeriodo(da, oggi), [da, oggi, ctx.versione]);
+  const { data: tutto, errore, reload } = useLoad(async () => { const [d, off] = await Promise.all([datiPeriodo(da, oggi), caricaOfferte({ aperte: true }).catch(() => null)]); return { d, off }; }, [da, oggi, ctx.versione]);
+  const data = tutto?.d;
   const r = useCallback(() => { reload(); }, [reload]); useAggiornamento(r);
   const eventiOggi = useMemo(() => (data?.eventi ?? []).filter(e => giornoRoma(e.at) === oggi), [data, oggi]);
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data || !config) return <Scheletro tessere={6} righe={8} />;
-  const f = { giorno: oggi };
   const ora = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
   return (
     <div className="dz-pag">
       <div className="page-hero"><div><h1>Panoramica</h1><p className="sub">Oggi, {ora} · sola lettura · si aggiorna da solo</p></div>
-        <Link className="btn" to={BASE}>Analisi del centralino</Link></div>
+        <Link className="btn" to={BASE}>Offerte e centralino</Link></div>
 
-      <Sezione id="oggi" titolo="Centralino oggi" sub="Clic su un numero per l'elenco completo">
-        <div className="kpis dz-kpis">
-          <Kpi id="pratiche" titolo="Contatti oggi" d={data} da={da} a={oggi} f={f} />
-          <Kpi id="aperte" titolo="Pratiche aperte" d={data} da={da} a={oggi} />
-          <Kpi id="in_ritardo" titolo="Scadute" d={data} da={da} a={oggi} rossoSe />
-          <Kpi id="comm_scaduti" d={data} da={da} a={oggi} rossoSe sub="ultimi 30 giorni" />
-          <Kpi id="sla" titolo="SLA rispettati oggi" d={data} da={da} a={oggi} f={f} soglia={80} />
-          <Kpi id="cliente1h" d={data} da={da} a={oggi} f={f} soglia={80} />
+      <Sezione id="oggi" titolo="Oggi" sub="Ogni numero ha sotto la sua spiegazione">
+        <div className="dz2-kpis">
+          <Numero t={DIR.richieste} n={data.pratiche.filter(x => giornoRoma(x.created_at) === oggi).length} extra="oggi" />
+          <Numero t={KPI_OFFERTE.arrivate} n={data.pratiche.filter(x => x.tipo.startsWith('offerta') && giornoRoma(x.created_at) === oggi).length} extra="oggi" />
+          {tutto?.off && (() => { const k = kpiOfferte(tutto.off, new Date()); return <>
+            <Numero t={{ it: 'Offerte ancora da inviare', def: 'Tutte le offerte non ancora inviate al cliente, di qualunque giorno.' }} n={k.da_inviare} liv={k.da_inviare_scadute ? 'warn' : ''}
+              extra={k.da_inviare_scadute ? `${DIR.di_cui.it} ${k.da_inviare_scadute} ${DIR.oltre_scadenza.it}` : undefined} />
+            <Numero t={{ it: 'Offerte in attesa di risposta', def: 'Offerte inviate: il cliente non ha ancora detto sì o no.' }} n={tutto.off.filter(o => o.esito === 'in_attesa').length} />
+          </>; })()}
         </div>
       </Sezione>
 

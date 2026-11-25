@@ -45,7 +45,7 @@ export default function ShellDirezione() {
   const gruppi: Gruppo[] = [
     { titolo: 'Direzione', voci: [
       { to: '/direzione', label: 'Panoramica', icona: 'panoramica', end: true },
-      { to: '/direzione/centralino', label: 'Centralino', icona: 'telefono' }] },
+      { to: '/direzione/centralino', label: 'Offerte e centralino', icona: 'telefono' }] },
     { titolo: 'In arrivo', voci: [
       { to: '/direzione/flotta', label: 'Flotta', icona: 'flotta', disabilitata: P },
       { to: '/direzione/personale', label: 'Personale', icona: 'tecnici', disabilitata: P },

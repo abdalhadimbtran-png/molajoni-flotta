@@ -9,6 +9,7 @@ import { useEffect, type KeyboardEvent as RKE, type RefObject } from 'react';
 /** Scorciatoie mostrate nel riquadro «?» e in docs/CENTRALINO.md. */
 export const SCORCIATOIE: { tasti: string[]; testo: string; gruppo: 'Ovunque' | 'Elenchi' | 'Nuovo contatto' | 'Finestre' }[] = [
   { tasti: ['N'], testo: 'Nuovo contatto', gruppo: 'Ovunque' },
+  { tasti: ['R'], testo: 'Registra chiamata (di prima, già chiusa)', gruppo: 'Ovunque' },
   { tasti: ['/'], testo: 'Cerca pratica', gruppo: 'Ovunque' },
   { tasti: ['G', 'O'], testo: 'Vai a Oggi', gruppo: 'Ovunque' },
   { tasti: ['G', 'P'], testo: 'Vai a Pratiche', gruppo: 'Ovunque' },
@@ -27,6 +28,11 @@ export const SCORCIATOIE: { tasti: string[]; testo: string; gruppo: 'Ovunque' | 
   { tasti: ['Ctrl', 'Invio'], testo: 'Salva e chiudi (offerta: Salva e apri email)', gruppo: 'Nuovo contatto' },
   { tasti: ['Ctrl', 'Maiusc', 'Invio'], testo: 'Salva da seguire', gruppo: 'Nuovo contatto' },
   { tasti: ['Esc'], testo: 'Esce dal campo (la finestra resta aperta: nessun dato perso)', gruppo: 'Nuovo contatto' },
+  { tasti: ['1–4'], testo: 'Registra chiamata: Canale', gruppo: 'Finestre' },
+  { tasti: ['G'], testo: 'Registra chiamata: Gestita da me', gruppo: 'Finestre' },
+  { tasti: ['P'], testo: 'Registra chiamata: Passata a…', gruppo: 'Finestre' },
+  { tasti: ['Ctrl', 'Invio'], testo: 'Registra chiamata: Registra', gruppo: 'Finestre' },
+  { tasti: ['Ctrl', 'Maiusc', 'Invio'], testo: 'Registra chiamata: Registra e nuova (tiene giorno e canale)', gruppo: 'Finestre' },
   { tasti: ['Invio'], testo: 'Passo dell\'offerta: Avanti', gruppo: 'Finestre' },
   { tasti: ['T'], testo: '«Avvisato per telefono» (presa in carico offerta, email al commerciale)', gruppo: 'Finestre' },
 ];

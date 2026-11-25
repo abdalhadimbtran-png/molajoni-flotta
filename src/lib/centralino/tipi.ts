@@ -22,6 +22,7 @@ export interface Pratica {
   esito_offerta: 'accettata' | 'rifiutata' | 'in_attesa' | null; stato_corrente: string; esito: Esito;
   sla_stadio: string | null; sla_scadenza: string | null; sla_rispettato: boolean | null;
   created_by: string | null; created_at: string; updated_at: string; closed_at: string | null;
+  registrata_dopo?: boolean; inserito_il?: string | null;
   stato_cliente: StatoCliente | null; stato_cliente_manuale: boolean; tipo_contatto?: TipoContatto; documento_intervento: string | null;
   urgenza?: 'urgente' | 'ordinario' | null; coordinatore_nome?: string | null; coordinatore_telefonato?: boolean | null;
   tecnico_dipendente_id?: number | null; tecnico_quando?: string | null; tecnico_quando_at?: string | null; whatsapp_tecnico?: boolean | null; avviso_app_at?: string | null;

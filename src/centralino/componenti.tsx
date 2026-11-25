@@ -70,6 +70,8 @@ export function SlaChip({ p, soglia, regola }: { p: Pick<Pratica, 'created_at' |
 export function ChiBadge(_: { t?: string | null; soloNonClienti?: boolean }) {
   return null;
 }
+/** Piccola etichetta per le pratiche inserite con «Registra chiamata». */
+export const TagDopo = ({ p }: { p: { registrata_dopo?: boolean } }) => (p.registrata_dopo ? <span className="pill ct-tag-dopo" title="Inserita dopo con «Registra chiamata»">Registrata dopo</span> : null);
 export const nomeStadio = (f: Flusso | undefined, k: string | null) => stadioDi(f, k)?.nome ?? k ?? '';
 
 export function CardPratica({ p, f, ora, base, onAvanza, soglia }: { p: Pratica; f?: Flusso; ora: Date; base: string; onAvanza?: (p: Pratica) => void; soglia?: number }) {
@@ -89,7 +91,7 @@ export function CardPratica({ p, f, ora, base, onAvanza, soglia }: { p: Pratica;
           <span className="ct-card-meta">
             <span className="ct-stadio">{semplice && p.esito === 'aperta' ? `Da seguire${p.assegnato_nome ? ` · ${p.assegnato_nome}` : ''}` : nomeStadio(f, p.stato_corrente)}</span>{vecchia && <span className="pill warn">da più di 24 ore</span>}
             {p.appuntamento_data && <span>{dataLunga(p.appuntamento_data).replace(/\/\d{4}$/, '')} · {p.appuntamento_fascia}</span>}
-            {p.esito !== 'aperta' && <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}
+            {p.esito !== 'aperta' && <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}<TagDopo p={p} />
           </span>
         </span>
       </Link>

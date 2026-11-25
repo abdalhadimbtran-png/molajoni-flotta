@@ -10,7 +10,7 @@ import { CAMPI_PRATICA, tutteLeRighe, useAdesso, useConfig } from './comune';
 
 /** Righe massime nell'elenco (oltre: restringere il periodo). */
 const MAX_ELENCO = 2000;
-import { ChiBadge, Ic, SlaChip, iconaTipo, nomeStadio, regolaDi } from './componenti';
+import { ChiBadge, Ic, SlaChip, TagDopo, iconaTipo, nomeStadio, regolaDi } from './componenti';
 import { Scheletro } from './Scheletro';
 import DettaglioPratica from './Pratica';
 import { useCtx } from './ShellCentralino';
@@ -72,7 +72,7 @@ export default function Pratiche() {
                 <Link to={`${ctx.base}/pratica/${p.id}`} data-k-apri className={`ct-split-i ${String(p.id) === id ? 'sel' : ''} ${p.priorita === 'urgente' ? 'urgente' : ''}`} aria-current={String(p.id) === id ? 'page' : undefined}>
                   <span className="ct-split-ic"><Ic n={iconaTipo(p.tipo)} size={16} /></span>
                   <span className="ct-split-c">
-                    <span className="ct-split-r1"><b>{p.cliente_nome}</b><ChiBadge t={p.tipo_contatto} soloNonClienti />{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}</span>
+                    <span className="ct-split-r1"><b>{p.cliente_nome}</b><ChiBadge t={p.tipo_contatto} soloNonClienti />{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}<TagDopo p={p} /></span>
                     <span className="sub">{p.numero} · {NOME_TIPO[p.tipo]} · {nomeStadio(fl(p.tipo), p.stato_corrente)} · {fmtOra(p.created_at)}</span>
                   </span>
                 </Link>

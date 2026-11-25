@@ -7,6 +7,7 @@ export interface RecPratica {
   id: number; numero: string; tipo: string; sottotipo: string | null; canale: string; esito: string; esito_offerta: string | null; stato_corrente: string;
   cliente_nome: string; stato_cliente?: string | null; tipo_contatto?: string | null; importo_stimato: number | null; sla_rispettato: boolean | null; sla_scadenza: string | null;
   created_at: string; closed_at: string | null; assegnato_nome?: string | null; telefono?: string | null; urgenza?: string | null;
+  /** registrata dopo con «Registra chiamata» (già chiusa, fuori dai KPI di tempo) */ registrata_dopo?: boolean;
 }
 export interface RecTrasf {
   id: number; pratica_id: number | null; destinatario_nome: string; esito: string; modalita?: string; richiamo_scadenza: string | null; richiamato_at: string | null; at: string; solo_commerciale?: boolean;
@@ -76,6 +77,7 @@ export const KPI: Def[] = [
     num: r => P(r).tipo === 'offerta_grande' && inviata(P(r)), den: r => P(r).tipo === 'offerta_grande' && !annullata(P(r)) },
   { id: 'qual_email', titolo: 'Pratiche con email al cliente', spiegazione: 'Numeratore: pratiche con almeno un\'email inviata dal centralino. Denominatore: pratiche del periodo, annullate escluse.', fonte: 'pratiche',
     num: (r, c) => !annullata(P(r)) && c.email.has(P(r).id), den: r => !annullata(P(r)) },
+  { id: 'registrate_dopo', titolo: 'Registrate dopo', spiegazione: 'Chiamate inserite dopo con «Registra chiamata» (già chiuse, nessuna email). Contano nei volumi per tipo e canale, non nei tempi.', fonte: 'pratiche', num: r => !!P(r).registrata_dopo },
   { id: 'annullate', titolo: 'Annullate', spiegazione: 'Pratiche del periodo annullate.', fonte: 'pratiche', num: r => annullata(P(r)) },
   { id: 'annullate_motivo', titolo: 'Annullate con motivo', spiegazione: 'Numeratore: pratiche annullate con il motivo scritto. Denominatore: pratiche annullate.', fonte: 'pratiche',
     num: (r, c) => annullata(P(r)) && !!c.motivo.get(P(r).id)?.trim(), den: r => annullata(P(r)) },

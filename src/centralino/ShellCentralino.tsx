@@ -24,12 +24,13 @@ export function bip() {
   } catch { /* nessun audio */ }
 }
 import NuovoContatto from './NuovoContatto';
+import RegistraChiamata from './RegistraChiamata';
 import './centralino.css';
 import { impostaOperatore } from '../lib/centralino/preferenze';
 import { idEffettivo } from '../lib/vediCome';
 
 export interface ClientePreset { codice: string | null; nome: string; fonte?: 'taylor' | 'pratiche' }
-export interface CtxCentralino { scrive: boolean; admin?: boolean; base: string; nuovo: (cliente?: ClientePreset) => void; versione: number; aggiorna: () => void }
+export interface CtxCentralino { scrive: boolean; admin?: boolean; base: string; nuovo: (cliente?: ClientePreset) => void; registra?: () => void; versione: number; aggiorna: () => void }
 export const useCtx = () => useOutletContext<CtxCentralino>();
 
 /**
@@ -74,6 +75,7 @@ export default function ShellCentralino() {
   }, [s.sessione, s.centralino, s.direzione]);
   // tastiera globale: N, ?, G poi O/P/C, Esc (fuori dai campi di testo; Esc anche nei campi)
   const [aiuto, setAiuto] = useState(false);
+  const [registra, setRegistra] = useState(false);
   const prec = useRef<{ k: string; t: number } | null>(null);
   const baseK = loc.pathname.startsWith('/direzione') ? '/direzione/centralino' : '/centralino';
   useEffect(() => {
@@ -95,6 +97,7 @@ export default function ShellCentralino() {
       if (e.key === 'g' || e.key === 'G') { prec.current = { k: 'g', t: Date.now() }; return; }
       if (e.key === '?') { e.preventDefault(); setAiuto(true); return; }
       if (scrive && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); setPreset(undefined); setAperto(true); }
+      if (scrive && !direzione && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); setRegistra(true); }
     };
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
   }, [scrive, loc.pathname, baseK]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -129,7 +132,7 @@ export default function ShellCentralino() {
       { to: '/centralino/referenti', label: 'Referenti', icona: 'account' },
       { to: '/centralino/impostazioni', label: 'Impostazioni', icona: 'impostazioni' }] },
   ];
-  const ctx: CtxCentralino = { scrive, admin: s.admin, base, nuovo: c => { setPreset(c); setAperto(true); }, versione, aggiorna: () => setVersione(v => v + 1) };
+  const ctx: CtxCentralino = { scrive, admin: s.admin, base, nuovo: c => { setPreset(c); setAperto(true); }, registra: () => setRegistra(true), versione, aggiorna: () => setVersione(v => v + 1) };
   return (
     <div className="hr-area ct-area">
       <Layout prodotto={direzione ? 'Direzione' : 'Centralino'} gruppi={gruppi} email={s.sessione?.user.email ?? ''}
@@ -137,6 +140,7 @@ export default function ShellCentralino() {
           {!soloTrasf && <StatoLive base={base} versione={versione} />}
           {!soloTrasf && <Ricerca base={base} />}
           {scrive && <button className="btn ct-nuovo-btn" onClick={() => { setPreset(undefined); setAperto(true); }} title="Nuovo contatto (tasto N)"><Ic n="piu" size={18} /><span>Nuovo contatto</span><kbd>N</kbd></button>}
+          {scrive && !direzione && <button className="btn-ghost ct-reg-btn" onClick={() => setRegistra(true)} title="Registra una chiamata di prima (tasto R)"><Ic n="telefono" size={16} /><span>Registra chiamata</span><kbd>R</kbd></button>}
           <button className="btn-ghost btn-sm ct-aiuto-btn" onClick={() => setAiuto(true)} title="Scorciatoie da tastiera (tasto ?)" aria-label="Scorciatoie da tastiera"><kbd>?</kbd></button>
           <Campanella />
         </>}
@@ -147,6 +151,7 @@ export default function ShellCentralino() {
         </>}>
         <Protezione chiave={loc.pathname}><Outlet context={ctx} /></Protezione>
       </Layout>
+      {registra && <RegistraChiamata onClose={() => setRegistra(false)} onFatto={() => { setRegistra(false); setVersione(v => v + 1); }} />}
       {aiuto && <AiutoTastiera onClose={() => setAiuto(false)} />}
       {aperto && <NuovoContatto cliente={preset} onClose={() => setAperto(false)} onCreata={(id, dopo) => { setAperto(false); setVersione(v => v + 1); if (dopo === 'chiusa') nav('/centralino'); else nav(`/centralino/pratica/${id}?nuova=1${dopo ? `&${dopo}` : ''}`); }} />}
     </div>

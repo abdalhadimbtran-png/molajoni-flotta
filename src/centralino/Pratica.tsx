@@ -6,7 +6,7 @@ import { Banner, Caricamento, Errore, Modal, Pill, toast, useLoad } from '../ui'
 import { REGOLA_ANAGRAFICA, ESITI, FASCE, NOME_TIPO, RUOLI_ASSEGNA, RUOLI_DISMESSI, STATI_CLIENTE, campiCambiati, conTecnicoScelto, eCliente, nomeCanale, prossimoStadio, senzaRiepilogo, type Pratica as P, type StatoCliente, type Trasferimento, type Commerciale } from '../lib/centralino/tipi';
 import { dataLunga } from '../lib/centralino/modelli';
 import { ESTENSIONI, apriAllegato, caricaAllegato, pratica, useAdesso, useAggiornamento, useConfig } from './comune';
-import { ChiBadge, Ic, SlaChip, Trascorso, regolaDi, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
+import { ChiBadge, Ic, SlaChip, TagDopo, Trascorso, regolaDi, Stepper, Timeline, iconaCanale, iconaTipo, nomeStadio } from './componenti';
 import Avanza, { avanzaDiretto, prossimoDi } from './Avanza';
 import Appunti from './Appunti';
 import ModaleEmail from './ModaleEmail';
@@ -112,7 +112,7 @@ export default function Pratica() {
       <header className={`ct-testa ${p.priorita === 'urgente' ? 'urgente' : ''}`}>
         <span className="ct-testa-ic"><Ic n={p.priorita === 'urgente' && p.tipo === 'manutenzione' ? 'allarme' : iconaTipo(p.tipo)} size={26} /></span>
         <div className="ct-testa-c">
-          <div className="ct-testa-r"><span className="ct-num">{p.numero}</span><Pill s={ESITI[p.esito][0] as 'ok'}>{ESITI[p.esito][1]}</Pill>
+          <div className="ct-testa-r"><span className="ct-num">{p.numero}</span><Pill s={ESITI[p.esito][0] as 'ok'}>{ESITI[p.esito][1]}</Pill><TagDopo p={p} />
             {p.priorita === 'urgente' && <span className="ct-sla rosso">urgente</span>}<SlaChip p={p} regola={regolaDi(f, p)} /><Trascorso da={p.created_at} fino={p.closed_at} /></div>
           {aperta && regolaDi(f, p) && <div className="sub ct-regola">Procedura: {regolaDi(f, p)}</div>}
           <h1>{p.cliente_nome} <ChiBadge t={p.tipo_contatto} /></h1>

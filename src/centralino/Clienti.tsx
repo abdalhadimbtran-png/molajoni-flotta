@@ -5,7 +5,7 @@ import { fmtOra } from '../lib/format';
 import { Errore, Modal, Banner, toast, useLoad } from '../ui';
 import { ESITI, NOME_TIPO, STATI_CLIENTE, type Pratica, type StatoCliente, type Trasferimento } from '../lib/centralino/tipi';
 import { CAMPI_PRATICA, useAdesso, useConfig } from './comune';
-import { Ic, SlaChip, nomeStadio, regolaDi } from './componenti';
+import { Ic, SlaChip, TagDopo, nomeStadio, regolaDi } from './componenti';
 import { RigaTrasf } from './Trasferimento';
 import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
@@ -89,7 +89,7 @@ function Scheda({ cod, nome }: { cod: string | null; nome: string }) {
           <section className="ct-blocco"><h2>Pratiche <span className="ct-n">{data.pratiche.length}</span></h2>
             {data.pratiche.length ? <ul className="ct-split-lista">{data.pratiche.map(p => (
               <li key={p.id}><Link to={`${ctx.base}/pratica/${p.id}`} className="ct-split-i">
-                <span className="ct-split-c"><span className="ct-split-r1"><b>{NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''}</b>{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}</span>
+                <span className="ct-split-c"><span className="ct-split-r1"><b>{NOME_TIPO[p.tipo]}{p.sottotipo ? ` · ${p.sottotipo}` : ''}</b>{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}<TagDopo p={p} /></span>
                   <span className="sub">{p.numero} · {fmtOra(p.created_at)} · {nomeStadio(fl(p.tipo), p.stato_corrente)}</span></span></Link></li>))}</ul> : <p className="ct-vuoto">Nessuna pratica per questo cliente.</p>}
           </section>
           {data.trasf.length > 0 && <section className="ct-blocco"><h2>Chiamate per responsabili</h2>{data.trasf.map(t => <RigaTrasf key={t.id} t={t} ora={ora} base={ctx.base} />)}</section>}

@@ -76,6 +76,7 @@ export default function CentralinoDirezione() {
         <Kpi id="off_piccole" titolo="Offerte Jennifer" d={d} prev={p} da={da} a={a} />
         <Kpi id="offerte60" titolo="Offerte entro 60 min" d={d} prev={p} da={da} a={a} soglia={80} />
         <Kpi id="off_grandi" titolo="Offerte al Commerciale" d={d} prev={p} da={da} a={a} />
+        <Kpi id="registrate_dopo" d={d} prev={p} da={da} a={a} buono="neutro" />
         <Kpi id="da_seguire" d={d} da={da} a={a} />
         <Kpi id="in_ritardo" titolo="Offerte in ritardo" d={d} da={da} a={a} rossoSe />
       </div>

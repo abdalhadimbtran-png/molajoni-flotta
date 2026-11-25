@@ -9,7 +9,7 @@ import { fmtEuro } from '../lib/format';
 import { FONTE } from './comuni';
 
 const VOCI: [string, string[]][] = [
-  ['Volumi', ['pratiche', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_info']],
+  ['Volumi', ['pratiche', 'registrate_dopo', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_info']],
   ['Offerte', ['off_piccole', 'offerte60', 'off_piccole_inviate', 'off_grandi', 'off_grandi_passate', 'in_ritardo']],
   ['Da seguire', ['da_seguire']],
   ['Qualità', ['annullate', 'annullate_motivo', 'senza_contatti', 'reg_anagrafica']],

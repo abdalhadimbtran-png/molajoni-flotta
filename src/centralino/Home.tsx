@@ -92,6 +92,7 @@ export default function Home() {
           <p className="ct-script-h">{REGOLA_SQUILLI} «{SCRIPT_TELEFONO}»</p>
         </div>
         {ctx.scrive && <div className="ct-hero2-a">
+          {ctx.registra && <button className="btn-ghost btn-sm ct-reg-oggi" onClick={ctx.registra} title="Chiamate di prima non inserite (tasto R)"><span>Registra chiamata</span> <kbd>R</kbd></button>}
           <div className="ct-info-rapide"><span className="sub">Solo informazione:</span>
             <button className="btn-ghost btn-sm" onClick={() => info('telefono')}>+1 telefonata</button>
             <button className="btn-ghost btn-sm" onClick={() => info('whatsapp')}>+1 WhatsApp</button>
@@ -132,7 +133,7 @@ export default function Home() {
               <li key={e.id} onClick={() => nav(`${ctx.base}/pratica/${e.pratica_id}`)} className="ct-clic">
                 <span className="ct-feed2-t">{fmtOra(e.at).split(' ').pop()}</span>
                 <span><b>{e.pratiche?.cliente_nome ?? ''}</b> · {e.tipo === 'stato' ? `${ETICHETTA_EV.stato} «${nomeStadio(config.flussi.find(f => f.stadi.some(s => s.key === e.a_stato)), e.a_stato)}»` : `${ETICHETTA_EV[e.tipo] ?? e.tipo}${e.testo ? `: ${e.testo}` : ''}`}
-                  <span className="sub"> · {e.autore_nome ?? 'Sistema'}</span></span>
+                  <span className="sub"> · {e.autore_nome ?? 'Sistema'}</span>{e.tipo === 'creata' && (e.dati as { registrata_dopo?: boolean } | null)?.registrata_dopo ? <> <span className="pill ct-tag-dopo">Registrata dopo</span></> : null}</span>
               </li>))}</ol> : <Vuoto>Ancora nessun movimento oggi.</Vuoto>}
           </section>
           <section className="ct-blocco ct-altro">

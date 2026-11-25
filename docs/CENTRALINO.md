@@ -14,6 +14,14 @@ Decisione di Hadi dopo una settimana d'uso: pochissimi clic, email solo per le o
 - Direzione e Report Direzione (`privato.report_sez_centralino`, 0097): contatti per tipo/canale, offerte Jennifer vs Commerciale, % offerte inviate entro 60 min, da seguire aperte (KPI `da_seguire`).
 - Prove: `supabase/prove/semplice_prove.sql` (atteso `PROVE SEMPLICE OK`).
 
+## Registra chiamata (0098, 25/11/2026)
+Chiamate di prima che Jennifer non ha inserito in diretta. Pulsante «Registra chiamata» accanto a «Nuovo contatto» (barra in alto, solo icona sotto 1500 px) e in Oggi; tasto **R** (fuori dai campi). Una finestra:
+- **Quando**: Oggi/Ieri + ora HH:MM (predefinita adesso). **Canale**: Telefono/WhatsApp/Email/Altro (tasti 1–4). **Chi**: ricerca clienti (come Nuovo contatto, cliente con codice → stato «attivo») oppure nome libero + telefono. **Cosa voleva** (obbligatorio) + tipo Intervento/Sopralluogo/Offerta/Modifiche/Informazione (predefinito Informazione). **Esito**: Gestita da me (G) / Passata a… (P → referente attivo, obbligatorio).
+- **Registra** (Ctrl+Invio) · **Registra e nuova** (Ctrl+Maiusc+Invio: finestra aperta, campi svuotati, giorno e canale tenuti). Bozza in localStorage, nessuna chiusura con clic fuori.
+- RPC `centralino_registra_chiamata(p jsonb)` (SECURITY DEFINER, `is_centralino()`, revocata ad anon/public): ora non nel futuro e non oltre 7 giorni; crea la pratica già **chiusa_ok** con `created_at = closed_at = ora scelta`, `registrata_dopo = true`, `inserito_il = now()`, `assegnato_nome` = Passata a, `sla_rispettato = null`; Offerta → `offerta_piccola` (gestita) / `offerta_grande` (passata). Nessuna email, passo o SLA.
+- Etichetta «Registrata dopo» in Pratiche, scheda, Clienti, coda e Movimenti di Oggi. Direzione: KPI `registrate_dopo` (pagina e Report Direzione); contano nei volumi per tipo/canale, escluse da «% offerte entro 60 min» (lato SQL `report_sez_centralino`) e dai KPI di tempo (nessun evento SLA).
+- Prove: `supabase/prove/registra_chiamata_prove.sql` (atteso `PROVE REGISTRA OK`). Logica pura: `src/lib/centralino/registra.ts` (+ test).
+
 Fonte: procedura «Jennifer MARCHETTI Rev.01/2027». Migrazioni `0043`–`0053` (`0047_centralino_procedura_rigida`: passi rigidi, appunti, offerte al Tecnico Commerciale).
 
 ## Struttura (rifacimento)
@@ -44,7 +52,7 @@ Intestazioni «Codice», «Ragione sociale», «Località», «Telefono», «Ema
 | `/direzione/centralino` | direzione, admin | Periodo Oggi/Settimana/Mese/Personalizzato con confronto ▲▼; Volumi (canale, tipo, chi chiama, stato cliente, heatmap giorno×ora, trend 30/90), Servizio (SLA per tipo e passo, tempi, prima risposta, scadute, urgenze in giornata), Offerte (gestite da Jennifer / passate al Tecnico Commerciale, richiami per commerciale), Trasferimenti, Qualità, Registro di Jennifer, Movimenti; «Report direzione» PDF/Excel; interruttore «Report settimanale e mensile (PDF)», «Scarica report settimana/mese», «Invia report di prova» (admin) – vedi `docs/REPORT_DIREZIONE.md` |
 | `/direzione/centralino/pratica/:id` | direzione | Stessa scheda, sola lettura |
 
-Scorciatoia **N** = nuovo contatto (fuori dai campi). Ricerca in alto: cliente, contatto, telefono (ultime 6 cifre), email, `CT-…`. Scheda «Centralino oggi» nella Panoramica dell'amministratore.
+Scorciatoia **N** = nuovo contatto, **R** = registra chiamata (fuori dai campi). Ricerca in alto: cliente, contatto, telefono (ultime 6 cifre), email, `CT-…`. Scheda «Centralino oggi» nella Panoramica dell'amministratore.
 
 ## Ruoli
 - `responsabili.centralino` / `responsabili.direzione` (booleani: il CHECK su `area` non si cambia). Da **Amministrazione › Account › Cambia ruolo**: «Centralino» o «Direzione». Questi account non entrano nella flotta (`is_responsabile()` li esclude).

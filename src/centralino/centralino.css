@@ -452,3 +452,17 @@ p.k-hint { margin:4px 0 0; }
 .ct-bozza { margin:0; font-size:var(--t-xs); color:var(--ink-3); }
 .ct-conf { font-size:var(--t-s); color:var(--ink-2); margin-inline-end:var(--sp-2); }
 .ct-dest { margin: 4px 0 0; font-size: 14px; padding: 6px 10px; border-left: 3px solid var(--accent, #E30613); background: rgba(0,0,0,.03); }
+
+/* Registra chiamata (0098) */
+.ct-reg-btn { border-radius:999px; padding:7px 12px; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.ct-reg-btn kbd, .ct-reg-oggi kbd { font-family:var(--f-mono); font-size:11px; background:var(--surface-2); border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+@media (max-width:1500px) { .ct-reg-btn span { display:none; } }
+@media (max-width:760px) { .ct-reg-btn kbd { display:none; } }
+.ct-registra .ct-canali { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); }
+.ct-registra .ct-canale-l { overflow:visible; text-overflow:clip; }
+.ct-reg-riga { display:flex; flex-wrap:wrap; gap:var(--sp-3); align-items:flex-end; }
+.ct-reg-riga > .field { flex:1 1 220px; min-width:0; }
+.ct-reg-riga > .field:last-child { flex:2 1 320px; }
+.ct-reg-quando { display:flex; gap:var(--sp-2); align-items:center; }
+.ct-reg-ora { width:84px; font-variant-numeric:tabular-nums; text-align:center; }
+.ct-tag-dopo { background:var(--info-bg); color:var(--info); font-size:11px; margin-left:6px; }

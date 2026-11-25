@@ -2,6 +2,7 @@
  * Registro dei KPI del centralino: OGNI numero (tessera, barra, contatore) viene da qui,
  * e la pagina di dettaglio (/centralino/analisi?kpi=…) usa la stessa funzione → numero e lista coincidono sempre.
  */
+import { KPI_TESTI } from './testiDirezione';
 export type Fonte = 'pratiche' | 'aperte' | 'chiuse' | 'trasferimenti' | 'contatti' | 'anagrafica';
 export interface RecPratica {
   id: number; numero: string; tipo: string; sottotipo: string | null; canale: string; esito: string; esito_offerta: string | null; stato_corrente: string;
@@ -114,6 +115,8 @@ export const KPI: Def[] = [
   { id: 'trasf_senza_email', titolo: 'Email mancanti', spiegazione: 'Trasferimenti senza email al referente, oppure senza email al cliente e senza motivo.', fonte: 'trasferimenti',
     num: r => !T(r).email_referente_inviata_at || (!conCliente(T(r)) && !T(r).email_non_disponibile) },
 ];
+// titoli e definizioni in parole semplici: fonte unica testiDirezione.ts
+for (const k of KPI) { const x = KPI_TESTI[k.id]; if (x) { k.titolo = x.it; if (x.def) k.spiegazione = x.def; } }
 export const kpi = (id: string) => KPI.find(k => k.id === id);
 
 const giorno = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date(iso));

@@ -7,17 +7,18 @@ import { kpi, valuta, type Dataset } from '../lib/centralino/registro';
 import { intervallo, precedente, valore, variazione } from '../lib/direzione/analisi';
 import { fmtEuro } from '../lib/format';
 import { FONTE } from './comuni';
+import { REPORT, nomeTipo } from '../lib/centralino/testiDirezione';
 
 const VOCI: [string, string[]][] = [
-  ['Volumi', ['pratiche', 'registrate_dopo', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_info']],
-  ['Offerte', ['off_piccole', 'offerte60', 'off_piccole_inviate', 'off_grandi', 'off_grandi_passate', 'in_ritardo']],
-  ['Da seguire', ['da_seguire']],
-  ['Qualità', ['annullate', 'annullate_motivo', 'senza_contatti', 'reg_anagrafica']],
+  [REPORT.sez_volumi.it, ['pratiche', 'registrate_dopo', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_info']],
+  [REPORT.sez_offerte.it, ['off_piccole', 'offerte60', 'off_piccole_inviate', 'off_grandi', 'off_grandi_passate', 'in_ritardo']],
+  [REPORT.sez_seguire.it, ['da_seguire']],
+  [REPORT.sez_qualita.it, ['annullate', 'annullate_motivo', 'senza_contatti', 'reg_anagrafica']],
 ];
 const COL: Col[] = [
-  { k: 'sezione', l: 'Sezione', t: 'testo', w: 14 }, { k: 'voce', l: 'Indicatore', t: 'testo', w: 30 }, { k: 'valore', l: 'Valore', t: 'testo', w: 12 },
-  { k: 'dettaglio', l: 'Numeratore / denominatore', t: 'testo', w: 16 }, { k: 'prec', l: 'Periodo precedente', t: 'testo', w: 14 }, { k: 'var', l: 'Variazione', t: 'testo', w: 11 },
-  { k: 'def', l: 'Definizione', t: 'testo', w: 60 },
+  { k: 'sezione', l: REPORT.col_sezione.it, t: 'testo', w: 14 }, { k: 'voce', l: REPORT.col_voce.it, t: 'testo', w: 30 }, { k: 'valore', l: REPORT.col_valore.it, t: 'testo', w: 12 },
+  { k: 'dettaglio', l: REPORT.col_conteggio.it, t: 'testo', w: 16 }, { k: 'prec', l: REPORT.col_prec.it, t: 'testo', w: 14 }, { k: 'var', l: REPORT.col_var.it, t: 'testo', w: 11 },
+  { k: 'def', l: REPORT.col_def.it, t: 'testo', w: 60 },
 ];
 
 /** Righe del report: stessi KPI del registro della pagina (valori identici). Funzione pura, testata. */
@@ -29,12 +30,12 @@ export function righeReport(d: Dataset, p: Dataset, ora = new Date()): Riga[] {
     const pc = !!def.den, att = pc ? v.pct : v.n, pr = pc ? w.pct : w.n;
     const x = def.fonte === 'aperte' ? null : variazione(att, pr, pc);
     out.push({ sezione: sez, voce: def.titolo, valore: att == null ? '—' : pc ? `${att}%` : String(att), dettaglio: pc ? `${v.n} / ${v.den}` : '',
-      prec: def.fonte === 'aperte' ? 'situazione attuale' : pr == null ? '—' : pc ? `${pr}%` : String(pr), var: x ? `${x.su ? '▲' : '▼'} ${Math.abs(x.v)}${pc ? ' pt' : '%'}` : '—',
-      def: `${def.spiegazione} Fonte: ${FONTE[def.fonte]}.` });
+      prec: def.fonte === 'aperte' ? REPORT.adesso.it : pr == null ? '—' : pc ? `${pr}%` : String(pr), var: x ? `${x.su ? '▲' : '▼'} ${Math.abs(x.v)}${pc ? ' punti' : '%'}` : '—',
+      def: `${def.spiegazione} Contati: ${FONTE[def.fonte]}.` });
   }
   const vp = (l: Dataset['pratiche'], t: string) => fmtEuro(valore(l.filter(x => x.tipo === t)));
-  out.push({ sezione: 'Offerte', voce: 'Valore offerte gestite dal centralino', valore: vp(d.pratiche, 'offerta_piccola'), dettaglio: '', prec: vp(p.pratiche, 'offerta_piccola'), var: '—', def: 'Somma degli importi stimati.' });
-  out.push({ sezione: 'Offerte', voce: 'Valore offerte del Tecnico Commerciale', valore: vp(d.pratiche, 'offerta_grande'), dettaglio: '', prec: vp(p.pratiche, 'offerta_grande'), var: '—', def: 'Somma degli importi stimati.' });
+  out.push({ sezione: REPORT.sez_offerte.it, voce: REPORT.val_jen.it, valore: vp(d.pratiche, 'offerta_piccola'), dettaglio: '', prec: vp(p.pratiche, 'offerta_piccola'), var: '—', def: `${nomeTipo('offerta_piccola')}: ${REPORT.val_jen.def}` });
+  out.push({ sezione: REPORT.sez_offerte.it, voce: REPORT.val_col.it, valore: vp(d.pratiche, 'offerta_grande'), dettaglio: '', prec: vp(p.pratiche, 'offerta_grande'), var: '—', def: `${nomeTipo('offerta_grande')}: ${REPORT.val_col.def}` });
   return out;
 }
 
@@ -50,18 +51,18 @@ export default function ReportDirezione({ d, p, da, a, pda, pa }: { d: Dataset; 
       const m = await import('../admin/report/esporta');
       const { data: u } = await supabase.auth.getUser();
       const righe = righeReport(x, y);
-      const rep: Report = { id: 'direzione_centralino', titolo: 'Report direzione – Centralino', descrizione: 'Riepilogo dei KPI del centralino con confronto col periodo precedente. Sola lettura; appunti privati mai inclusi.',
+      const rep: Report = { id: 'direzione_centralino', titolo: REPORT.titolo.it, descrizione: REPORT.descr.it,
         gruppo: 'Controllo e costi', periodo: 'intervallo', filtri: {}, colonne: COL, orizzontale: true, raggruppa: { k: 'sezione', etichetta: r => String(r.sezione) } };
-      const c = { periodo: `${testoCella(i[0], 'data')} – ${testoCella(i[1], 'data')}`, filtri: `confronto: ${testoCella(j[0], 'data')} – ${testoCella(j[1], 'data')}`, autore: u.user?.email ?? 'direzione', generato: new Date(), prodotto: 'Direzione' };
+      const c = { periodo: `${testoCella(i[0], 'data')} – ${testoCella(i[1], 'data')}`, filtri: `confronto con: ${testoCella(j[0], 'data')} – ${testoCella(j[1], 'data')}`, autore: u.user?.email ?? 'direzione', generato: new Date(), prodotto: 'Direzione' };
       await (t === 'xlsx' ? m.esportaExcel(rep, righe, c) : m.esportaPdf(rep, righe, c));
       toast(t === 'xlsx' ? 'File Excel pronto' : 'File PDF pronto');
     } catch (e) { toast(testoErrore(e)); } finally { setLav(''); }
   }
   return (
     <div className="dz-menu">
-      <button className="btn" onClick={() => setAperto(!aperto)} aria-expanded={aperto} disabled={!!lav}>{lav ? 'Preparo…' : 'Report direzione'}</button>
+      <button className="btn" onClick={() => setAperto(!aperto)} aria-expanded={aperto} disabled={!!lav}>{lav ? 'Preparo…' : REPORT.bottone.it}</button>
       {aperto && <div className="dz-menu-pop" role="menu">
-        {([['settimana', 'Settimana (da lunedì)'], ['mese', 'Mese corrente'], ['corrente', 'Periodo mostrato']] as const).map(([q, l]) => (
+        {([['settimana', REPORT.settimana.it], ['mese', REPORT.mese.it], ['corrente', REPORT.corrente.it]] as const).map(([q, l]) => (
           <div key={q} className="dz-menu-r"><span>{l}</span><button className="btn-ghost btn-sm" onClick={() => esporta(q, 'pdf')}>PDF</button><button className="btn-ghost btn-sm" onClick={() => esporta(q, 'xlsx')}>Excel</button></div>))}
       </div>}
     </div>

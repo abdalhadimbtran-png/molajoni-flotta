@@ -6,11 +6,11 @@ import { datiPeriodo } from '../centralino/Direzione';
 import { useAdesso, useAggiornamento } from '../centralino/comune';
 import { Scheletro } from '../centralino/Scheletro';
 import { calcolaKpi } from '../lib/centralino/kpi';
-import { CANALI, NOME_TIPO, nomeCanale } from '../lib/centralino/tipi';
+import { CANALI, nomeCanale } from '../lib/centralino/tipi';
 import { fineGiornoRoma, inizioGiornoRoma } from '../lib/centralino/sla';
 import { intervallo, piuGiorni, precedente, type Periodo } from '../lib/direzione/analisi';
 import { conta, durataTesto, inRitardo, kpiOfferte, pct, perPersona, statoOfferta, tempoInvio, type Offerta, type StatoOfferta } from '../lib/centralino/offerte';
-import { DIR, KPI_OFFERTE, STATI_OFFERTA } from '../lib/centralino/testiDirezione';
+import { DIR, KPI_OFFERTE, LEGENDA, SOTTOTIPI_OFFERTA, STATI_OFFERTA, TIPI_RICHIESTA, gruppoTipo } from '../lib/centralino/testiDirezione';
 import { PillStato, caricaOfferte, dataOra } from '../centralino/OfferteComuni';
 import { oggiRoma } from './comuni';
 import ReportDirezione from './ReportDirezione';
@@ -56,6 +56,8 @@ export default function CentralinoDirezione() {
       <div className="page-hero"><div><h1>{DIR.titolo.it}</h1><p className="sub">{DIR.sottotitolo.it}</p></div>
         <div className="dz-azioni"><ReportDirezione d={data.d} p={data.p} da={da} a={a} pda={pda} pa={pa} /><Digest /></div></div>
 
+      <Legenda />
+
       <div className="dz-barra-per">
         <span className="dz2-lbl">{DIR.periodo.it}</span>
         <div className="segmented" role="group" aria-label={DIR.periodo.it}>
@@ -96,8 +98,8 @@ export default function CentralinoDirezione() {
           <div className="dz-card dz2-card">
             <div className="dz2-tab-h"><div><h3>{DIR.tabella.it} <span className="sub">({tab.length})</span></h3><p className="dz2-def">{DIR.tabella.def}</p></div>
               <div className="dz2-filtri">
-                <select aria-label={DIR.col_gestita.it} value={persona} onChange={e => setPersona(e.target.value)}><option value="">{DIR.col_gestita.it}: tutti</option>{persone.map(x => <option key={x.persona}>{x.persona}</option>)}</select>
-                <select aria-label={DIR.col_stato.it} value={stato} onChange={e => setStato(e.target.value as StatoOfferta | '')}><option value="">{DIR.col_stato.it}: tutti</option>{(Object.keys(STATI_OFFERTA) as StatoOfferta[]).map(s => <option key={s} value={s}>{STATI_OFFERTA[s].it}</option>)}</select>
+                <select aria-label={DIR.col_gestita.it} value={persona} onChange={e => setPersona(e.target.value)}><option value="">{DIR.col_gestita.it}: tutte le persone</option>{persone.map(x => <option key={x.persona}>{x.persona}</option>)}</select>
+                <select aria-label={DIR.col_stato.it} value={stato} onChange={e => setStato(e.target.value as StatoOfferta | '')}><option value="">{DIR.col_stato.it}: tutti gli stati</option>{(Object.keys(STATI_OFFERTA) as StatoOfferta[]).map(s => <option key={s} value={s}>{STATI_OFFERTA[s].it}</option>)}</select>
               </div></div>
             {tab.length ? <div className="dz2-scroll"><table className="dz2-tab dz2-tutte">
               <thead><tr><th>{DIR.col_cliente.it}</th><th>{DIR.col_richiesta.it}</th><th>{DIR.col_arrivata.it}</th><th>{DIR.col_gestita.it}</th><th>{DIR.col_inviata.it}</th><th>{DIR.col_stato.it}</th><th>{DIR.col_motivo.it}</th></tr></thead>
@@ -119,11 +121,23 @@ export default function CentralinoDirezione() {
             <Numero t={DIR.richieste} n={data.d.pratiche.length} />
             <Numero t={DIR.registrate_dopo} n={registrate} />
           </div>
-          <Elenco t={DIR.per_tipo} v={Object.keys(NOME_TIPO).map(t => ({ l: NOME_TIPO[t as 'manutenzione'], n: k.perTipo[t] ?? 0 })).filter(x => x.n).sort((x, y) => y.n - x.n)} />
+          <Elenco t={DIR.per_tipo} v={(Object.keys(TIPI_RICHIESTA) as (keyof typeof TIPI_RICHIESTA)[]).map(g => ({ l: TIPI_RICHIESTA[g].it, n: Object.entries(k.perTipo).filter(([t]) => gruppoTipo(t) === g).reduce((s, [, n]) => s + (n ?? 0), 0) })).filter(x => x.n).sort((x, y) => y.n - x.n)} />
           <Elenco t={DIR.per_canale} v={CANALI.map(c => ({ l: nomeCanale(c.v), n: k.perCanale[c.v] ?? 0 })).filter(x => x.n).sort((x, y) => y.n - x.n)} />
         </div>
       </section>
     </div>
+  );
+}
+
+/** Legenda sempre visibile (si può chiudere): i tipi di richiesta con la definizione di una riga. */
+function Legenda() {
+  return (
+    <details className="dz-card dz2-card dz2-legenda" open>
+      <summary><b>{LEGENDA.titolo.it}</b></summary>
+      <p className="dz2-def">{LEGENDA.sotto.it}</p>
+      <dl>{(Object.keys(TIPI_RICHIESTA) as (keyof typeof TIPI_RICHIESTA)[]).map(g => <div key={g}><dt>{TIPI_RICHIESTA[g].it}</dt><dd>{TIPI_RICHIESTA[g].def}
+        {g === 'offerta' && <ul>{Object.values(SOTTOTIPI_OFFERTA).map(x => <li key={x.it}><b>{x.it}</b>: {x.def}</li>)}</ul>}</dd></div>)}</dl>
+    </details>
   );
 }
 

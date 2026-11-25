@@ -16,6 +16,7 @@ import { contaEsitiInfo } from '../lib/centralino/informazione';
 import { CAMPI_PRATICA, tutteLeRighe, useAdesso, useAggiornamento, useConfig } from './comune';
 import { nomeStadio } from './componenti';
 import { trasferimenti } from './Trasferimento';
+import { MOVIMENTI } from '../lib/centralino/testiDirezione';
 import { useCtx } from './ShellCentralino';
 
 export interface DatiPeriodo extends Dataset { pratiche: Pratica[]; eventi: (Evento & { pratiche?: { numero: string; cliente_nome: string } | null })[]; aperte: Pratica[]; trasf: Trasferimento[]; chiuse: Pratica[] }
@@ -113,7 +114,7 @@ export default function Direzione() {
 
       <section className="ct-blocco"><h2>Ultimi movimenti</h2>
         <ul className="ct-feed">{data.eventi.slice(0, 40).map(e => (
-          <li key={e.id}><span className="sub">{fmtOra(e.at)}</span> <b>{e.autore_nome ?? 'Sistema'}</b> · {e.tipo === 'stato' ? `→ ${nomeSt(e.a_stato ?? '')}` : e.testo ?? e.tipo}
+          <li key={e.id}><span className="sub">{fmtOra(e.at)}</span> <b>{e.autore_nome ?? 'Sistema'}</b> · {e.tipo === 'stato' ? `→ ${nomeSt(e.a_stato ?? '')}` : e.testo ?? MOVIMENTI.altro.it}
             {e.pratiche && <> · <Link to={`${ctx.base}/pratica/${e.pratica_id}`}>{e.pratiche.cliente_nome} ({e.pratiche.numero})</Link></>}</li>))}</ul>
         {!data.eventi.length && <p className="ct-vuoto">Nessun movimento nel periodo.</p>}
       </section>

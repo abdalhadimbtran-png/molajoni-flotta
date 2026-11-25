@@ -12,7 +12,7 @@ import { BASE, Sezione, oggiRoma } from './comuni';
 import { Numero } from './Centralino';
 import { caricaOfferte } from '../centralino/OfferteComuni';
 import { kpiOfferte } from '../lib/centralino/offerte';
-import { DIR, KPI_OFFERTE } from '../lib/centralino/testiDirezione';
+import { DIR, KPI_OFFERTE, PAN } from '../lib/centralino/testiDirezione';
 import { Feed } from './Feed';
 
 /** /direzione: la giornata a colpo d'occhio. Dati degli ultimi 30 giorni (per i richiami ancora aperti), numeri del giorno con filtro «giorno». */
@@ -29,30 +29,30 @@ export default function Panoramica() {
   const ora = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
   return (
     <div className="dz-pag">
-      <div className="page-hero"><div><h1>Panoramica</h1><p className="sub">Oggi, {ora} · sola lettura · si aggiorna da solo</p></div>
-        <Link className="btn" to={BASE}>Offerte e centralino</Link></div>
+      <div className="page-hero"><div><h1>{PAN.titolo.it}</h1><p className="sub">{ora} · {PAN.sotto.it}</p></div>
+        <Link className="btn" to={BASE}>{DIR.titolo.it}</Link></div>
 
-      <Sezione id="oggi" titolo="Oggi" sub="Ogni numero ha sotto la sua spiegazione">
+      <Sezione id="oggi" titolo={PAN.oggi.it} sub={PAN.oggi.def}>
         <div className="dz2-kpis">
-          <Numero t={DIR.richieste} n={data.pratiche.filter(x => giornoRoma(x.created_at) === oggi).length} extra="oggi" />
-          <Numero t={KPI_OFFERTE.arrivate} n={data.pratiche.filter(x => x.tipo.startsWith('offerta') && giornoRoma(x.created_at) === oggi).length} extra="oggi" />
+          <Numero t={DIR.richieste} n={data.pratiche.filter(x => giornoRoma(x.created_at) === oggi).length} extra={PAN.oggi.it} />
+          <Numero t={KPI_OFFERTE.arrivate} n={data.pratiche.filter(x => x.tipo.startsWith('offerta') && giornoRoma(x.created_at) === oggi).length} extra={PAN.oggi.it} />
           {tutto?.off && (() => { const k = kpiOfferte(tutto.off, new Date()); return <>
-            <Numero t={{ it: 'Offerte ancora da inviare', def: 'Tutte le offerte non ancora inviate al cliente, di qualunque giorno.' }} n={k.da_inviare} liv={k.da_inviare_scadute ? 'warn' : ''}
+            <Numero t={PAN.da_inviare} n={k.da_inviare} liv={k.da_inviare_scadute ? 'warn' : ''}
               extra={k.da_inviare_scadute ? `${DIR.di_cui.it} ${k.da_inviare_scadute} ${DIR.oltre_scadenza.it}` : undefined} />
-            <Numero t={{ it: 'Offerte in attesa di risposta', def: 'Offerte inviate: il cliente non ha ancora detto sì o no.' }} n={tutto.off.filter(o => o.esito === 'in_attesa').length} />
+            <Numero t={PAN.in_attesa} n={tutto.off.filter(o => o.esito === 'in_attesa').length} />
           </>; })()}
         </div>
       </Sezione>
 
-      <Sezione id="feed" titolo="Ultimi movimenti" sub="In diretta: chi ha fatto cosa, e quando">
+      <Sezione id="feed" titolo={PAN.movimenti.it} sub={PAN.movimenti.def}>
         <Feed eventi={eventiOggi.slice(0, 25)} config={config} />
-        {eventiOggi.length > 25 && <Link to={`${BASE}#movimenti`} className="sub">Tutti i movimenti →</Link>}
+        {eventiOggi.length > 25 && <Link to={`${BASE}#movimenti`} className="sub">{PAN.tutti_mov.it}</Link>}
       </Sezione>
 
       <div className="dz-prox">
-        {['Flotta', 'Personale', 'Formazione', 'Interventi'].map(x => <div key={x} className="dz-prox-c"><b>{x}</b><span className="sub">Prossimamente</span></div>)}
+        {['Flotta', 'Personale', 'Formazione', 'Interventi'].map(x => <div key={x} className="dz-prox-c"><b>{x}</b><span className="sub">{PAN.prossimamente.it}</span></div>)}
       </div>
-      <p className="sub dz-agg">Aggiornato alle {fmtOra(new Date().toISOString())}</p>
+      <p className="sub dz-agg">{PAN.aggiornato.it} {fmtOra(new Date().toISOString())}</p>
     </div>
   );
 }

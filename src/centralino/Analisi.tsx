@@ -12,6 +12,7 @@ import { useAdesso, useConfig } from './comune';
 import { Conto, nomeStadio } from './componenti';
 import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
+import { ANALISI, FILTRI_NOMI, KPI_TESTI } from '../lib/centralino/testiDirezione';
 
 const c = (k: string, l: string, t: Col['t'], w: number, tot?: boolean): Col => ({ k, l, t, w, tot });
 const COL_PRATICHE: Col[] = [c('numero', 'Numero', 'testo', 15), c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 11), c('tipo', 'Tipo', 'testo', 20), c('cliente', 'Nome', 'testo', 24),
@@ -53,8 +54,8 @@ export default function Analisi() {
         argomento: t.tipo_argomento ?? '', esito: t.modalita === 'richiamo' ? 'Non disponibile' : 'Trasferita', scadenza: t.richiamo_scadenza, richiamato: t.richiamato_at, ritardo: rit,
         email_ref: t.email_referente_inviata_at ? 'Sì' : 'No', email_cli: t.email_cliente_inviata_at || t.email_riepilogo_at ? 'Sì' : t.email_non_disponibile ? 'Non disp.' : 'No' };
     }
-    if ('contatto_id' in r) return { quando: r.at, canale: '—', cliente: `Contatto modificato: ${r.campo} → ${r.a ?? '—'}${r.autore_nome ? ` (${r.autore_nome})` : ''}`, tipo: 'Aggiornamento anagrafica' };
-    if (!('cliente_nome' in r)) { const x = r as RecInfo; return { quando: x.at, canale: nomeCanale(x.canale), cliente: x.nota ?? '—', tipo: 'Solo informazione' }; }
+    if ('contatto_id' in r) return { quando: r.at, canale: '—', cliente: `Contatto modificato: ${r.campo} → ${r.a ?? '—'}${r.autore_nome ? ` (${r.autore_nome})` : ''}`, tipo: KPI_TESTI.reg_anagrafica.it };
+    if (!('cliente_nome' in r)) { const x = r as RecInfo; return { quando: x.at, canale: nomeCanale(x.canale), cliente: x.nota ?? '—', tipo: KPI_TESTI.reg_info.it }; }
     const p = r as RecPratica;
     const rit = p.esito === 'aperta' && p.sla_scadenza && new Date(p.sla_scadenza) < ora ? orologio((ora.getTime() - new Date(p.sla_scadenza).getTime()) / 1000) : '';
     return { _p: p.id, _r: p, numero: p.numero, quando: p.created_at, canale: nomeCanale(p.canale), tipo: NOME_TIPO[p.tipo as 'manutenzione'] + (p.sottotipo ? ` · ${p.sottotipo}` : ''), chi: nomeTipoContatto(p.tipo_contatto), cliente: p.cliente_nome,
@@ -69,8 +70,8 @@ export default function Analisi() {
       const m = await import('../admin/report/esporta');
       const { data: u } = await supabase.auth.getUser();
       const rep: Report = { id: `ct_${def.id}`, titolo: def.titolo, descrizione: def.spiegazione, gruppo: 'Controllo e costi', periodo: 'intervallo', filtri: {}, colonne, orizzontale: true,
-        riepilogo: () => [{ l: 'Elementi', v: String(v?.n ?? 0) }, ...(v?.den != null ? [{ l: 'Su', v: String(v.den) }, { l: 'Percentuale', v: v.pct == null ? '—' : `${v.pct}%` }] : [])] };
-      const filtri = Object.entries(f).map(([k, x]) => `${k}: ${x}`).join(' · ');
+        riepilogo: () => [{ l: ANALISI.elementi.it, v: String(v?.n ?? 0) }, ...(v?.den != null ? [{ l: ANALISI.su.it, v: String(v.den) }, { l: 'Percentuale', v: v.pct == null ? '—' : `${v.pct}%` }] : [])] };
+      const filtri = Object.entries(f).map(([k, x]) => `${FILTRI_NOMI[k] ?? k}: ${k === 'tipo' ? NOME_TIPO[x as 'manutenzione'] ?? x : k === 'canale' ? nomeCanale(x) : k === 'stato' ? STATI_CLIENTE[x as 'nuovo']?.[1] ?? x : x}`).join(' · ');
       const c2 = { periodo: `${testoCella(da, 'data')} – ${testoCella(a, 'data')}`, filtri, autore: u.user?.email ?? 'centralino', generato: new Date(), prodotto: 'Centralino' };
       await (t === 'xlsx' ? m.esportaExcel(rep, righe, c2) : m.esportaPdf(rep, righe, c2));
       toast(t === 'xlsx' ? 'File Excel pronto' : 'File PDF pronto');
@@ -84,7 +85,7 @@ export default function Analisi() {
 
   return (
     <div className="ct-analisi">
-      <Link to={ctx.base === '/centralino' ? '/centralino' : ctx.base} className="ct-indietro">← Indietro</Link>
+      <Link to={ctx.base === '/centralino' ? '/centralino' : ctx.base} className="ct-indietro">{ANALISI.indietro.it}</Link>
       <div className="page-hero"><div>
         <h1>{def.titolo}</h1>
         <p className="sub ct-spieg">{def.spiegazione}</p>
@@ -94,26 +95,26 @@ export default function Analisi() {
       <div className="row-flex ct-filtri">
         <input type="date" aria-label="Dal" value={da} onChange={e => imposta('da', e.target.value)} /><input type="date" aria-label="Al" value={a} onChange={e => imposta('a', e.target.value)} />
         {def.fonte !== 'trasferimenti' && <>
-          <select aria-label="Canale" value={f.canale ?? ''} onChange={e => imposta('canale', e.target.value)}><option value="">Tutti i canali</option>{CANALI.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
-          {!def.conInfo && <select aria-label="Tipo" value={f.tipo ?? ''} onChange={e => imposta('tipo', e.target.value)}><option value="">Tutti i tipi</option>{Object.entries(NOME_TIPO).map(([k, x]) => <option key={k} value={k}>{x}</option>)}</select>}
+          <select aria-label="Canale" value={f.canale ?? ''} onChange={e => imposta('canale', e.target.value)}><option value="">{ANALISI.tutti_canali.it}</option>{CANALI.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
+          {!def.conInfo && <select aria-label="Tipo" value={f.tipo ?? ''} onChange={e => imposta('tipo', e.target.value)}><option value="">{ANALISI.tutti_tipi.it}</option>{Object.entries(NOME_TIPO).map(([k, x]) => <option key={k} value={k}>{x}</option>)}</select>}
         </>}
         {def.fonte === 'trasferimenti' && <>
-          <select aria-label="Destinatario" value={f.dest ?? ''} onChange={e => imposta('dest', e.target.value)}><option value="">Tutti i destinatari</option>{dest.map(x => <option key={x}>{x}</option>)}</select>
-          <select aria-label="Argomento" value={f.arg ?? ''} onChange={e => imposta('arg', e.target.value)}><option value="">Tutti gli argomenti</option>{arg.map(x => <option key={x}>{x}</option>)}</select>
+          <select aria-label="Destinatario" value={f.dest ?? ''} onChange={e => imposta('dest', e.target.value)}><option value="">{ANALISI.tutti_dest.it}</option>{dest.map(x => <option key={x}>{x}</option>)}</select>
+          <select aria-label="Argomento" value={f.arg ?? ''} onChange={e => imposta('arg', e.target.value)}><option value="">{ANALISI.tutti_arg.it}</option>{arg.map(x => <option key={x}>{x}</option>)}</select>
         </>}
-        {!def.conInfo && <select aria-label="Stato cliente" value={f.stato ?? ''} onChange={e => imposta('stato', e.target.value)}><option value="">Tutti i clienti</option>{Object.entries(STATI_CLIENTE).map(([k, x]) => <option key={k} value={k}>{x[1]}</option>)}</select>}
+        {!def.conInfo && <select aria-label="Stato cliente" value={f.stato ?? ''} onChange={e => imposta('stato', e.target.value)}><option value="">{ANALISI.tutti_clienti.it}</option>{Object.entries(STATI_CLIENTE).map(([k, x]) => <option key={k} value={k}>{x[1]}</option>)}</select>}
         <button className="btn btn-sm" onClick={() => esporta('pdf')} disabled={!righe.length || !!esporto}>{esporto === 'pdf' ? 'Preparo…' : 'PDF'}</button>
         <button className="btn-ghost btn-sm" onClick={() => esporta('xlsx')} disabled={!righe.length || !!esporto}>{esporto === 'xlsx' ? 'Preparo…' : 'Excel'}</button>
       </div>
       {!v ? <Scheletro righe={6} /> : <>
         <div className="kpis ct-riep">
-          <div className="kpi"><div className="num">{def.den ? (v.pct == null ? '—' : `${v.pct}%`) : v.n}</div><div className="lbl">{def.den ? `${v.n} su ${v.den}` : 'Elementi'}</div></div>
-          {def.den && <div className="kpi"><div className="num">{v.n}</div><div className="lbl">Numeratore (elenco qui sotto)</div></div>}
-          {def.den && <div className="kpi"><div className="num">{v.den}</div><div className="lbl">Denominatore</div></div>}
-          {medio && <div className="kpi"><div className="num num-sm">{medio}</div><div className="lbl">Tempo medio di richiamo</div></div>}
-          {valore > 0 && <div className="kpi"><div className="num num-sm">{fmtEuro(valore)}</div><div className="lbl">Valore stimato</div></div>}
+          <div className="kpi"><div className="num">{def.den ? (v.pct == null ? '—' : `${v.pct}%`) : v.n}</div><div className="lbl">{def.den ? `${v.n} su ${v.den}` : ANALISI.elementi.it}</div></div>
+          {def.den && <div className="kpi"><div className="num">{v.n}</div><div className="lbl">{ANALISI.conteggio.it}</div></div>}
+          {def.den && <div className="kpi"><div className="num">{v.den}</div><div className="lbl">{ANALISI.su.it}</div></div>}
+          {medio && <div className="kpi"><div className="num num-sm">{medio}</div><div className="lbl">{ANALISI.tempo_richiamo.it}</div></div>}
+          {valore > 0 && <div className="kpi"><div className="num num-sm">{fmtEuro(valore)}</div><div className="lbl">{ANALISI.valore.it}</div></div>}
         </div>
-        {righe.length === 0 ? <p className="ct-vuoto">Nessun elemento con questi filtri. Prova ad allargare il periodo.</p> : (
+        {righe.length === 0 ? <p className="ct-vuoto">{ANALISI.vuoto.it}</p> : (
           <div className="table-wrap ct-tw-analisi"><table className="ct-tab-analisi">
             <thead><tr>{colonne.map(x => <th key={x.k} className={`c-${x.k}`}>{x.l}</th>)}</tr></thead>
             <tbody>{righe.slice(0, 1000).map((r, i) => (
@@ -122,8 +123,8 @@ export default function Analisi() {
                   ? <Conto inizio={String(r.quando)} scadenza={String(r.scadenza)} /> : x.k === 'ritardo' && r.ritardo ? <span className="ko-t">{String(r.ritardo)}</span> : x.t === 'dataora' && r[x.k] ? fmtOra(String(r[x.k])) : testoCella(r[x.k], x.t)}</td>)}
               </tr>))}</tbody>
           </table></div>)}
-        {righe.length > 1000 && <p className="hint">Mostrate le prime 1000 righe; l'esportazione le contiene tutte.</p>}
-        <p className="hint">Aggiornato {fmtOra(new Date().toISOString())}. Il numero sulla tessera e questo elenco usano lo stesso calcolo.</p>
+        {righe.length > 1000 && <p className="hint">{ANALISI.piu_1000.it}</p>}
+        <p className="hint">Aggiornato {fmtOra(new Date().toISOString())}. {ANALISI.stesso_calcolo.it}</p>
       </>}
     </div>
   );

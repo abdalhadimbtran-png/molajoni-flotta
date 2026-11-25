@@ -48,7 +48,7 @@ begin
   select coalesce(jsonb_agg(jsonb_build_array(m, n) order by n desc), '[]') into ritardi
     from (select coalesce(motivo_ritardo, 'Motivo non scritto') m, count(*) n from privato.offerte_periodo(p_ini, p_fin) _off where in_rit group by 1 order by 2 desc limit 10) x;
   select coalesce(jsonb_agg(jsonb_build_array(c, n) order by n desc), '[]') into per_canale_off
-    from (select case canale when 'telefono' then 'Telefono' when 'whatsapp' then 'WhatsApp' when 'email' then 'Email' when 'tablet_tmq' then 'Tablet TMQ' else 'Altro' end c, count(*) n from privato.offerte_periodo(p_ini, p_fin) _off group by 1) x;
+    from (select case canale when 'telefono' then 'Telefono' when 'whatsapp' then 'WhatsApp' when 'email' then 'Email' when 'tablet_tmq' then 'Tablet del tecnico' else 'Altro' end c, count(*) n from privato.offerte_periodo(p_ini, p_fin) _off group by 1) x;
   select coalesce(jsonb_agg(r order by a), '[]') into non_acc from (
     select arrivata_il a, jsonb_build_array(coalesce(cliente_nome, '—'), gestita_da, to_char(arrivata_il at time zone 'Europe/Rome', 'DD/MM'),
            motivo || coalesce(' – ' || left(motivo_nota, 80), '')) r
@@ -61,13 +61,13 @@ begin
   -- chiamate e richieste
   select count(*), count(*) filter (where registrata_dopo) into tot, n_reg from public.pratiche where tipo = any(tipi) and created_at >= p_ini and created_at < p_fin;
   select jsonb_agg(jsonb_build_array(g.nome, coalesce(c.n, 0)) order by g.o) into per_tipo
-  from (values (1,'Intervento',array['manutenzione']), (2,'Sopralluogo',array['sopralluogo']),
+  from (values (1,'Intervento tecnico',array['manutenzione']), (2,'Sopralluogo',array['sopralluogo']),
                (3,'Offerta',array['offerta_piccola','offerta_grande','offerta_tablet']),
-               (4,'Modifiche / Disdetta',array['modifica']), (5,'Informazione',array['informazione'])) g(o, nome, t)
+               (4,'Modifica dati o disdetta',array['modifica']), (5,'Informazione',array['informazione'])) g(o, nome, t)
   left join lateral (select count(*) n from public.pratiche p where p.tipo = any(g.t) and p.created_at >= p_ini and p.created_at < p_fin) c on true;
   select jsonb_agg(jsonb_build_array(g.nome, coalesce(c.n, 0)) order by g.o) into per_canale
   from (values (1,'Telefono',array['telefono']), (2,'WhatsApp',array['whatsapp']), (3,'Email',array['email']),
-               (4,'Tablet TMQ',array['tablet_tmq']), (5,'Altro',array['collega','altro'])) g(o, nome, t)
+               (4,'Tablet del tecnico',array['tablet_tmq']), (5,'Altro',array['collega','altro'])) g(o, nome, t)
   left join lateral (select count(*) n from public.pratiche p where p.tipo = any(tipi) and p.canale = any(g.t)
                       and p.created_at >= p_ini and p.created_at < p_fin) c on true;
   select coalesce(jsonb_agg(jsonb_build_object('label', to_char(d, 'DD/MM'), 'valore', coalesce(c.n, 0)) order by d), '[]') into serie
@@ -87,7 +87,7 @@ begin
       jsonb_build_object('label', 'Accettate', 'valore', n_acc),
       jsonb_build_object('label', 'Non accettate', 'valore', n_non),
       jsonb_build_object('label', 'Richieste ricevute', 'valore', tot),
-      jsonb_build_object('label', 'Registrate dopo', 'valore', n_reg)),
+      jsonb_build_object('label', 'Chiamate registrate dopo', 'valore', n_reg)),
     'tabelle', jsonb_build_array(
       jsonb_build_object('titolo', 'Offerte: numeri del periodo', 'colonne', jsonb_build_array('Voce', 'N.', '%'), 'righe', jsonb_build_array(
         jsonb_build_array('Offerte arrivate', n_arr, ''),
@@ -105,7 +105,15 @@ begin
         jsonb_build_array('Inviate in ritardo', 'Inviate dopo la scadenza. % sulle offerte arrivate.'),
         jsonb_build_array('Ancora da inviare', 'Non ancora inviate al cliente. % sulle offerte arrivate.'),
         jsonb_build_array('Accettate', 'Accettate dal cliente. % sulle offerte inviate.'),
-        jsonb_build_array('Non accettate', 'Non accettate dal cliente. % sulle offerte inviate.'))),
+        jsonb_build_array('Non accettate', 'Non accettate dal cliente. % sulle offerte inviate.'),
+        jsonb_build_array('Richieste ricevute', 'Chiamate, email e messaggi registrati al centralino nel periodo.'),
+        jsonb_build_array('Chiamate registrate dopo', 'Chiamate inserite più tardi, non durante la telefonata.'))),
+      jsonb_build_object('titolo', 'Cosa chiede il cliente (tipi di richiesta)', 'larga', true, 'colonne', jsonb_build_array('Tipo', 'Significato'), 'righe', jsonb_build_array(
+        jsonb_build_array('Intervento tecnico', 'Il cliente chiede un tecnico: guasto, allarme o manutenzione da fare.'),
+        jsonb_build_array('Sopralluogo', 'Visita per valutare un lavoro prima dell''offerta.'),
+        jsonb_build_array('Offerta', 'Il cliente chiede un preventivo: offerta fatta da Jennifer, passata a un collega o da tablet del tecnico.'),
+        jsonb_build_array('Modifica dati o disdetta', 'Cambio dati del cliente, del calendario o disdetta del contratto.'),
+        jsonb_build_array('Informazione', 'Il cliente chiede solo un''informazione.'))),
       jsonb_build_object('titolo', 'Offerte per persona', 'larga', true,
         'colonne', jsonb_build_array('Persona', 'Arrivate', 'Inviate in tempo', 'Accettate', 'Tempo medio di invio'), 'righe', per_persona),
       jsonb_build_object('titolo', 'Perché non accettate', 'colonne', jsonb_build_array('Motivo', 'N.'), 'righe', motivi),
@@ -114,9 +122,9 @@ begin
         'colonne', jsonb_build_array('Cliente', 'Gestita da', 'Arrivata il', 'Motivo'), 'righe', non_acc),
       jsonb_build_object('titolo', 'Offerte ancora da inviare', 'larga', true,
         'colonne', jsonb_build_array('Cliente', 'Gestita da', 'Arrivata il', 'Scadenza invio', 'Stato'), 'righe', da_fare),
-      jsonb_build_object('titolo', 'Offerte per canale', 'colonne', jsonb_build_array('Canale', 'N.'), 'righe', per_canale_off),
-      jsonb_build_object('titolo', 'Richieste per tipo', 'colonne', jsonb_build_array('Tipo', 'N.'), 'righe', per_tipo),
-      jsonb_build_object('titolo', 'Richieste per canale', 'colonne', jsonb_build_array('Canale', 'N.'), 'righe', per_canale)),
+      jsonb_build_object('titolo', 'Da dove arrivano le offerte', 'colonne', jsonb_build_array('Canale', 'N.'), 'righe', per_canale_off),
+      jsonb_build_object('titolo', 'Cosa ha chiesto il cliente', 'colonne', jsonb_build_array('Tipo', 'N.'), 'righe', per_tipo),
+      jsonb_build_object('titolo', 'Come è arrivata la richiesta', 'colonne', jsonb_build_array('Canale', 'N.'), 'righe', per_canale)),
     'serie', jsonb_build_array(jsonb_build_object('titolo', 'Offerte arrivate al giorno', 'punti', serie)),
     'attenzione', att);
 end $function$;

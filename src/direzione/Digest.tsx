@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase, testoErrore } from '../lib/supabase';
 import { toast } from '../ui';
+import { REPORT } from '../lib/centralino/testiDirezione';
 
 type Stato = { attivo: boolean; email: string | null; ultimo_settimana: string | null; ultimo_mese: string | null; admin: boolean };
 
@@ -30,7 +31,7 @@ export default function Digest() {
     supabase.rpc('report_direzione_stato').then(({ data, error }) => setS(error ? 'non_attivo' : (data as Stato)));
   }, []);
   if (s === null) return null;
-  if (s === 'non_attivo') return <span className="dz-digest off" title="La funzione del database (report_direzione) non è ancora stata attivata.">Report PDF: in attesa di attivazione</span>;
+  if (s === 'non_attivo') return <span className="dz-digest off" title={REPORT.non_attivo_def.it}>{REPORT.non_attivo.it}</span>;
   const st = s;
 
   async function cambia() {
@@ -60,12 +61,12 @@ export default function Digest() {
   }
   return (
     <>
-      <label className="dz-digest" title="Ogni venerdì alle 16:00 (giovedì se festivo: da lunedì alle 16:00) e l'ultimo giorno lavorativo del mese alle 16:00 (dal 1°), con il PDF allegato. Finché Resend è in modalità di prova, l'email arriva solo all'indirizzo del titolare dell'account Resend.">
-        <input type="checkbox" role="switch" checked={st.attivo} onChange={cambia} /> Report settimanale e mensile (PDF)
+      <label className="dz-digest" title={REPORT.auto_def.it}>
+        <input type="checkbox" role="switch" checked={st.attivo} onChange={cambia} /> {REPORT.auto.it}
       </label>
-      <button className="btn-ghost btn-sm" disabled={!!lav} onClick={() => scarica('settimana')}>{lav === 'settimana' ? 'Preparo…' : 'Scarica report settimana'}</button>
-      <button className="btn-ghost btn-sm" disabled={!!lav} onClick={() => scarica('mese')}>{lav === 'mese' ? 'Preparo…' : 'Scarica report mese'}</button>
-      {st.admin && <button className="btn-ghost btn-sm" disabled={!!lav} onClick={prova} title={`Invia subito il report della settimana in corso a ${st.email ?? 'te'}`}>{lav === 'prova' ? 'Invio…' : 'Invia report di prova'}</button>}
+      <button className="btn-ghost btn-sm" disabled={!!lav} onClick={() => scarica('settimana')}>{lav === 'settimana' ? 'Preparo…' : REPORT.scarica_sett.it}</button>
+      <button className="btn-ghost btn-sm" disabled={!!lav} onClick={() => scarica('mese')}>{lav === 'mese' ? 'Preparo…' : REPORT.scarica_mese.it}</button>
+      {st.admin && <button className="btn-ghost btn-sm" disabled={!!lav} onClick={prova} title={`Invia subito il report della settimana in corso a ${st.email ?? 'te'}`}>{lav === 'prova' ? 'Invio…' : REPORT.prova.it}</button>}
     </>
   );
 }

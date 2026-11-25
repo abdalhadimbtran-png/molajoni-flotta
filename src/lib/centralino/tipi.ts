@@ -1,4 +1,5 @@
 import type { RegolaSla } from './sla';
+import { CANALI_NOMI, ESITI_NOMI, TIPI_RICHIESTA, nomeTipo } from './testiDirezione';
 
 export type Canale = 'telefono' | 'whatsapp' | 'email' | 'collega' | 'tablet_tmq' | 'altro';
 export type Esito = 'aperta' | 'chiusa_ok' | 'chiusa_ko' | 'annullata';
@@ -71,27 +72,26 @@ export interface Impostazioni {
 }
 
 export const CANALI: { v: Canale; l: string; ic: string }[] = [
-  { v: 'telefono', l: 'Telefono', ic: 'telefono' }, { v: 'whatsapp', l: 'WhatsApp', ic: 'whatsapp' }, { v: 'email', l: 'Email', ic: 'email' },
-  { v: 'collega', l: 'Collega / Tecnico', ic: 'collega' }, { v: 'tablet_tmq', l: 'Tablet TMQ', ic: 'tablet' }, { v: 'altro', l: 'Altro', ic: 'altro' },
+  { v: 'telefono', l: CANALI_NOMI.telefono.it, ic: 'telefono' }, { v: 'whatsapp', l: CANALI_NOMI.whatsapp.it, ic: 'whatsapp' }, { v: 'email', l: CANALI_NOMI.email.it, ic: 'email' },
+  { v: 'collega', l: CANALI_NOMI.collega.it, ic: 'collega' }, { v: 'tablet_tmq', l: CANALI_NOMI.tablet_tmq.it, ic: 'tablet' }, { v: 'altro', l: CANALI_NOMI.altro.it, ic: 'altro' },
 ];
-export const nomeCanale = (c: string) => CANALI.find(x => x.v === c)?.l ?? c;
+export const nomeCanale = (c: string) => CANALI.find(x => x.v === c)?.l ?? CANALI_NOMI.altro.it;
 
 /** «Cosa chiede?»: le offerte sono un solo pulsante; poi si sceglie chi la gestisce (Jennifer o Tecnico Commerciale).
  * Fatture e Fornitori non sono pratiche: si girano con i pulsanti rapidi (↪). */
 export const RICHIESTE: { v: TipoPratica | 'offerta'; l: string; ic: string; breve: string }[] = [
-  { v: 'manutenzione', l: 'Intervento', ic: 'manutenzione', breve: 'Guasto, ritardo, allarme' },
-  { v: 'sopralluogo', l: 'Sopralluogo', ic: 'sopralluogo', breve: 'Visita per valutare' },
-  { v: 'offerta', l: 'Offerta', ic: 'offerta', breve: 'Preventivo' },
-  { v: 'modifica', l: 'Modifiche / Disdetta', ic: 'modifica', breve: 'Calendario, dati, disdetta' },
-  { v: 'informazione', l: 'Informazione', ic: 'informazione', breve: 'Risposta o → responsabile' },
+  { v: 'manutenzione', l: TIPI_RICHIESTA.manutenzione.it, ic: 'manutenzione', breve: 'Guasto, ritardo, allarme' },
+  { v: 'sopralluogo', l: TIPI_RICHIESTA.sopralluogo.it, ic: 'sopralluogo', breve: 'Visita per valutare' },
+  { v: 'offerta', l: TIPI_RICHIESTA.offerta.it, ic: 'offerta', breve: 'Preventivo' },
+  { v: 'modifica', l: TIPI_RICHIESTA.modifica.it, ic: 'modifica', breve: 'Calendario, dati, disdetta' },
+  { v: 'informazione', l: TIPI_RICHIESTA.informazione.it, ic: 'informazione', breve: 'Risposta o → responsabile' },
 ];
 
-export const NOME_TIPO: Record<TipoPratica, string> = {
-  manutenzione: 'Manutenzione', sopralluogo: 'Sopralluogo', offerta_piccola: 'Offerta gestita da Jennifer', offerta_grande: 'Offerta al Tecnico Commerciale',
-  modifica: 'Modifica / anagrafica', amministrazione: 'Amministrazione', fornitori: 'Fornitori', informazione: 'Informazione', trasferta: 'Trasferta (alloggio)', abbigliamento: 'Abbigliamento', offerta_tablet: 'Offerta da tablet TMQ',
-};
+/** Nomi per le persone: fonte unica in testiDirezione.ts (mai la chiave interna). */
+const TUTTI_TIPI: TipoPratica[] = ['manutenzione', 'sopralluogo', 'offerta_piccola', 'offerta_grande', 'offerta_tablet', 'modifica', 'informazione', 'amministrazione', 'fornitori', 'trasferta', 'abbigliamento'];
+export const NOME_TIPO = Object.fromEntries(TUTTI_TIPI.map(k => [k, nomeTipo(k)])) as Record<TipoPratica, string>;
 export const ESITI: Record<Esito, [string, string]> = {
-  aperta: ['info', 'Aperta'], chiusa_ok: ['ok', 'Chiusa'], chiusa_ko: ['ko', 'Chiusa (negativa)'], annullata: ['na', 'Annullata'],
+  aperta: ['info', ESITI_NOMI.aperta.it], chiusa_ok: ['ok', ESITI_NOMI.chiusa_ok.it], chiusa_ko: ['ko', ESITI_NOMI.chiusa_ko.it], annullata: ['na', ESITI_NOMI.annullata.it],
 };
 /** Tipi dismessi (0071–0073): fatture e fornitori non sono più pratiche. I dati restano leggibili, ma non si propongono nei filtri. */
 export const TIPI_DISMESSI: string[] = ['amministrazione', 'fornitori'];

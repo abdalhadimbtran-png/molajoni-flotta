@@ -4,26 +4,20 @@ import { kpi, linkAnalisi, valuta, type Dataset, type Def, type Filtri } from '.
 import { variazione } from '../lib/direzione/analisi';
 import { giornoRoma } from '../lib/centralino/sla';
 import { Numero } from '../centralino/Tessera';
+import { FONTI } from '../lib/centralino/testiDirezione';
 
 export const BASE = '/direzione/centralino';
 export const oggiRoma = () => giornoRoma(new Date());
 
-export const FONTE: Record<Def['fonte'], string> = {
-  pratiche: 'pratiche create nel periodo (tabella pratiche, con la loro storia)',
-  aperte: 'pratiche aperte in questo momento, di qualunque giorno',
-  chiuse: 'pratiche chiuse nel periodo (data di chiusura)',
-  trasferimenti: 'chiamate trasferite / richiami del periodo (chiamate_trasferite)',
-  contatti: 'pratiche del periodo + contatti solo informativi («+1»)',
-  anagrafica: 'pratiche «modifica» + storia della rubrica clienti',
-};
+export const FONTE: Record<Def['fonte'], string> = Object.fromEntries(Object.entries(FONTI).map(([k, v]) => [k, v.it])) as Record<Def['fonte'], string>;
 
 /** «i» con la definizione: numeratore, denominatore, fonte. Hover/focus o tocco. */
 export function Info({ def }: { def: Def }) {
   const [aperto, setAperto] = useState(false);
   return (
     <span className="dz-info" onMouseEnter={() => setAperto(true)} onMouseLeave={() => setAperto(false)}>
-      <button type="button" aria-label={`Come si calcola: ${def.titolo}`} onClick={e => { e.preventDefault(); e.stopPropagation(); setAperto(!aperto); }} onFocus={() => setAperto(true)} onBlur={() => setAperto(false)}>i</button>
-      {aperto && <span className="dz-pop" role="tooltip"><b>{def.titolo}</b>{def.spiegazione}<span className="dz-fonte">Fonte: {FONTE[def.fonte]}{def.den ? ' · valore = numeratore / denominatore' : ' · valore = conteggio'}</span></span>}
+      <button type="button" aria-label={`Cosa conta: ${def.titolo}`} onClick={e => { e.preventDefault(); e.stopPropagation(); setAperto(!aperto); }} onFocus={() => setAperto(true)} onBlur={() => setAperto(false)}>i</button>
+      {aperto && <span className="dz-pop" role="tooltip"><b>{def.titolo}</b>{def.spiegazione}<span className="dz-fonte">Fonte: {FONTE[def.fonte]}{def.den ? ' · valore = quanti su quanti, in %' : ' · valore = quanti'}</span></span>}
     </span>
   );
 }
@@ -32,9 +26,9 @@ export function Info({ def }: { def: Def }) {
 export function Delta({ att, prec, punti, buono = 'su' }: { att: number | null; prec: number | null; punti?: boolean; buono?: 'su' | 'giu' | 'neutro' }) {
   const v = variazione(att, prec, punti);
   if (!v) return <span className="dz-delta na" title="Nessun confronto possibile">—</span>;
-  if (v.v === 0) return <span className="dz-delta na" title="Uguale al periodo precedente">= 0{punti ? ' pt' : '%'}</span>;
+  if (v.v === 0) return <span className="dz-delta na" title="Uguale al periodo precedente">= 0{punti ? ' punti' : '%'}</span>;
   const meglio = buono === 'neutro' ? null : (buono === 'su') === v.su;
-  return <span className={`dz-delta ${meglio == null ? 'na' : meglio ? 'ok' : 'ko'}`} title={`Periodo precedente: ${prec}${punti ? '%' : ''}`}>{v.su ? '▲' : '▼'} {Math.abs(v.v)}{punti ? ' pt' : '%'}</span>;
+  return <span className={`dz-delta ${meglio == null ? 'na' : meglio ? 'ok' : 'ko'}`} title={`Periodo precedente: ${prec}${punti ? '%' : ''}`}>{v.su ? '▲' : '▼'} {Math.abs(v.v)}{punti ? ' punti' : '%'}</span>;
 }
 
 /** Tessera KPI della Direzione: valore dal registro, confronto col precedente, definizione, clic → elenco. */

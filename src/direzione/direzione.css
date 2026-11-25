@@ -86,3 +86,11 @@
 .dz-menu-r { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: var(--t-s); } .dz-menu-r span { flex: 1; }
 .dz-digest { display: inline-flex; gap: 8px; align-items: center; font-size: var(--t-s); color: var(--ink-2); cursor: pointer; }
 .dz-digest.off { color: var(--ink-3); cursor: default; font-size: var(--t-xs); }
+
+/* Legenda tipi di richiesta (Direzione › Offerte e centralino) */
+.dz2-legenda { margin: 0 0 16px; }
+.dz2-legenda summary { cursor: pointer; }
+.dz2-legenda dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 20px; margin: 8px 0 0; }
+.dz2-legenda dt { font-weight: 600; }
+.dz2-legenda dd { margin: 2px 0 0; color: var(--muted, #555); font-size: .92em; }
+.dz2-legenda ul { margin: 4px 0 0; padding-left: 18px; }

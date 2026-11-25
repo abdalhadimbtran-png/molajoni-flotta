@@ -466,3 +466,19 @@ p.k-hint { margin:4px 0 0; }
 .ct-reg-quando { display:flex; gap:var(--sp-2); align-items:center; }
 .ct-reg-ora { width:84px; font-variant-numeric:tabular-nums; text-align:center; }
 .ct-tag-dopo { background:var(--info-bg); color:var(--info); font-size:11px; margin-left:6px; }
+
+/* ── Barra in alto del centralino (soglie sulla barra = viewport − sidebar ≈250px): niente sovrapposizioni a qualsiasi larghezza/zoom.
+   Container query sulla larghezza reale della barra (copre zoom del browser e sidebar). */
+.ct-area .gest-top { container-type:inline-size; container-name:ctbar; min-width:0; }
+.ct-area .gest-top > * { flex-shrink:0; }
+.ct-area .gest-top .gest-top-sp { flex:1 1 0; min-width:0; }
+.ct-area .gest-top .btn, .ct-area .gest-top .btn-ghost, .ct-area .gest-top .ct-live-c { white-space:nowrap; flex-shrink:0; }
+.ct-area .gest-top .gest-crumb { white-space:nowrap; min-width:0; }
+.ct-area .gest-top .ct-cerca { flex:1 1 auto; min-width:160px; max-width:360px; }
+.ct-area .gest-top .ct-cerca > svg { flex-shrink:0; }
+.ct-area .gest-top .ct-cerca input { flex:1 1 auto; width:auto; min-width:0; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
+.ct-area .gest-top .ct-live { flex-shrink:0; }
+@container ctbar (max-width:1060px) { .gest-crumb { display:none; } }
+@container ctbar (max-width:1160px) { .ct-live-c span { display:none; } .ct-live-c { padding:5px 9px; } }
+@container ctbar (max-width:900px) { .ct-live { display:none; } }
+@container ctbar (max-width:760px) { .ct-nuovo-btn span, .ct-nuovo-btn kbd { display:none; } .ct-cerca { min-width:120px; } }

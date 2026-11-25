@@ -140,7 +140,6 @@ export default function ShellCentralino() {
           {!soloTrasf && <StatoLive base={base} versione={versione} />}
           {!soloTrasf && <Ricerca base={base} />}
           {scrive && <button className="btn ct-nuovo-btn" onClick={() => { setPreset(undefined); setAperto(true); }} title="Nuovo contatto (tasto N)"><Ic n="piu" size={18} /><span>Nuovo contatto</span><kbd>N</kbd></button>}
-          {scrive && !direzione && <button className="btn-ghost ct-reg-btn" onClick={() => setRegistra(true)} title="Registra una chiamata di prima (tasto R)"><Ic n="telefono" size={16} /><span>Registra chiamata</span><kbd>R</kbd></button>}
           <button className="btn-ghost btn-sm ct-aiuto-btn" onClick={() => setAiuto(true)} title="Scorciatoie da tastiera (tasto ?)" aria-label="Scorciatoie da tastiera"><kbd>?</kbd></button>
           <Campanella />
         </>}
@@ -183,9 +182,9 @@ function StatoLive({ base, versione }: { base: string; versione: number }) {
   const oggi = new Date().toISOString().slice(0, 10), da30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
   return (
     <div className="ct-live" aria-label="Situazione in diretta">
-      <Link to={`${base}/analisi?kpi=in_scadenza&da=${oggi}&a=${oggi}`} className={`ct-live-c ${inScad ? 'arancio' : ''}`}><b>{inScad}</b> in scadenza</Link>
-      <Link to={`${base}/analisi?kpi=in_ritardo&da=${oggi}&a=${oggi}`} className={`ct-live-c ${scadute ? 'rosso' : ''}`}><b>{scadute}</b> scadute</Link>
-      <Link to={`${base}/analisi?kpi=richiami_dovuti&da=${da30}&a=${oggi}`} className={`ct-live-c ${richiami ? 'rosso' : ''}`}><b>{richiami}</b> richiami</Link>
+      <Link to={`${base}/analisi?kpi=in_scadenza&da=${oggi}&a=${oggi}`} className={`ct-live-c ${inScad ? 'arancio' : ''}`} title={`${inScad} in scadenza entro un'ora`}><b>{inScad}</b><span> in scadenza</span></Link>
+      <Link to={`${base}/analisi?kpi=in_ritardo&da=${oggi}&a=${oggi}`} className={`ct-live-c ${scadute ? 'rosso' : ''}`} title={`${scadute} scadute`}><b>{scadute}</b><span> scadute</span></Link>
+      <Link to={`${base}/analisi?kpi=richiami_dovuti&da=${da30}&a=${oggi}`} className={`ct-live-c ${richiami ? 'rosso' : ''}`} title={`${richiami} richiami dovuti`}><b>{richiami}</b><span> richiami</span></Link>
     </div>
   );
 }
@@ -218,7 +217,7 @@ function Ricerca({ base }: { base: string }) {
   return (
     <div className="ct-cerca" ref={box}>
       <Ic n="cerca" size={17} />
-      <input ref={inp} type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca  /  cliente, telefono, CT-…" aria-label="Cerca pratiche"
+      <input ref={inp} type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca…" title="Cerca per cliente, telefono o numero pratica CT-… (tasto /)" aria-label="Cerca pratiche per cliente, telefono o numero CT-…"
         onKeyDown={e => {
           if (!r?.length) return;
           if (e.key === 'ArrowDown') { e.preventDefault(); setSel(Math.min(sel + 1, r.length - 1)); }

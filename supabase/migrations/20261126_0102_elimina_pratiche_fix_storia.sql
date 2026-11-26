@@ -1,0 +1,4 @@
+-- 0102 (applicata): tg_solo_aggiunta consente anche UPDATE quando privato.azzera='on';
+-- admin_elimina_pratiche scollega clienti_contatti_storia dentro la finestra azzera (prima falliva con
+-- «La storia della pratica non si modifica e non si cancella»). Testata con blocco annullato su CT-2026-000003.
+-- Vedi il corpo completo applicato nel database (stesso testo di 0101 con lo spostamento dell'update).

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { REPORT_CHIAMATE } from './testiDirezione';
 import { intervallo, oggettoReport, variazione, type Periodo } from '../../../supabase/functions/report-direzione/render';
 
-const sql = readFileSync('supabase/da_confermare/20261126_0101_report_direzione_chiamate.sql', 'utf8');
+const sql = readFileSync('supabase/migrations/20261126_0103_report_direzione_chiamate.sql', 'utf8');
 const P = (tipo: 'settimana' | 'mese', dal: string, al: string): Periodo => ({ tipo, dal, al, chiave: '', etichetta: '', file: '' });
 
 describe('Report Direzione – chiamate', () => {

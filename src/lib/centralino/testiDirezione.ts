@@ -280,7 +280,6 @@ export const ANALISI = {
   valore: { it: 'Valore stimato', ar: 'القيمة التقديرية' },
   vuoto: { it: 'Nessun elemento con questi filtri. Prova ad allargare il periodo.', ar: 'لا عناصر بهذه المرشحات' },
   piu_1000: { it: 'Mostrate le prime 1000 righe; il file scaricato le contiene tutte.', ar: 'تظهر أول 1000 سطر فقط' },
-  stesso_calcolo: { it: 'Il numero sulla pagina e questo elenco usano lo stesso calcolo.', ar: 'الرقم والقائمة بنفس الحساب' },
   tutti_canali: { it: 'Tutti i canali', ar: 'كل القنوات' },
   tutti_tipi: { it: 'Tutti i tipi', ar: 'كل الأنواع' },
   tutti_dest: { it: 'Tutti i destinatari', ar: 'كل المستلمين' },

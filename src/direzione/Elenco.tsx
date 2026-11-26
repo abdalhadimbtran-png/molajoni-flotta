@@ -97,7 +97,6 @@ export default function ElencoDirezione() {
             {offerte && <><td className="of-nowrap">{r.inviata ? dataOra(r.inviata) : '—'}</td><td>{r.esito}</td><td>{r.motivo}</td></>}
           </tr>)}</tbody>
         </table></div>
-        <p className="hint">{ANALISI.stesso_calcolo.it}</p>
       </>}
     </div>
   );

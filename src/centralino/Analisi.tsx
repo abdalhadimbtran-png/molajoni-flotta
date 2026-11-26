@@ -13,6 +13,9 @@ import { Conto, nomeStadio } from './componenti';
 import { Scheletro } from './Scheletro';
 import { useCtx } from './ShellCentralino';
 import { ANALISI, FILTRI_NOMI, KPI_TESTI } from '../lib/centralino/testiDirezione';
+import { attiva as vistaAttiva } from '../lib/vediCome';
+import { ModaleEliminaInfo, ROSSO_ELIMINA, useEliminaInfoAttiva } from './EliminaInfo';
+import { cambiaTutte, puoEliminareInfo, statoTutte, type InfoDaEliminare } from './eliminaInfo';
 
 const c = (k: string, l: string, t: Col['t'], w: number, tot?: boolean): Col => ({ k, l, t, w, tot });
 const COL_PRATICHE: Col[] = [c('numero', 'Numero', 'testo', 15), c('quando', 'Data e ora', 'dataora', 15), c('canale', 'Canale', 'testo', 11), c('tipo', 'Tipo', 'testo', 20), c('cliente', 'Nome', 'testo', 24),
@@ -42,6 +45,10 @@ export default function Analisi() {
   const f: Filtri = Object.fromEntries((['canale', 'tipo', 'stato', 'chi', 'dest', 'arg', 'giorno'] as const).map(k => [k, qs.get(k) ?? '']).filter(([, v]) => v));
   const { data, errore, reload } = useLoad(() => datiPeriodo(da, a), [da, a, ctx.versione]);
   const [esporto, setEsporto] = useState('');
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [daEliminare, setDaEliminare] = useState<InfoDaEliminare[] | null>(null);
+  const puoElim = puoEliminareInfo(ctx.admin, vistaAttiva()) && !!def.conInfo;
+  const elimAttiva = useEliminaInfoAttiva(puoElim);
   const v = useMemo(() => (data ? valuta(def, data, f, ora) : null), [data, def, qs.toString(), ora]); // eslint-disable-line react-hooks/exhaustive-deps
   const fl = (t: string) => config?.flussi.find(x => x.tipo === t);
   const imposta = (k: string, val: string) => { const n = new URLSearchParams(qs); if (val) n.set(k, val); else n.delete(k); setQs(n, { replace: true }); };
@@ -55,7 +62,7 @@ export default function Analisi() {
         email_ref: t.email_referente_inviata_at ? 'Sì' : 'No', email_cli: t.email_cliente_inviata_at || t.email_riepilogo_at ? 'Sì' : t.email_non_disponibile ? 'Non disp.' : 'No' };
     }
     if ('contatto_id' in r) return { quando: r.at, canale: '—', cliente: `Contatto modificato: ${r.campo} → ${r.a ?? '—'}${r.autore_nome ? ` (${r.autore_nome})` : ''}`, tipo: KPI_TESTI.reg_anagrafica.it };
-    if (!('cliente_nome' in r)) { const x = r as RecInfo; return { quando: x.at, canale: nomeCanale(x.canale), cliente: x.nota ?? '—', tipo: KPI_TESTI.reg_info.it }; }
+    if (!('cliente_nome' in r)) { const x = r as RecInfo; return { _i: x, quando: x.at, canale: nomeCanale(x.canale), cliente: x.nota ?? '—', tipo: KPI_TESTI.reg_info.it }; }
     const p = r as RecPratica;
     const rit = p.esito === 'aperta' && p.sla_scadenza && new Date(p.sla_scadenza) < ora ? orologio((ora.getTime() - new Date(p.sla_scadenza).getTime()) / 1000) : '';
     return { _p: p.id, _r: p, numero: p.numero, quando: p.created_at, canale: nomeCanale(p.canale), tipo: NOME_TIPO[p.tipo as 'manutenzione'] + (p.sottotipo ? ` · ${p.sottotipo}` : ''), chi: nomeTipoContatto(p.tipo_contatto), cliente: p.cliente_nome,
@@ -114,18 +121,34 @@ export default function Analisi() {
           {medio && <div className="kpi"><div className="num num-sm">{medio}</div><div className="lbl">{ANALISI.tempo_richiamo.it}</div></div>}
           {valore > 0 && <div className="kpi"><div className="num num-sm">{fmtEuro(valore)}</div><div className="lbl">{ANALISI.valore.it}</div></div>}
         </div>
+        {puoElim && righe.length > 0 && (() => {
+          const ids = righe.slice(0, 1000).flatMap(r => r._i ? [(r._i as InfoDaEliminare).id] : []);
+          const st = statoTutte(ids, sel);
+          const scelte = righe.flatMap(r => r._i && sel.has((r._i as InfoDaEliminare).id) ? [r._i as InfoDaEliminare] : []);
+          return <div className="row-flex" style={{ gap: 8, margin: '8px 0' }}>
+            <label><input type="checkbox" aria-label="Seleziona tutte" checked={st === 'tutte'} ref={el => { if (el) el.indeterminate = st === 'alcune'; }} onChange={() => setSel(cambiaTutte(ids, sel))} /> Tutte</label>
+            {elimAttiva === false
+              ? <button type="button" className="btn-ghost btn-sm" disabled title="Migrazione 0103 da applicare">Eliminazione non ancora attiva</button>
+              : <button type="button" className="btn-ghost btn-sm" style={{ color: ROSSO_ELIMINA, borderColor: ROSSO_ELIMINA }} disabled={elimAttiva === null || !scelte.length} onClick={() => setDaEliminare(scelte)}>Elimina selezionate ({scelte.length})</button>}
+          </div>;
+        })()}
         {righe.length === 0 ? <p className="ct-vuoto">{ANALISI.vuoto.it}</p> : (
           <div className="table-wrap ct-tw-analisi"><table className="ct-tab-analisi">
-            <thead><tr>{colonne.map(x => <th key={x.k} className={`c-${x.k}`}>{x.l}</th>)}</tr></thead>
+            <thead><tr>{puoElim && <th className="c-sel" />}{colonne.map(x => <th key={x.k} className={`c-${x.k}`}>{x.l}</th>)}</tr></thead>
             <tbody>{righe.slice(0, 1000).map((r, i) => (
               <tr key={i} className={r._p ? 'ct-clic' : ''} onClick={() => r._p && nav(`${ctx.base}/pratica/${r._p}`)}>
+                {puoElim && <td className="c-sel of-nowrap">{r._i ? (() => { const x = r._i as InfoDaEliminare; return <>
+                  <input type="checkbox" aria-label="Seleziona" checked={sel.has(x.id)} onChange={() => setSel(p => { const n = new Set(p); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n; })} />
+                  <button type="button" className="btn-ghost btn-sm" aria-label="Elimina" title={elimAttiva === false ? 'Eliminazione non ancora attiva' : 'Elimina'} disabled={!elimAttiva} style={{ color: ROSSO_ELIMINA, marginLeft: 4, padding: '0 6px' }} onClick={() => setDaEliminare([x])}>🗑</button>
+                </>; })() : null}</td>}
                 {colonne.map(x => <td key={x.k} title={typeof r[x.k] === 'string' ? String(r[x.k]) : undefined} className={`c-${x.k}`}>{x.k === 'scadenza' && r.scadenza && !r.richiamato && (r._r ? (r._r as RecPratica).esito === 'aperta' : true)
                   ? <Conto inizio={String(r.quando)} scadenza={String(r.scadenza)} /> : x.k === 'ritardo' && r.ritardo ? <span className="ko-t">{String(r.ritardo)}</span> : x.t === 'dataora' && r[x.k] ? fmtOra(String(r[x.k])) : testoCella(r[x.k], x.t)}</td>)}
               </tr>))}</tbody>
           </table></div>)}
         {righe.length > 1000 && <p className="hint">{ANALISI.piu_1000.it}</p>}
-        <p className="hint">Aggiornato {fmtOra(new Date().toISOString())}. {ANALISI.stesso_calcolo.it}</p>
+        <p className="hint">Aggiornato {fmtOra(new Date().toISOString())}</p>
       </>}
+      {daEliminare && <ModaleEliminaInfo righe={daEliminare} onClose={() => setDaEliminare(null)} onFatto={() => { setDaEliminare(null); setSel(new Set()); reload(); ctx.aggiorna(); }} />}
     </div>
   );
 }

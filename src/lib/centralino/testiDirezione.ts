@@ -142,6 +142,22 @@ export const CANALI_NOMI = {
   altro: { it: 'Altro', ar: 'غير ذلك' },
 } satisfies Record<string, Testo>;
 
+/** Report Direzione PDF/email: blocco «Chiamate e richieste del periodo» (stesse parole in privato.report_sez_centralino). */
+export const REPORT_CHIAMATE = {
+  blocco: { it: 'Chiamate e richieste del periodo', ar: 'المكالمات والطلبات في الفترة' },
+  ricevute: { it: 'Richieste ricevute', def: 'Chiamate, email e messaggi registrati al centralino nel periodo.', ar: 'كل المكالمات والإيميلات والرسائل المسجلة' },
+  completate: { it: 'Completate', def: 'Richieste ricevute nel periodo e già completate (lavoro fatto). % sulle richieste ricevute.', ar: 'طلبات الفترة التي اكتملت (المهمة أُنجزت)' },
+  aperte: { it: 'Ancora aperte', def: 'Richieste ricevute nel periodo ancora da seguire o in corso.', ar: 'طلبات الفترة التي ما زالت مفتوحة' },
+  collega: { it: 'Passate a un collega', def: 'Richieste ricevute nel periodo e affidate a un collega o a un responsabile.', ar: 'طلبات حُوّلت لزميل' },
+  altre: { it: 'Chiuse senza esito o annullate', def: 'Richieste ricevute nel periodo chiuse senza esito positivo o annullate.', ar: 'مغلقة دون نتيجة أو ملغاة' },
+  chiuse: { it: 'Richieste chiuse', def: 'Richieste completate e chiuse nel periodo.', ar: 'طلبات اكتملت وأُغلقت خلال الفترة' },
+  per_tipo: { it: 'Per tipo di richiesta', def: 'Ricevute e completate per ogni tipo.', ar: 'حسب نوع الطلب' },
+  per_canale: { it: 'Come è arrivata la richiesta', def: 'Ricevute e completate per canale.', ar: 'حسب القناة' },
+  per_giorno: { it: 'Richieste per giorno (lun–ven)', def: 'Richieste ricevute in ogni giorno lavorativo.', ar: 'الطلبات حسب اليوم' },
+  of_in_tempo: { it: 'Offerte inviate in tempo', def: 'Inviate entro la scadenza: 60 minuti per Jennifer, 2 giorni lavorativi per i colleghi. % sulle offerte arrivate.', ar: 'عروض أُرسلت ضمن المهلة' },
+  of_accettate: { it: 'Offerte accettate', def: 'Accettate dal cliente. % sulle offerte inviate.', ar: 'عروض قبلها الزبون. النسبة من العروض المرسلة' },
+} satisfies Record<string, Testo>;
+
 export const ESITI_NOMI = {
   aperta: { it: 'Aperta', def: 'Ancora da completare.', ar: 'مفتوحة' },
   chiusa_ok: { it: 'Chiusa', def: 'Completata.', ar: 'مغلقة' },

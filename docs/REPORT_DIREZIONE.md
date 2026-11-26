@@ -40,3 +40,10 @@ Titolo «Centralino e offerte». KPI: Offerte arrivate, Inviate in tempo (%), In
 ## Prove
 - Sample PDF (dati fittizi, marcati ESEMPIO): generati con `render.ts` in Node (`node --experimental-strip-types`).
 - SQL verificato con dati sintetici in una transazione annullata (40 pratiche: KPI, ritardi, annullate, avvisi corretti).
+
+## Dal 26/11/2026 (0101, da applicare: `supabase/da_confermare/20261126_0101_report_direzione_chiamate.sql`)
+- Il Centralino apre con **«Chiamate e richieste del periodo»**: Richieste ricevute · Completate (`chiusa_ok`, ricevute nel periodo, % sulle ricevute) · Ancora aperte (da seguire o in corso) · Passate a un collega (`assegnato_nome` o stato `passat…`) · Richieste chiuse (chiuse nel periodo, `closed_at`, definizione invariata). Barre per tipo e per canale (ricevute/completate), barre per giorno lun–ven (settimana: un giorno per barra; mese: somma per giorno della settimana). Poi il blocco **Offerte** (come 0100).
+- Forma estesa della sezione (facoltativa, le vecchie sezioni continuano a funzionare): `kpi[].def` (definizione in una riga, stampata sotto ogni numero), `kpi[].hero` (4 numeri grandi in prima pagina), `kpi[].sotto` («34 su 46»), `kpi[].blocco`, `kpi[].meglio` (`su`/`giu`/`neutro`: colore della freccia), `blocchi[]`, `barre[]`, `tabelle[].blocco`.
+- PDF (A4, 2–3 pagine): fascia con logo, «Report Direzione», periodo, data; 4 numeri grandi con freccia verde/rossa (per le % la differenza è in punti); riquadro ambra «Da attenzionare»; blocchi con card, barre e tabelle (larghezze misurate, testo a capo, numeri a destra); piè di pagina «Report automatico · Portale Molajoni» e «Pagina x / y».
+- Email: oggetto «Report settimanale · 23–27 nov 2026» / «Report mensile · Novembre 2026»; logo, 4 numeri (tabelle per Outlook), «Da attenzionare», pulsante «Apri la pagina Direzione», PDF allegato.
+- Testi: `REPORT_CHIAMATE` in `testiDirezione.ts`; `src/lib/centralino/reportChiamate.test.ts` controlla che l'SQL usi le stesse parole.

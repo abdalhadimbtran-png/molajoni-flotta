@@ -13,6 +13,7 @@ const MAX_ELENCO = 2000;
 import { ChiBadge, Ic, SlaChip, TagDopo, iconaTipo, nomeStadio, regolaDi } from './componenti';
 import { Scheletro } from './Scheletro';
 import DettaglioPratica from './Pratica';
+import { BottoneElimina, ModaleElimina, useEliminaAttiva } from './EliminaPratiche';
 import { useCtx } from './ShellCentralino';
 
 type Vista = 'aperte' | 'oggi' | 'periodo';
@@ -33,6 +34,10 @@ export default function Pratiche() {
   const [da, setDa] = useState(primoDelMeseRoma(oggi));
   const [a, setA] = useState(giornoRoma(oggi));
   const [tipo, setTipo] = useState(''); const [esito, setEsito] = useState(''); const [canale, setCanale] = useState(''); const [q, setQ] = useState(''); const [stato, setStato] = useState(''); const [chi] = useState('');
+  const eliminaAttiva = useEliminaAttiva(ctx.admin);
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [elimina, setElimina] = useState(false);
+  const cambia = (pid: number) => setSel(s => { const n = new Set(s); if (n.has(pid)) n.delete(pid); else n.add(pid); return n; });
   const { data, errore, reload } = useLoad(async () => {
     const q = (r0: number, r1: number) => {
       let x = supabase.from('pratiche').select(CAMPI_PRATICA);
@@ -63,13 +68,19 @@ export default function Pratiche() {
             <select aria-label="Stato cliente" value={stato} onChange={e => setStato(e.target.value)}><option value="">Clienti</option>{Object.entries(STATI_CLIENTE).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>
             {vista !== 'aperte' && <select aria-label="Stato" value={esito} onChange={e => setEsito(e.target.value)}><option value="">Stato</option>{Object.entries(ESITI).map(([k, v]) => <option key={k} value={k}>{v[1]}</option>)}</select>}
           </div>
+          {ctx.admin && <div className="row-flex" style={{ gap: 8 }}>
+            <label className="sub"><input type="checkbox" aria-label="Seleziona tutte" checked={righe.length > 0 && righe.slice(0, 500).every(p => sel.has(p.id))} onChange={e => setSel(e.target.checked ? new Set(righe.slice(0, 500).map(p => p.id)) : new Set())} /> Tutte</label>
+            {sel.size > 0 && <BottoneElimina attiva={eliminaAttiva} testo={`Elimina selezionate (${sel.size})`} onClick={() => setElimina(true)} />}
+          </div>}
+          {elimina && <ModaleElimina pratiche={(data ?? []).filter(p => sel.has(p.id))} onClose={() => setElimina(false)} onFatto={() => { setElimina(false); setSel(new Set()); reload(); ctx.aggiorna(); }} />}
           <span className="sub">{righe.length} pratiche{(data?.length ?? 0) >= MAX_ELENCO ? ` (mostrate le prime ${MAX_ELENCO}: restringi il periodo)` : ''} <span className="k-hint"><kbd>J</kbd><kbd>K</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>A</kbd> avanza</span></span>
         </div>
         {!data ? <Scheletro righe={10} /> : (
           <ul className="ct-split-lista" ref={lista}>
             {righe.slice(0, 500).map(p => (
-              <li key={p.id}>
-                <Link to={`${ctx.base}/pratica/${p.id}`} data-k-apri className={`ct-split-i ${String(p.id) === id ? 'sel' : ''} ${p.priorita === 'urgente' ? 'urgente' : ''}`} aria-current={String(p.id) === id ? 'page' : undefined}>
+              <li key={p.id} style={ctx.admin ? { display: 'flex', alignItems: 'center', gap: 6 } : undefined}>
+                {ctx.admin && <input type="checkbox" aria-label={`Seleziona ${p.numero}`} checked={sel.has(p.id)} onChange={() => cambia(p.id)} />}
+                <Link style={ctx.admin ? { flex: 1, minWidth: 0 } : undefined} to={`${ctx.base}/pratica/${p.id}`} data-k-apri className={`ct-split-i ${String(p.id) === id ? 'sel' : ''} ${p.priorita === 'urgente' ? 'urgente' : ''}`} aria-current={String(p.id) === id ? 'page' : undefined}>
                   <span className="ct-split-ic"><Ic n={iconaTipo(p.tipo)} size={16} /></span>
                   <span className="ct-split-c">
                     <span className="ct-split-r1"><b>{p.cliente_nome}</b><ChiBadge t={p.tipo_contatto} soloNonClienti />{p.esito === 'aperta' ? <SlaChip p={p} ora={ora} regola={regolaDi(fl(p.tipo), p)} /> : <span className={`pill ${ESITI[p.esito][0]}`}>{ESITI[p.esito][1]}</span>}<TagDopo p={p} /></span>

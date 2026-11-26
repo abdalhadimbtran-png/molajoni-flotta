@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { BottoneElimina, ModaleElimina, useEliminaAttiva } from './EliminaPratiche';
 import { rpc, testoErrore } from '../lib/supabase';
 import { fmtEuro, fmtOra } from '../lib/format';
 import { SchedaOfferta } from './OfferteComuni';
@@ -23,6 +24,9 @@ export default function Pratica() {
   const ora = useAdesso();
   const [qs, setQs] = useSearchParams();
   const { config } = useConfig();
+  const nav = useNavigate(); const loc = useLocation();
+  const eliminaAttiva = useEliminaAttiva(ctx.admin);
+  const [elimina, setElimina] = useState(false);
   const { data, errore, reload } = useLoad(async () => {
     const [d, tr, pr] = await Promise.all([pratica(Number(id)), trasferimenti(undefined, Number(id)), prossimoDi(Number(id)).catch(() => null)]);
     return { ...d, tr, pr };
@@ -110,6 +114,8 @@ export default function Pratica() {
       {senzaEmail.length > 0 && <div className="ct-flag-bar">Email di riepilogo non inviata per {senzaEmail.length === 1 ? 'la chiamata trasferita' : `${senzaEmail.length} chiamate trasferite`}.
         {ctx.scrive && <button className="btn btn-sm" onClick={() => setRiep(senzaEmail[0])}>Scrivi il riepilogo</button>}</div>}
 
+      {elimina && ctx.admin && <ModaleElimina pratiche={[p]} onClose={() => setElimina(false)}
+        onFatto={() => { setElimina(false); ctx.aggiorna(); if (loc.pathname.startsWith('/direzione')) nav(-1); else nav(`${ctx.base}/pratiche`, { replace: true }); }} />}
       <header className={`ct-testa ${p.priorita === 'urgente' ? 'urgente' : ''}`}>
         <span className="ct-testa-ic"><Ic n={p.priorita === 'urgente' && p.tipo === 'manutenzione' ? 'allarme' : iconaTipo(p.tipo)} size={26} /></span>
         <div className="ct-testa-c">
@@ -125,6 +131,7 @@ export default function Pratica() {
             <option value="">{p.stato_cliente_manuale ? 'Torna a proposta automatica' : 'Proposta automatica'}</option>
             {(Object.keys(STATI_CLIENTE) as StatoCliente[]).map(k => <option key={k} value={k}>{STATI_CLIENTE[k][1]}</option>)}
           </select>}
+          {ctx.admin && <BottoneElimina attiva={eliminaAttiva} onClick={() => setElimina(true)} />}
         </div>
       </header>
 

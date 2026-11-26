@@ -64,7 +64,9 @@ export const DIR = {
   nessuna: { it: 'Nessuna offerta nel periodo.', ar: 'لا توجد عروض في هذه الفترة' },
   sez_chiamate: { it: 'Chiamate e richieste', def: 'Tutti i contatti registrati al centralino nel periodo.', ar: 'المكالمات والطلبات' },
   richieste: { it: 'Richieste ricevute', def: 'Chiamate, email e messaggi registrati al centralino nel periodo.', ar: 'كل المكالمات والإيميلات والرسائل المسجلة' },
-  registrate_dopo: { it: 'Chiamate registrate dopo', def: 'Chiamate inserite più tardi, non durante la telefonata.', ar: 'مكالمات سُجلت لاحقاً وليس أثناء المكالمة' },
+  richieste_chiuse: { it: 'Richieste chiuse', def: 'Richieste completate e chiuse nel periodo.', ar: 'طلبات اكتملت وأُغلقت خلال الفترة' },
+  per_giorno: { it: 'Richieste al giorno', def: 'Quante richieste sono arrivate ogni giorno. Clic su un giorno per l\'elenco.', ar: 'عدد الطلبات كل يوم — اضغط على اليوم لرؤية القائمة' },
+  clic_numero: { it: 'Clic su qualunque numero per vedere l\'elenco.', ar: 'اضغط على أي رقم لرؤية القائمة' },
   per_tipo: { it: 'Cosa ha chiesto il cliente', def: 'Numero di richieste per tipo (vedi «Legenda» in alto).', ar: 'ماذا طلب الزبون: عدد الطلبات حسب النوع' },
   per_canale: { it: 'Come è arrivata la richiesta', def: 'Telefono, WhatsApp, email, tablet del tecnico o altro.', ar: 'كيف وصل الطلب (القناة)' },
   db_mancante: { it: 'Il registro delle offerte non è ancora attivo: manca l\'aggiornamento del database.', ar: 'سجل العروض غير مفعّل بعد: ينقص تحديث قاعدة البيانات' },
@@ -214,6 +216,44 @@ export const REPORT = {
   prova: { it: 'Invia report di prova', ar: 'إرسال تقرير تجريبي' },
 } satisfies Record<string, Testo>;
 
+/** Elenco di un numero della Direzione (/direzione/centralino/elenco): titolo = etichetta del numero, sotto la definizione. */
+export const DRILL = {
+  of_arrivate: { it: 'Offerte arrivate', def: 'Richieste di offerta arrivate nel periodo (telefono, email, WhatsApp…).', ar: 'طلبات عروض الأسعار التي وصلت خلال الفترة' },
+  of_in_tempo: { it: 'Offerte inviate in tempo', def: 'Inviate entro la scadenza: 60 minuti per Jennifer, 2 giorni lavorativi per i colleghi.', ar: 'عروض أُرسلت ضمن المهلة' },
+  of_in_ritardo: { it: 'Offerte inviate in ritardo', def: 'Inviate dopo la scadenza.', ar: 'عروض أُرسلت بعد انتهاء المهلة' },
+  of_da_inviare: { it: 'Offerte ancora da inviare', def: 'Arrivate nel periodo e non ancora inviate al cliente.', ar: 'عروض الفترة التي لم تُرسل بعد' },
+  of_da_inviare_scadute: { it: 'Offerte da inviare oltre la scadenza', def: 'Arrivate nel periodo, non ancora inviate e con la scadenza già passata.', ar: 'عروض الفترة التي لم تُرسل وتجاوزت المهلة' },
+  of_inviate: { it: 'Offerte inviate', def: 'Arrivate nel periodo e già inviate al cliente (base del tempo medio di invio).', ar: 'عروض الفترة التي أُرسلت (أساس متوسط وقت الإرسال)' },
+  of_accettate: { it: 'Offerte accettate', def: 'Accettate dal cliente.', ar: 'عروض قبلها الزبون' },
+  of_non_accettate: { it: 'Offerte non accettate', def: 'Non accettate dal cliente, con il motivo.', ar: 'عروض لم يقبلها الزبون مع السبب' },
+  of_aperte_da_inviare: { it: 'Offerte ancora da inviare', def: 'Tutte le offerte non ancora inviate al cliente, di qualunque giorno.', ar: 'كل العروض التي لم تُرسل بعد، من أي يوم' },
+  of_aperte_scadute: { it: 'Offerte da inviare oltre la scadenza', def: 'Tutte le offerte non ancora inviate con la scadenza già passata, di qualunque giorno.', ar: 'كل العروض التي لم تُرسل وتجاوزت المهلة، من أي يوم' },
+  of_aperte_in_attesa: { it: 'Offerte in attesa di risposta', def: 'Offerte inviate: il cliente non ha ancora detto sì o no.', ar: 'عروض أُرسلت والزبون لم يرد بعد' },
+  pr_richieste: { it: 'Richieste ricevute', def: 'Chiamate, email e messaggi registrati al centralino nel periodo.', ar: 'كل المكالمات والإيميلات والرسائل المسجلة' },
+  pr_chiuse: { it: 'Richieste chiuse', def: 'Richieste completate e chiuse nel periodo.', ar: 'طلبات اكتملت وأُغلقت خلال الفترة' },
+} satisfies Record<string, Testo>;
+export const ELENCO = {
+  periodo: { it: 'Periodo', ar: 'الفترة' },
+  tutte_le_date: { it: 'Di qualunque giorno', ar: 'من أي يوم' },
+  col_arrivo: { it: 'Data/ora arrivo', ar: 'تاريخ/وقت الوصول' },
+  col_cosa: { it: 'Cosa chiede', ar: 'ماذا يطلب' },
+  col_canale: { it: 'Canale', ar: 'القناة' },
+  col_tipo: { it: 'Tipo', ar: 'النوع' },
+  col_esito: { it: 'Esito', ar: 'النتيجة' },
+  quanti: { it: 'elementi in elenco', ar: 'عناصر في القائمة' },
+  excel: { it: 'Scarica Excel', ar: 'تنزيل إكسل' },
+  preparo: { it: 'Preparo…', ar: 'جارٍ التحضير' },
+  pronto: { it: 'File Excel pronto', ar: 'ملف إكسل جاهز' },
+  vuoto: { it: 'Nessun elemento.', ar: 'لا عناصر' },
+  apri: { it: 'Clic su una riga per aprire la pratica completa (storia, email, note, offerta).', ar: 'اضغط على السطر لفتح الملف كاملاً (السجل، الإيميلات، الملاحظات، العرض)' },
+  filtro_persona: { it: 'Persona', ar: 'الشخص' },
+  filtro_motivo: { it: 'Motivo', ar: 'السبب' },
+  filtro_motivo_rit: { it: 'Motivo del ritardo', ar: 'سبب التأخير' },
+  filtro_giorno: { it: 'Giorno', ar: 'اليوم' },
+  filtro_chi: { it: 'Gestite da', ar: 'يتابعها' },
+  scheda: { it: 'Pratica', ar: 'الملف' },
+} satisfies Record<string, Testo>;
+
 /** Pagina di dettaglio di un numero (Analisi). */
 export const ANALISI = {
   indietro: { it: '← Indietro', ar: 'رجوع' },
@@ -267,7 +307,7 @@ export const KPI_TESTI: Record<string, Testo> = {
   off_grandi: { it: 'Offerte passate a un collega', def: 'Richieste di offerta passate a un collega nel periodo.', ar: 'عروض محوّلة لزميل' },
   off_grandi_passate: { it: 'Collega avvisato', def: 'Offerte passate a un collega con l\'email o la telefonata al collega fatta, su quelle non annullate.', ar: 'تم إبلاغ الزميل' },
   qual_email: { it: 'Richieste con email al cliente', def: 'Richieste con almeno un\'email inviata al cliente, su tutte (annullate escluse).', ar: 'طلبات أُرسل فيها بريد للزبون' },
-  registrate_dopo: { it: 'Chiamate registrate dopo', def: 'Chiamate inserite più tardi, non durante la telefonata. Contano nei totali, non nei tempi.', ar: 'مكالمات سُجلت لاحقاً' },
+  richieste_chiuse: { it: 'Richieste chiuse', def: 'Richieste completate e chiuse nel periodo.', ar: 'طلبات اكتملت وأُغلقت خلال الفترة' },
   annullate: { it: 'Annullate', def: 'Richieste del periodo annullate.', ar: 'طلبات ملغاة' },
   annullate_motivo: { it: 'Annullate con il motivo scritto', def: 'Richieste annullate in cui è scritto il perché, su tutte le annullate.', ar: 'ملغاة مع ذكر السبب' },
   senza_contatti: { it: 'Senza nome o telefono', def: 'Richieste senza il nome di chi chiama oppure senza numero di telefono.', ar: 'طلبات بلا اسم أو هاتف' },

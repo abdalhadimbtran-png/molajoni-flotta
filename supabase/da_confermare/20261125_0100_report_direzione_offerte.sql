@@ -22,7 +22,7 @@ declare
   g_ini date := (p_ini at time zone 'Europe/Rome')::date;
   g_fin date := least(((p_fin - interval '1 second') at time zone 'Europe/Rome')::date, oggi);
   n_arr int; n_tempo int; n_rit int; n_da int; n_da_scad int; n_inv int; n_acc int; n_non int; n_ann int; n_jen int; n_col int;
-  tot int; n_reg int;
+  tot int; n_chiuse int;
   per_persona jsonb; motivi jsonb; ritardi jsonb; non_acc jsonb; per_canale_off jsonb; per_tipo jsonb; per_canale jsonb; serie jsonb; da_fare jsonb;
   att jsonb := '[]';
 begin
@@ -59,7 +59,9 @@ begin
       from privato.offerte_periodo(p_ini, p_fin) _off where inviata_il is null and esito = 'da_inviare' order by scadenza limit 20) x;
 
   -- chiamate e richieste
-  select count(*), count(*) filter (where registrata_dopo) into tot, n_reg from public.pratiche where tipo = any(tipi) and created_at >= p_ini and created_at < p_fin;
+  select count(*) into tot from public.pratiche where tipo = any(tipi) and created_at >= p_ini and created_at < p_fin;
+  -- Richieste chiuse: pratiche di tutti i tipi chiuse con esito positivo nel periodo (data di chiusura)
+  select count(*) into n_chiuse from public.pratiche where tipo = any(tipi) and esito = 'chiusa_ok' and closed_at >= p_ini and closed_at < p_fin;
   select jsonb_agg(jsonb_build_array(g.nome, coalesce(c.n, 0)) order by g.o) into per_tipo
   from (values (1,'Intervento tecnico',array['manutenzione']), (2,'Sopralluogo',array['sopralluogo']),
                (3,'Offerta',array['offerta_piccola','offerta_grande','offerta_tablet']),
@@ -87,7 +89,7 @@ begin
       jsonb_build_object('label', 'Accettate', 'valore', n_acc),
       jsonb_build_object('label', 'Non accettate', 'valore', n_non),
       jsonb_build_object('label', 'Richieste ricevute', 'valore', tot),
-      jsonb_build_object('label', 'Chiamate registrate dopo', 'valore', n_reg)),
+      jsonb_build_object('label', 'Richieste chiuse', 'valore', n_chiuse)),
     'tabelle', jsonb_build_array(
       jsonb_build_object('titolo', 'Offerte: numeri del periodo', 'colonne', jsonb_build_array('Voce', 'N.', '%'), 'righe', jsonb_build_array(
         jsonb_build_array('Offerte arrivate', n_arr, ''),
@@ -107,7 +109,7 @@ begin
         jsonb_build_array('Accettate', 'Accettate dal cliente. % sulle offerte inviate.'),
         jsonb_build_array('Non accettate', 'Non accettate dal cliente. % sulle offerte inviate.'),
         jsonb_build_array('Richieste ricevute', 'Chiamate, email e messaggi registrati al centralino nel periodo.'),
-        jsonb_build_array('Chiamate registrate dopo', 'Chiamate inserite più tardi, non durante la telefonata.'))),
+        jsonb_build_array('Richieste chiuse', 'Richieste completate e chiuse nel periodo.'))),
       jsonb_build_object('titolo', 'Cosa chiede il cliente (tipi di richiesta)', 'larga', true, 'colonne', jsonb_build_array('Tipo', 'Significato'), 'righe', jsonb_build_array(
         jsonb_build_array('Intervento tecnico', 'Il cliente chiede un tecnico: guasto, allarme o manutenzione da fare.'),
         jsonb_build_array('Sopralluogo', 'Visita per valutare un lavoro prima dell''offerta.'),

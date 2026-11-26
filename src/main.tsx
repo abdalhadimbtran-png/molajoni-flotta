@@ -70,6 +70,8 @@ import ReferentiCentralino from './centralino/Referenti';
 import ShellDirezione from './direzione/ShellDirezione';
 import PanoramicaDirezione from './direzione/Panoramica';
 import CentralinoDirezione from './direzione/Centralino';
+import ElencoDirezione from './direzione/Elenco';
+import SchedaDirezione from './direzione/Scheda';
 
 function ProtezionePagina({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
@@ -141,6 +143,8 @@ function App() {
           <Route path="/direzione/centralino" element={<CentralinoDirezione />} />
           <Route path="/direzione/centralino/pratica/:id" element={<PraticheCentralino />} />
           <Route path="/direzione/centralino/analisi" element={<AnalisiCentralino />} />
+          <Route path="/direzione/centralino/elenco" element={<ElencoDirezione />} />
+          <Route path="/direzione/centralino/scheda/:id" element={<SchedaDirezione />} />
           <Route path="/direzione/*" element={<Navigate to="/direzione" replace />} />
         </Route>
         <Route element={<Shell />}>

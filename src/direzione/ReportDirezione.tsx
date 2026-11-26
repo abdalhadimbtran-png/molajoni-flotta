@@ -10,7 +10,7 @@ import { FONTE } from './comuni';
 import { REPORT, nomeTipo } from '../lib/centralino/testiDirezione';
 
 const VOCI: [string, string[]][] = [
-  [REPORT.sez_volumi.it, ['pratiche', 'registrate_dopo', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_info']],
+  [REPORT.sez_volumi.it, ['pratiche', 'richieste_chiuse', 'reg_telefonate', 'reg_whatsapp', 'reg_email', 'reg_info']],
   [REPORT.sez_offerte.it, ['off_piccole', 'offerte60', 'off_piccole_inviate', 'off_grandi', 'off_grandi_passate', 'in_ritardo']],
   [REPORT.sez_seguire.it, ['da_seguire']],
   [REPORT.sez_qualita.it, ['annullate', 'annullate_motivo', 'senza_contatti', 'reg_anagrafica']],

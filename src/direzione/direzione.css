@@ -94,3 +94,22 @@
 .dz2-legenda dt { font-weight: 600; }
 .dz2-legenda dd { margin: 2px 0 0; color: var(--muted, #555); font-size: .92em; }
 .dz2-legenda ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* drill-down: ogni numero è un link all'elenco */
+.dz2-num-a { color:inherit; text-decoration:none; border-bottom:2px dotted currentColor; }
+.dz2-num-a:hover, .dz2-num-a:focus-visible { color:var(--accent, #1d4ed8); }
+.dz2-num-x a, .dz2-legenda dt a { color:inherit; }
+.dz2-legenda dt .ct-cifra { margin-left:6px; }
+.dz2-bar-a { display:contents; color:inherit; text-decoration:none; cursor:pointer; }
+.dz2-barre li:has(.dz2-bar-a):hover { background:var(--bg-2, #f3f4f6); }
+.dz2-col { margin-top:16px; }
+.dz2-colonne { display:flex; align-items:flex-end; gap:4px; height:150px; overflow-x:auto; padding-top:18px; }
+.dz2-c { flex:1 0 22px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; text-decoration:none; color:var(--ink-2, #555); font-size:11px; }
+.dz2-c i { display:block; width:70%; min-height:2px; background:var(--accent, #1d4ed8); border-radius:3px 3px 0 0; }
+.dz2-c b { font-size:11px; color:var(--ink, #111); }
+.dz2-c span { margin-top:4px; white-space:nowrap; }
+.dz2-c:hover i { opacity:.75; }
+.dz-el-n { font-size:1.1em; }
+.dz-el-tab td { vertical-align:top; }
+.btn-link { background:none; border:0; padding:0; cursor:pointer; font:inherit; }
+.dz-elenco > .ct-indietro, .dz-scheda > .ct-indietro { display:block; margin-right:auto; text-align:left; }

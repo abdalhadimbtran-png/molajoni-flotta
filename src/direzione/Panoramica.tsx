@@ -11,7 +11,8 @@ import { giornoRoma } from '../lib/centralino/sla';
 import { BASE, Sezione, oggiRoma } from './comuni';
 import { Numero } from './Centralino';
 import { caricaOfferte } from '../centralino/OfferteComuni';
-import { kpiOfferte } from '../lib/centralino/offerte';
+import { contaDrill, linkDrill, type DatiDrill } from '../lib/centralino/drill';
+import { useRicordaScroll } from './scroll';
 import { DIR, KPI_OFFERTE, PAN } from '../lib/centralino/testiDirezione';
 import { Feed } from './Feed';
 
@@ -24,6 +25,7 @@ export default function Panoramica() {
   const data = tutto?.d;
   const r = useCallback(() => { reload(); }, [reload]); useAggiornamento(r);
   const eventiOggi = useMemo(() => (data?.eventi ?? []).filter(e => giornoRoma(e.at) === oggi), [data, oggi]);
+  useRicordaScroll(!!data && !!config);
   if (errore) return <Errore testo={errore} onRetry={reload} />;
   if (!data || !config) return <Scheletro tessere={6} righe={8} />;
   const ora = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -34,13 +36,21 @@ export default function Panoramica() {
 
       <Sezione id="oggi" titolo={PAN.oggi.it} sub={PAN.oggi.def}>
         <div className="dz2-kpis">
-          <Numero t={DIR.richieste} n={data.pratiche.filter(x => giornoRoma(x.created_at) === oggi).length} extra={PAN.oggi.it} />
-          <Numero t={KPI_OFFERTE.arrivate} n={data.pratiche.filter(x => x.tipo.startsWith('offerta') && giornoRoma(x.created_at) === oggi).length} extra={PAN.oggi.it} />
-          {tutto?.off && (() => { const k = kpiOfferte(tutto.off, new Date()); return <>
-            <Numero t={PAN.da_inviare} n={k.da_inviare} liv={k.da_inviare_scadute ? 'warn' : ''}
-              extra={k.da_inviare_scadute ? `${DIR.di_cui.it} ${k.da_inviare_scadute} ${DIR.oltre_scadenza.it}` : undefined} />
-            <Numero t={PAN.in_attesa} n={tutto.off.filter(o => o.esito === 'in_attesa').length} />
-          </>; })()}
+          {(() => {
+            // stessi numeri dell'elenco che si apre col clic (lib/centralino/drill.ts)
+            const dd: DatiDrill = { off: tutto?.off ?? null, pratiche: data.pratiche.filter(x => giornoRoma(x.created_at) === oggi), chiuse: [] };
+            const ora = new Date();
+            const scad = contaDrill('of_aperte_scadute', dd, {}, ora);
+            return <>
+              <Numero t={DIR.richieste} n={contaDrill('pr_richieste', dd)} to={linkDrill(BASE, 'pr_richieste', oggi, oggi)} extra={PAN.oggi.it} />
+              <Numero t={KPI_OFFERTE.arrivate} n={contaDrill('pr_richieste', dd, { gruppo: 'offerta' })} to={linkDrill(BASE, 'pr_richieste', oggi, oggi, { gruppo: 'offerta' })} extra={PAN.oggi.it} />
+              {tutto?.off && <>
+                <Numero t={PAN.da_inviare} n={contaDrill('of_aperte_da_inviare', dd, {}, ora)} to={linkDrill(BASE, 'of_aperte_da_inviare', oggi, oggi)} liv={scad ? 'warn' : ''}
+                  extra={scad ? <Link to={linkDrill(BASE, 'of_aperte_scadute', oggi, oggi)}>{DIR.di_cui.it} {scad} {DIR.oltre_scadenza.it}</Link> : undefined} />
+                <Numero t={PAN.in_attesa} n={contaDrill('of_aperte_in_attesa', dd, {}, ora)} to={linkDrill(BASE, 'of_aperte_in_attesa', oggi, oggi)} />
+              </>}
+            </>;
+          })()}
         </div>
       </Sezione>
 

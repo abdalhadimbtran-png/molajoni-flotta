@@ -153,7 +153,7 @@ export default function CentralinoDirezione() {
 /** Legenda sempre visibile (si può chiudere): i tipi di richiesta con la definizione di una riga. */
 function Legenda({ n, to }: { n: (g: string) => number; to: (g: string) => string }) {
   return (
-    <details className="dz-card dz2-card dz2-legenda" open>
+    <details className="dz-card dz2-card dz2-legenda">
       <summary><b>{LEGENDA.titolo.it}</b></summary>
       <p className="dz2-def">{LEGENDA.sotto.it}</p>
       <dl>{(Object.keys(TIPI_RICHIESTA) as (keyof typeof TIPI_RICHIESTA)[]).map(g => <div key={g}><dt><Link to={to(g)}>{TIPI_RICHIESTA[g].it} <span className="ct-cifra">{n(g)}</span></Link></dt><dd>{TIPI_RICHIESTA[g].def}

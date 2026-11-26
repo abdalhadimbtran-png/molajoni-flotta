@@ -72,7 +72,7 @@ describe('testi Direzione chiari', () => {
     expect(errati).toEqual([]);
   });
   it('Report Direzione PDF (SQL 0100 da confermare): etichette chiare', () => {
-    const sql = readFileSync(resolve(__dirname, '../../supabase/da_confermare/20261125_0100_report_direzione_offerte.sql'), 'utf8');
+    const sql = readFileSync(resolve(__dirname, '../../supabase/migrations/20261125_0100_report_direzione_offerte.sql'), 'utf8');
     const etichette = [...sql.matchAll(/'(?:label|titolo)',\s*'([^']+)'/g), ...sql.matchAll(/\(\d+,'([^']+)',array/g), ...sql.matchAll(/jsonb_build_array\('([^']+)',\s*'/g), ...sql.matchAll(/then '([^']+)'/g)].map(m => m[1]);
     expect(etichette.length).toBeGreaterThan(20);
     expect(etichette.filter(s => vietato(s))).toEqual([]);
